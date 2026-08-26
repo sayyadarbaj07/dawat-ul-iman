@@ -32,7 +32,14 @@ app.use(
   })
 );
 app.use(compression());
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({ 
+  origin: function (origin, callback) {
+    callback(null, true);
+  }, 
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+}));
 app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
