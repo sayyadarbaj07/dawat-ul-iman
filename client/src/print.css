@@ -1,0 +1,66 @@
+
+@media print {
+  /* Hide unnecessary UI elements when printing */
+  .no-print,
+  nav,
+  aside,
+  header,
+  footer:not(.print-footer),
+  .sidebar,
+  [data-testid^="nav-"],
+  button,
+  .print-hidden {
+    display: none !important;
+  }
+
+  /* Reset body and remove backgrounds */
+  body, 
+  .print-container {
+    background-color: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+
+  /* A4 Page layout setup */
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  /* Force elements to display properly */
+  .print-area {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Table styling for print */
+  table {
+    page-break-inside: auto;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+  
+  /* Ensure backgrounds print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
