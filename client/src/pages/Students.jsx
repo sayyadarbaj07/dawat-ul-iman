@@ -214,7 +214,7 @@ export default function Students() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="name">{tr("students", "fullName")}</Label>
                   <Input
@@ -238,7 +238,7 @@ export default function Students() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="class">
                     {tr("students", "departmentClass")}
@@ -280,7 +280,7 @@ export default function Students() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="rollNumber">Roll Number</Label>
                   <Input
@@ -328,7 +328,7 @@ export default function Students() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleEditSubmit} className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-name">{tr("students", "fullName")}</Label>
                   <Input
@@ -350,7 +350,7 @@ export default function Students() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-class">
                     {tr("students", "departmentClass")}
@@ -388,7 +388,7 @@ export default function Students() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-rollNumber">Roll Number</Label>
                   <Input
@@ -437,33 +437,46 @@ export default function Students() {
             </DialogHeader>
             {selectedStudent && (
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="font-semibold">Roll Number:</div>
-                  <div>{selectedStudent.rollNumber || "—"}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/20 p-4 rounded-xl border border-border/50">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Roll Number</span>
+                    <span className="font-medium text-foreground">{selectedStudent.rollNumber || "—"}</span>
+                  </div>
                   
-                  <div className="font-semibold">System ID:</div>
-                  <div className="text-muted-foreground text-xs">{selectedStudent.studentId || selectedStudent.id}</div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">System ID</span>
+                    <span className="font-medium text-foreground text-xs font-mono">{selectedStudent.studentId || selectedStudent.id}</span>
+                  </div>
                   
-                  <div className="font-semibold">{tr("students", "fullName")}:</div>
-                  <div>{selectedStudent.fullName || selectedStudent.name}</div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "fullName")}</span>
+                    <span className="font-medium text-foreground">{selectedStudent.fullName || selectedStudent.name}</span>
+                  </div>
                   
-                  <div className="font-semibold">{tr("students", "fatherName")}:</div>
-                  <div>{selectedStudent.fatherName}</div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "fatherName")}</span>
+                    <span className="font-medium text-foreground">{selectedStudent.fatherName}</span>
+                  </div>
                   
-                  <div className="font-semibold">{tr("students", "departmentClass")}:</div>
-                  <div className="capitalize">{selectedStudent.className}</div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "departmentClass")}</span>
+                    <span className="font-medium text-foreground capitalize">{selectedStudent.className}</span>
+                  </div>
                   
-                  <div className="font-semibold">{tr("students", "status")}:</div>
-                  <div>{selectedStudent.residential ? tr("students", "residential") : tr("students", "dayScholar")}</div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "status")}</span>
+                    <span className="font-medium text-foreground">{selectedStudent.residential ? tr("students", "residential") : tr("students", "dayScholar")}</span>
+                  </div>
                   
-                  <div className="font-semibold">{tr("students", "admission")}:</div>
-                  <div>{selectedStudent.admissionDate ? new Date(selectedStudent.admissionDate).toLocaleDateString() : "—"}</div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "admission")}</span>
+                    <span className="font-medium text-foreground">{selectedStudent.admissionDate ? new Date(selectedStudent.admissionDate).toLocaleDateString() : "—"}</span>
+                  </div>
                   
-                  <div className="font-semibold">{tr("students", "dateOfBirth")}:</div>
-                  <div>{selectedStudent.dateOfBirth ? new Date(selectedStudent.dateOfBirth).toLocaleDateString() : "—"}</div>
-                  
-                  <div className="font-semibold">{tr("students", "attendance")}:</div>
-                  <div>{selectedStudent.attendancePercent ?? 0}%</div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "dateOfBirth")}</span>
+                    <span className="font-medium text-foreground">{selectedStudent.dateOfBirth ? new Date(selectedStudent.dateOfBirth).toLocaleDateString() : "—"}</span>
+                  </div>
                 </div>
 
                 {/* Attendance Summary Section */}
@@ -473,22 +486,22 @@ export default function Students() {
                     <div className="text-xs text-muted-foreground">Loading summary...</div>
                   ) : studentAttendanceSummary ? (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-4 gap-2 text-center text-sm">
-                        <div className="bg-gray-50 p-2 rounded border">
-                          <div className="text-gray-500 text-xs">Total</div>
-                          <div className="font-bold">{studentAttendanceSummary.summary?.total || 0}</div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm">
+                        <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
+                          <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Total</div>
+                          <div className="font-bold text-lg text-foreground mt-1">{studentAttendanceSummary.summary?.total || 0}</div>
                         </div>
-                        <div className="bg-green-50 p-2 rounded border border-green-100">
-                          <div className="text-green-600 text-xs">Present</div>
-                          <div className="font-bold text-green-700">{studentAttendanceSummary.summary?.present || 0}</div>
+                        <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
+                          <div className="text-emerald-700 text-[10px] font-semibold uppercase tracking-wider">Present</div>
+                          <div className="font-bold text-lg text-emerald-700 mt-1">{studentAttendanceSummary.summary?.present || 0}</div>
                         </div>
-                        <div className="bg-red-50 p-2 rounded border border-red-100">
-                          <div className="text-red-600 text-xs">Absent</div>
-                          <div className="font-bold text-red-700">{studentAttendanceSummary.summary?.absent || 0}</div>
+                        <div className="bg-red-500/10 p-3 rounded-xl border border-red-500/20">
+                          <div className="text-red-700 text-[10px] font-semibold uppercase tracking-wider">Absent</div>
+                          <div className="font-bold text-lg text-red-700 mt-1">{studentAttendanceSummary.summary?.absent || 0}</div>
                         </div>
-                        <div className="bg-amber-50 p-2 rounded border border-amber-100">
-                          <div className="text-amber-600 text-xs">Late</div>
-                          <div className="font-bold text-amber-700">{studentAttendanceSummary.summary?.late || 0}</div>
+                        <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
+                          <div className="text-amber-700 text-[10px] font-semibold uppercase tracking-wider">Late</div>
+                          <div className="font-bold text-lg text-amber-700 mt-1">{studentAttendanceSummary.summary?.late || 0}</div>
                         </div>
                       </div>
                       
@@ -541,18 +554,18 @@ export default function Students() {
         </div>
 
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">
+          <Table className="min-w-[800px]">
+            <TableHeader className="bg-muted/40">
+              <TableRow className="hover:bg-transparent border-b-border/60">
+                <TableHead className="w-[100px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Roll No.
                 </TableHead>
-                <TableHead>{tr("students", "studentName")}</TableHead>
-                <TableHead>{tr("students", "fatherName")}</TableHead>
-                <TableHead>{tr("students", "classLabel")}</TableHead>
-                <TableHead>{tr("students", "status")}</TableHead>
-                <TableHead>{tr("students", "admission")}</TableHead>
-                <TableHead className="text-right">
+                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "studentName")}</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "fatherName")}</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "classLabel")}</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "status")}</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "admission")}</TableHead>
+                <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {tr("students", "attendance")}
                 </TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -563,28 +576,29 @@ export default function Students() {
                 filteredStudents.map((student) => (
                   <TableRow
                     key={student._id || student.id || student.studentId}
+                    className="hover:bg-muted/40 transition-colors duration-200"
                   >
-                    <TableCell className="font-medium text-foreground">
+                    <TableCell className="font-medium text-muted-foreground text-sm">
                       {student.rollNumber || "—"}
                     </TableCell>
-                    <TableCell className="font-semibold text-foreground">
+                    <TableCell className="font-semibold text-foreground text-sm">
                       {student.fullName || student.name}
                     </TableCell>
-                    <TableCell>{student.fatherName}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{student.fatherName}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="bg-gray-50">
+                      <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted font-medium border-transparent">
                         {student.className}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       {student.residential ? (
-                        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 border-transparent">
+                        <Badge className="bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-transparent shadow-none">
                           {tr("students", "residential")}
                         </Badge>
                       ) : (
                         <Badge
                           variant="outline"
-                          className="text-gray-500 border-gray-200"
+                          className="text-muted-foreground border-border/60 bg-transparent shadow-none"
                         >
                           {tr("students", "dayScholar")}
                         </Badge>

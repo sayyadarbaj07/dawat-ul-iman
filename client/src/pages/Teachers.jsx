@@ -187,7 +187,7 @@ export default function Teachers() {
               <form onSubmit={handleSubmit}>
                 <div className="grid gap-4 py-2">
                   <div className="font-semibold text-sm border-b pb-1">Profile Details</div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="name">{tr("teachers", "fullName")}</Label>
                       <Input id="name" required placeholder="Maulana Abdullah" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
@@ -197,7 +197,7 @@ export default function Teachers() {
                       <Input id="subject" required placeholder="Fiqh" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})}/>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="mobile">{tr("teachers", "mobileNumber")}</Label>
                       <Input id="mobile" required placeholder="03xx-xxxxxxx" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})}/>
@@ -239,7 +239,7 @@ export default function Teachers() {
                     <Label htmlFor="username">Username / Email</Label>
                     <Input id="username" required placeholder="teacher@example.com" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})}/>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="password">Password</Label>
                       <Input id="password" required type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
@@ -281,7 +281,7 @@ export default function Teachers() {
               </DialogHeader>
               <form onSubmit={handleEditSubmit}>
                 <div className="grid gap-4 py-2">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="edit-name">{tr("teachers", "fullName")}</Label>
                       <Input id="edit-name" required value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})}/>
@@ -291,7 +291,7 @@ export default function Teachers() {
                       <Input id="edit-subject" required value={editFormData.subject} onChange={e => setEditFormData({...editFormData, subject: e.target.value})}/>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="edit-mobile">{tr("teachers", "mobileNumber")}</Label>
                       <Input id="edit-mobile" required value={editFormData.mobile} onChange={e => setEditFormData({...editFormData, mobile: e.target.value})}/>
@@ -347,34 +347,45 @@ export default function Teachers() {
               </DialogHeader>
               {selectedTeacher && (
                 <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="font-semibold">{tr("teachers", "id")}:</div>
-                    <div className="text-muted-foreground">{(selectedTeacher._id || selectedTeacher.id).slice(-6).toUpperCase()}</div>
-                    
-                    <div className="font-semibold">Username / Email:</div>
-                    <div>{selectedTeacher.userId?.username || "—"}</div>
-                    
-                    <div className="font-semibold">{tr("teachers", "fullName")}:</div>
-                    <div>{selectedTeacher.name}</div>
-                    
-                    <div className="font-semibold">{tr("teachers", "primarySubject")}:</div>
-                    <div>{selectedTeacher.subject}</div>
-                    
-                    <div className="font-semibold">{tr("teachers", "mobileNumber")}:</div>
-                    <div>{selectedTeacher.mobile}</div>
-                    
-                    <div className="font-semibold">{tr("teachers", "classesAssigned")}:</div>
-                    <div>
-                      {selectedTeacher.assignedClasses && selectedTeacher.assignedClasses.length > 0 
-                        ? selectedTeacher.assignedClasses.join(", ") 
-                        : selectedTeacher.classesAssigned}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/20 p-4 rounded-xl border border-border/50">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "id")}</span>
+                      <span className="font-medium text-foreground text-xs font-mono">{(selectedTeacher._id || selectedTeacher.id).slice(-6).toUpperCase()}</span>
                     </div>
                     
-                    <div className="font-semibold">{tr("teachers", "salaryLabel")}:</div>
-                    <div>{selectedTeacher.salary.toLocaleString()}</div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Username / Email</span>
+                      <span className="font-medium text-foreground">{selectedTeacher.userId?.username || "—"}</span>
+                    </div>
                     
-                    <div className="font-semibold">{tr("teachers", "attendance")}:</div>
-                    <div>{selectedTeacher.attendancePercent ?? 0}%</div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "fullName")}</span>
+                      <span className="font-medium text-foreground">{selectedTeacher.name}</span>
+                    </div>
+                    
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "primarySubject")}</span>
+                      <span className="font-medium text-foreground">{selectedTeacher.subject}</span>
+                    </div>
+                    
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "mobileNumber")}</span>
+                      <span className="font-medium text-foreground">{selectedTeacher.mobile}</span>
+                    </div>
+                    
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "classesAssigned")}</span>
+                      <span className="font-medium text-foreground">
+                        {selectedTeacher.assignedClasses && selectedTeacher.assignedClasses.length > 0 
+                          ? selectedTeacher.assignedClasses.join(", ") 
+                          : selectedTeacher.classesAssigned}
+                      </span>
+                    </div>
+                    
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "salaryLabel")}</span>
+                      <span className="font-medium text-foreground">{selectedTeacher.salary.toLocaleString()}</span>
+                    </div>
                   </div>
 
                   {/* Attendance Summary Section */}
@@ -384,22 +395,22 @@ export default function Teachers() {
                       <div className="text-xs text-muted-foreground">Loading summary...</div>
                     ) : teacherAttendanceSummary ? (
                       <div className="space-y-4">
-                        <div className="grid grid-cols-4 gap-2 text-center text-sm">
-                          <div className="bg-gray-50 p-2 rounded border">
-                            <div className="text-gray-500 text-xs">Total</div>
-                            <div className="font-bold">{teacherAttendanceSummary.summary?.total || 0}</div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm">
+                          <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
+                            <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Total</div>
+                            <div className="font-bold text-lg text-foreground mt-1">{teacherAttendanceSummary.summary?.total || 0}</div>
                           </div>
-                          <div className="bg-green-50 p-2 rounded border border-green-100">
-                            <div className="text-green-600 text-xs">Present</div>
-                            <div className="font-bold text-green-700">{teacherAttendanceSummary.summary?.present || 0}</div>
+                          <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
+                            <div className="text-emerald-700 text-[10px] font-semibold uppercase tracking-wider">Present</div>
+                            <div className="font-bold text-lg text-emerald-700 mt-1">{teacherAttendanceSummary.summary?.present || 0}</div>
                           </div>
-                          <div className="bg-red-50 p-2 rounded border border-red-100">
-                            <div className="text-red-600 text-xs">Absent</div>
-                            <div className="font-bold text-red-700">{teacherAttendanceSummary.summary?.absent || 0}</div>
+                          <div className="bg-red-500/10 p-3 rounded-xl border border-red-500/20">
+                            <div className="text-red-700 text-[10px] font-semibold uppercase tracking-wider">Absent</div>
+                            <div className="font-bold text-lg text-red-700 mt-1">{teacherAttendanceSummary.summary?.absent || 0}</div>
                           </div>
-                          <div className="bg-amber-50 p-2 rounded border border-amber-100">
-                            <div className="text-amber-600 text-xs">Late</div>
-                            <div className="font-bold text-amber-700">{teacherAttendanceSummary.summary?.late || 0}</div>
+                          <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
+                            <div className="text-amber-700 text-[10px] font-semibold uppercase tracking-wider">Late</div>
+                            <div className="font-bold text-lg text-amber-700 mt-1">{teacherAttendanceSummary.summary?.late || 0}</div>
                           </div>
                         </div>
                         
@@ -447,28 +458,28 @@ export default function Teachers() {
           </div>
           
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[120px]">{tr("teachers", "id")}</TableHead>
-                  <TableHead>{tr("teachers", "name")}</TableHead>
-                  <TableHead>{tr("teachers", "primarySubject")}</TableHead>
-                  <TableHead className="text-center">{tr("teachers", "classes")}</TableHead>
-                  <TableHead>{tr("teachers", "mobile")}</TableHead>
-                  <TableHead className="text-right">{tr("teachers", "salaryLabel")}</TableHead>
-                  <TableHead className="text-right">{tr("teachers", "attendance")}</TableHead>
+            <Table className="min-w-[800px]">
+              <TableHeader className="bg-muted/40">
+                <TableRow className="hover:bg-transparent border-b-border/60">
+                  <TableHead className="w-[120px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "id")}</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "name")}</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "primarySubject")}</TableHead>
+                  <TableHead className="text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "classes")}</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "mobile")}</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "salaryLabel")}</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "attendance")}</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {!loading && filteredTeachers.length > 0 ? (filteredTeachers.map((teacher) => (
-                  <TableRow key={teacher._id || teacher.id}>
-                      <TableCell className="font-medium text-xs text-muted-foreground">
+                  <TableRow key={teacher._id || teacher.id} className="hover:bg-muted/40 transition-colors duration-200">
+                      <TableCell className="font-medium text-xs text-muted-foreground font-mono">
                         {(teacher._id || teacher.id).slice(-6).toUpperCase()}
                       </TableCell>
-                      <TableCell className="font-semibold text-foreground">{teacher.name}</TableCell>
+                      <TableCell className="font-semibold text-foreground text-sm">{teacher.name}</TableCell>
                       <TableCell>
-                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-green-50 text-green-700 text-xs font-medium border border-green-200">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-700 text-xs font-medium border border-transparent">
                           {teacher.subject}
                         </span>
                       </TableCell>

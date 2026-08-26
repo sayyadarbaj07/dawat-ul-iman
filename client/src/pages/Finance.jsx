@@ -171,7 +171,7 @@ export default function Finance() {
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Category</Label>
                     <Input
@@ -208,19 +208,19 @@ export default function Finance() {
           title={tr("finance", "totalIncome")}
           value={`Rs ${totalIncome.toLocaleString()}`}
           icon={<ArrowUpRight className="h-6 w-6" />}
-          className="border-green-200 bg-green-50/30"
+          className="border-emerald-500/20 bg-emerald-500/5"
         />
         <StatCard
           title={tr("finance", "totalExpenses")}
           value={`Rs ${totalExpenses.toLocaleString()}`}
           icon={<ArrowDownRight className="h-6 w-6" />}
-          className="border-red-200 bg-red-50/30"
+          className="border-red-500/20 bg-red-500/5"
         />
         <StatCard
           title={tr("finance", "currentBalance")}
           value={`Rs ${currentBalance.toLocaleString()}`}
           icon={<ArrowUpRight className="h-6 w-6" />}
-          className="border-primary/30 bg-primary/5"
+          className="border-primary/20 bg-primary/5"
         />
       </div>
 
@@ -293,15 +293,15 @@ export default function Finance() {
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-4">
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Transaction ID</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+          <Card className="overflow-x-auto">
+            <Table className="min-w-[700px]">
+              <TableHeader className="bg-muted/40">
+                <TableRow className="hover:bg-transparent border-b-border/60">
+                  <TableHead className="w-[120px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">Transaction ID</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Date</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Description</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Type</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -313,16 +313,16 @@ export default function Finance() {
                   </TableRow>
                 ) : filteredTransactions.length > 0 ? (
                   filteredTransactions.map((tx) => (
-                    <TableRow key={tx._id}>
-                      <TableCell className="font-medium text-xs text-muted-foreground">
+                    <TableRow key={tx._id} className="hover:bg-muted/40 transition-colors duration-200">
+                      <TableCell className="font-medium text-xs text-muted-foreground font-mono">
                         {tx._id.slice(-6).toUpperCase()}
                       </TableCell>
-                      <TableCell>{new Date(tx.date).toLocaleDateString()}</TableCell>
-                      <TableCell className="font-medium">{tx.description}</TableCell>
+                      <TableCell className="text-sm">{new Date(tx.date).toLocaleDateString()}</TableCell>
+                      <TableCell className="font-semibold text-sm">{tx.description}</TableCell>
                       <TableCell>
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${
-                            tx.type === "income" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                          className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium capitalize border border-transparent ${
+                            tx.type === "income" ? "bg-emerald-500/15 text-emerald-700" : "bg-red-500/15 text-red-700"
                           }`}
                         >
                           {tx.type}
