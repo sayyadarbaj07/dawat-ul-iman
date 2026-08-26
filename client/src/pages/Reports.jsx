@@ -258,6 +258,7 @@ export default function Reports() {
               onExport={handleExport}
               availableClasses={assignedClasses}
               loading={isLoading}
+              generateLabel={selectedReport.id === "student_attendance" ? "Generate PDF" : "Generate Report"}
           />
 
           <ReportLayout 

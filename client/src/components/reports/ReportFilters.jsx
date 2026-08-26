@@ -22,6 +22,7 @@ export function ReportFilters({
   loading = false,
   showPrint = true,
   showExport = true,
+  generateLabel = "Generate Report",
   availableClasses = ["all", "diniyat", "arabic", "contemporary"]
 }) {
   const CLASS_LABELS = {
@@ -219,7 +220,7 @@ export function ReportFilters({
                         Generating PDF...
                     </span>
                 ) : (
-                    "Generate Report"
+                    generateLabel
                 )}
             </Button>
           </div>

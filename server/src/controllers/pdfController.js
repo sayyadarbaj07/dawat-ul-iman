@@ -325,13 +325,6 @@ exports.generateStudentAttendancePDF = async (req, res) => {
     const { student, records, summary, totalWorkingDays, periodLabel } =
       await getStudentAttendanceForPDF(studentId, req.query);
 
-    // Human-readable filter block for the PDF header (no raw query keys)
-    const pdfFilters = {
-      Student : `${student.name}${student.rollNumber ? ` (Roll ${student.rollNumber})` : ""}`,
-      Class   : student.className,
-      Period  : periodLabel,
-    };
-
     const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
     generatePDF(res, `Student Attendance Report`, (doc) => {
@@ -425,7 +418,7 @@ exports.generateStudentAttendancePDF = async (req, res) => {
         50, y, { width: 500, align: "center" }
       );
 
-    }, pdfFilters);
+    });
 
   } catch (error) {
     const status = error.status || 500;
