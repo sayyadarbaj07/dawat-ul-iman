@@ -16,7 +16,15 @@
     "institutionName": "Dawat ul Iman",
     "copyright": "© 2026 Dawat ul Iman. All rights reserved.",
     "close": "Close",
-    "viewAll": "View All"
+    "viewAll": "View All",
+    "cancel": "Cancel",
+    "saveChanges": "Save Changes",
+    "changePassword": "Change Password",
+    "changePasswordHint": "Update your account password. You must know your current password.",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "passwordChanged": "Password changed successfully!",
+    "passwordChangeFailed": "Failed to change password"
   },
   "auth": {
     "welcomeBack": "Welcome back",
@@ -94,7 +102,13 @@
     "activities": "Activities",
     "meetings": "Meetings",
     "calendar": "Calendar",
-    "reports": "Reports"
+    "reports": "Reports",
+    "users": "Users",
+    "auditLogs": "Audit Logs",
+    "settings": "Settings",
+    "groupAcademic": "Academic",
+    "groupOperations": "Operations",
+    "groupAdmin": "Administration"
   },
   "students": {
     "pageTitle": "Students Directory",

@@ -10,53 +10,62 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useLocation } from "wouter";
+import { formatHeaderDates } from "@/lib/utils";
+import { getNavItemByPath } from "./nav";
+
 export function Header({ onMenuClick }) {
   const { user } = useAuth();
-  const { language, setLanguage, languages, t } = useLanguage();
+  const { language, setLanguage, languages, t, tr } = useLanguage();
+  const [location] = useLocation();
+  const currentNav = getNavItemByPath(location);
+  const { islamic, gregorian } = formatHeaderDates(language);
+
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-white px-4 md:px-6 shadow-sm">
-      <div className="flex items-center gap-4">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between gap-3 border-b border-border/80 bg-card/90 px-4 shadow-xs backdrop-blur-md md:px-6">
+      <div className="flex min-w-0 items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
           onClick={onMenuClick}
-          className="lg:hidden text-gray-500"
+          className="text-muted-foreground lg:hidden"
           data-testid="button-menu"
         >
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle Sidebar</span>
+          <span className="sr-only">{t("toggleSidebar")}</span>
         </Button>
         <div className="md:hidden">
           <BrandLogo
-            className="text-gray-800"
+            className="text-foreground"
             size="sm"
-            textClassName="text-gray-800"
+            textClassName="text-foreground"
             imageClassName="object-contain"
           />
         </div>
+        <div className="hidden min-w-0 md:block">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            {t("appSubtitle")}
+          </p>
+          <h2 className="truncate text-sm font-semibold text-foreground">
+            {tr("navigation", currentNav.key)}
+          </h2>
+        </div>
       </div>
 
-      <div className="hidden lg:flex">
-        <BrandLogo
-          className="text-gray-900"
-          size="md"
-          textClassName="text-gray-900"
-          imageClassName="object-contain"
-        />
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="hidden md:flex items-center text-sm font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-md">
-          19 Dhul Hijjah 1447 AH
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className="hidden items-center rounded-lg border border-primary/10 bg-primary/5 px-2.5 py-1.5 text-xs font-medium text-primary xl:flex">
+          <span className="max-w-[220px] truncate">{islamic}</span>
+          <span className="mx-2 text-primary/30">·</span>
+          <span className="text-primary/80">{gregorian}</span>
         </div>
 
-        <div className="relative hidden sm:block w-56">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+        <div className="relative hidden w-48 lg:block xl:w-56">
+          <Search className="pointer-events-none absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
             placeholder={t("searchPlaceholder")}
             data-testid="input-search"
-            className="w-full bg-gray-50 pl-9 border-gray-200 focus-visible:ring-primary"
+            className="h-9 border-border/80 bg-muted/40 ps-9"
           />
         </div>
 
@@ -65,7 +74,7 @@ export function Header({ onMenuClick }) {
             <Button
               variant="ghost"
               size="icon"
-              className="text-gray-500"
+              className="text-muted-foreground"
               data-testid="button-language"
             >
               <Globe className="h-5 w-5" />
@@ -92,24 +101,24 @@ export function Header({ onMenuClick }) {
         <Button
           variant="ghost"
           size="icon"
-          className="text-gray-500 relative"
+          className="relative text-muted-foreground"
           data-testid="button-notifications"
         >
           <Bell className="h-5 w-5" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive border border-white" />
+          <span className="absolute end-1.5 top-1.5 h-2 w-2 rounded-full border border-card bg-destructive" />
           <span className="sr-only">{t("notifications")}</span>
         </Button>
 
         {user && (
-          <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-gray-200">
-            <div className="h-8 w-8 rounded-full bg-sidebar flex items-center justify-center text-white text-xs font-bold">
+          <div className="hidden items-center gap-2 border-s border-border ps-2 sm:flex">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
               {user.initials}
             </div>
-            <div className="hidden md:flex flex-col leading-tight">
-              <span className="text-xs font-semibold text-gray-700">
+            <div className="hidden flex-col leading-tight md:flex">
+              <span className="text-xs font-semibold text-foreground">
                 {user.name}
               </span>
-              <span className="text-[10px] text-gray-400">
+              <span className="text-[10px] text-muted-foreground">
                 {user.roleLabel}
               </span>
             </div>

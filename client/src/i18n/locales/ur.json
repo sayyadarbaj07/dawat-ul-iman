@@ -16,7 +16,15 @@
     "institutionName": "دعوۃ الایمان",
     "copyright": "© 2026 دعوت الایمان۔ جملہ حقوق محفوظ ہیں۔",
     "close": "بند کریں",
-    "viewAll": "سب دیکھیں"
+    "viewAll": "سب دیکھیں",
+    "cancel": "منسوخ",
+    "saveChanges": "تبدیلیاں محفوظ کریں",
+    "changePassword": "پاس ورڈ تبدیل کریں",
+    "changePasswordHint": "اپنا اکاؤنٹ پاس ورڈ اپ ڈیٹ کریں۔ موجودہ پاس ورڈ درکار ہے۔",
+    "currentPassword": "موجودہ پاس ورڈ",
+    "newPassword": "نیا پاس ورڈ",
+    "passwordChanged": "پاس ورڈ کامیابی سے تبدیل ہو گیا!",
+    "passwordChangeFailed": "پاس ورڈ تبدیل نہیں ہو سکا"
   },
   "auth": {
     "welcomeBack": "خوش آمدید",
@@ -94,7 +102,13 @@
     "activities": "سرگرمیاں",
     "meetings": "میٹنگز",
     "calendar": "کیلینڈر",
-    "reports": "رپورٹس"
+    "reports": "رپورٹس",
+    "users": "صارفین",
+    "auditLogs": "آڈٹ لاگز",
+    "settings": "ترتیبات",
+    "groupAcademic": "تعلیمی",
+    "groupOperations": "آپریشنز",
+    "groupAdmin": "انتظامیہ"
   },
   "students": {
     "pageTitle": "طلبہ ڈائرکٹری",
