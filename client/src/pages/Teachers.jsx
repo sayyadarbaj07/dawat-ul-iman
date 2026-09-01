@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/ui/BackButton";
 import { Search, Plus, MoreVertical, Edit, Trash, FileText, Phone } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, } from "@/components/ui/dialog";
@@ -35,6 +36,7 @@ export default function Teachers() {
       password: "",
       confirmPassword: "",
       isActive: true,
+      photo: null,
     });
 
     const [editFormData, setEditFormData] = useState({
@@ -44,6 +46,7 @@ export default function Teachers() {
       salary: "",
       classesAssigned: "",
       assignedClasses: [],
+      photo: null,
     });
 
     const CLASS_OPTIONS = [
@@ -52,20 +55,24 @@ export default function Teachers() {
       { id: "contemporary", label: "Contemporary" }
     ];
 
-    const loadTeachers = async () => {
+    const [isSearching, setIsSearching] = useState(false);
+
+    const loadTeachers = async (isBackground = false) => {
       try {
-        setLoading(true);
+        if (isBackground) setIsSearching(true);
+        else setLoading(true);
         const res = await teacherApi.list();
         setTeachers(res.data || []);
       } catch (err) {
         setTeachers([]);
       } finally {
-        setLoading(false);
+        if (isBackground) setIsSearching(false);
+        else setLoading(false);
       }
     };
 
     useEffect(() => {
-      loadTeachers();
+      loadTeachers(false);
     }, []);
 
     const handleSubmit = async (event) => {
@@ -76,21 +83,25 @@ export default function Teachers() {
         return;
       }
       try {
-        await teacherApi.create({
-          name: formData.name,
-          subject: formData.subject,
-          mobile: formData.mobile,
-          salary: Number(formData.salary),
-          classesAssigned: Number(formData.classesAssigned),
-          assignedClasses: formData.assignedClasses,
-          username: formData.username,
-          password: formData.password,
-          isActive: formData.isActive
-        });
+        const payload = new FormData();
+        payload.append("name", formData.name);
+        payload.append("subject", formData.subject);
+        payload.append("mobile", formData.mobile);
+        payload.append("salary", Number(formData.salary));
+        payload.append("classesAssigned", Number(formData.classesAssigned));
+        formData.assignedClasses.forEach(c => payload.append("assignedClasses[]", c));
+        payload.append("username", formData.username);
+        payload.append("password", formData.password);
+        payload.append("isActive", formData.isActive);
+        if (formData.photo) {
+          payload.append("photo", formData.photo);
+        }
+        
+        await teacherApi.createWithFile(payload);
         setIsAddModalOpen(false);
         setFormData({
           name: "", subject: "", mobile: "", salary: "", classesAssigned: "", assignedClasses: [],
-          username: "", password: "", confirmPassword: "", isActive: true
+          username: "", password: "", confirmPassword: "", isActive: true, photo: null
         });
         loadTeachers();
       } catch (error) {
@@ -131,14 +142,17 @@ export default function Teachers() {
     const handleEditSubmit = async (event) => {
       event.preventDefault();
       try {
-        await teacherApi.update(selectedTeacher._id || selectedTeacher.id, {
-          name: editFormData.name,
-          subject: editFormData.subject,
-          mobile: editFormData.mobile,
-          salary: Number(editFormData.salary),
-          classesAssigned: Number(editFormData.classesAssigned),
-          assignedClasses: editFormData.assignedClasses,
-        });
+        const payload = new FormData();
+        payload.append("name", editFormData.name);
+        payload.append("subject", editFormData.subject);
+        payload.append("mobile", editFormData.mobile);
+        payload.append("salary", Number(editFormData.salary));
+        payload.append("classesAssigned", Number(editFormData.classesAssigned));
+        editFormData.assignedClasses.forEach(c => payload.append("assignedClasses[]", c));
+        if (editFormData.photo) {
+          payload.append("photo", editFormData.photo);
+        }
+        await teacherApi.updateWithFile(selectedTeacher._id || selectedTeacher.id, payload);
         setIsEditModalOpen(false);
         loadTeachers();
       } catch (error) {
@@ -232,6 +246,10 @@ export default function Teachers() {
                         </label>
                       ))}
                     </div>
+                  </div>
+                  <div className="grid gap-2 mt-4">
+                    <Label htmlFor="photo">Profile Photo</Label>
+                    <Input id="photo" type="file" accept="image/*" onChange={e => setFormData({...formData, photo: e.target.files[0]})} />
                   </div>
 
                   <div className="font-semibold text-sm border-b pb-1 mt-4">Login Credentials</div>
@@ -327,6 +345,10 @@ export default function Teachers() {
                       ))}
                     </div>
                   </div>
+                  <div className="grid gap-2 mt-4">
+                    <Label htmlFor="edit-photo">Profile Photo (Leave empty to keep current)</Label>
+                    <Input id="edit-photo" type="file" accept="image/*" onChange={e => setEditFormData({...editFormData, photo: e.target.files[0]})} />
+                  </div>
                 </div>
                 <DialogFooter className="mt-6">
                   <Button variant="outline" type="button" onClick={() => setIsEditModalOpen(false)}>{tr("teachers", "cancel")}</Button>
@@ -347,6 +369,11 @@ export default function Teachers() {
               </DialogHeader>
               {selectedTeacher && (
                 <div className="grid gap-4 py-4">
+                  {selectedTeacher.photo && (
+                    <div className="flex justify-center mb-4">
+                      <img src={`http://localhost:5000${selectedTeacher.photo}`} alt={selectedTeacher.name} className="h-24 w-24 rounded-full object-cover border" />
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/20 p-4 rounded-xl border border-border/50">
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "id")}</span>
@@ -442,8 +469,8 @@ export default function Teachers() {
                   </div>
                 </div>
               )}
-              <DialogFooter>
-                <Button onClick={() => setIsViewModalOpen(false)}>Close</Button>
+              <DialogFooter className="sm:justify-start">
+                <BackButton onClick={() => setIsViewModalOpen(false)} />
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -452,8 +479,8 @@ export default function Teachers() {
         <div className="bg-card rounded-lg border shadow-sm">
           <div className="p-4 border-b flex items-center justify-between">
             <div className="relative w-full max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"/>
-              <Input placeholder={tr("teachers", "searchPlaceholder")} className="pl-8" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/>
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/>
+              <Input placeholder={tr("teachers", "searchPlaceholder")} className="pl-9 rounded-full bg-muted/20 shadow-inner focus-visible:ring-primary/20" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/>
             </div>
           </div>
           

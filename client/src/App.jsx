@@ -15,6 +15,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Students from "@/pages/Students";
+import Promotions from "@/pages/Promotions";
 import Teachers from "@/pages/Teachers";
 import Curriculum from "@/pages/Curriculum";
 import Attendance from "./pages/Attendance";
@@ -73,6 +74,7 @@ function Router() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/students" component={Students} />
+            <Route path="/promotions" component={Promotions} />
             <Route path="/teachers" component={Teachers} />
             <Route path="/curriculum" component={Curriculum} />
             <Route path="/attendance" component={Attendance} />

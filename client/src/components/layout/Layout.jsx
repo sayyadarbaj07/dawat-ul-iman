@@ -25,7 +25,7 @@ export function Layout({ children }) {
         <Header onMenuClick={() => setSidebarOpen(true)} />
 
         <main className="flex-1 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6 lg:p-8">
-          <div className="mx-auto h-full w-full max-w-7xl">{children}</div>
+          <div className="mx-auto h-full w-full max-w-[1400px]">{children}</div>
         </main>
       </div>
     </div>

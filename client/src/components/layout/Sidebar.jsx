@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { LogOut, X, KeyRound } from "lucide-react";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,29 +105,17 @@ export function Sidebar({ isOpen, setIsOpen, isMobile }) {
                         <div
                           data-testid={`nav-${item.key}`}
                           className={cn(
-                            "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 cursor-pointer",
+                            "group relative flex items-center gap-3.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300 ease-out cursor-pointer",
                             isActive
-                              ? "bg-white/80 text-sidebar-primary shadow-sm"
-                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/80 hover:text-sidebar-foreground",
+                              ? "bg-white/15 text-white shadow-sm ring-1 ring-white/20"
+                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                           )}
                         >
-                          {isActive && (
-                            <motion.div
-                              layoutId="sidebar-active"
-                              className="absolute start-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-e-full bg-sidebar-primary"
-                              initial={false}
-                              transition={{
-                                type: "spring",
-                                stiffness: 300,
-                                damping: 30,
-                              }}
-                            />
-                          )}
                           <item.icon
                             className={cn(
-                              "h-[18px] w-[18px] shrink-0",
+                              "h-[18px] w-[18px] shrink-0 transition-all duration-300",
                               isActive
-                                ? "text-sidebar-primary"
+                                ? "text-white scale-105"
                                 : "text-sidebar-foreground/45 group-hover:text-sidebar-foreground/80",
                             )}
                           />
@@ -146,10 +133,10 @@ export function Sidebar({ isOpen, setIsOpen, isMobile }) {
         </nav>
       </div>
 
-      <div className="border-t border-sidebar-border/70 p-3">
-        <div className="rounded-xl border border-sidebar-border/60 bg-white/40 p-3">
-          <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-sidebar-primary/20 bg-sidebar-primary/10 text-sidebar-primary">
+      <div className="border-t border-sidebar-border/70 p-4">
+        <div className="rounded-2xl border border-sidebar-border/40 bg-sidebar-accent/30 p-4 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.02)] backdrop-blur-md">
+          <div className="mb-4 flex items-center gap-3.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white shadow-sm ring-1 ring-white/20">
               <span className="text-sm font-semibold tracking-tight">
                 {user?.initials ?? "?"}
               </span>
@@ -231,7 +218,7 @@ export function Sidebar({ isOpen, setIsOpen, isMobile }) {
             <Button
               variant="ghost"
               data-testid="button-logout"
-              className="w-full justify-center border border-transparent text-sidebar-foreground/80 hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive"
+              className="w-full justify-center border border-transparent text-sidebar-foreground/80 hover:border-destructive/40 hover:bg-destructive/20 hover:text-white"
               size="sm"
               onClick={handleLogout}
             >

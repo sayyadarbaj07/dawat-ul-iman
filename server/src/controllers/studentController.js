@@ -14,7 +14,11 @@ const sendError = (res, statusCode, message, error = null) => {
 
 exports.createStudent = async (req, res) => {
   try {
-    const student = await studentService.createStudent(req.body);
+    const payload = { ...req.body };
+    if (req.file) {
+      payload.photo = `/uploads/profiles/${req.file.filename}`;
+    }
+    const student = await studentService.createStudent(payload);
     return sendSuccess(res, 201, "Student created successfully", student);
   } catch (error) {
     return sendError(res, 500, "Failed to create student", error);
@@ -42,7 +46,11 @@ exports.getStudentById = async (req, res) => {
 
 exports.updateStudent = async (req, res) => {
   try {
-    const student = await studentService.updateStudent(req.params.id, req.body);
+    const payload = { ...req.body };
+    if (req.file) {
+      payload.photo = `/uploads/profiles/${req.file.filename}`;
+    }
+    const student = await studentService.updateStudent(req.params.id, payload);
     if (!student) return sendError(res, 404, "Student not found");
     return sendSuccess(res, 200, "Student updated successfully", student);
   } catch (error) {
@@ -57,5 +65,24 @@ exports.deleteStudent = async (req, res) => {
     return sendSuccess(res, 200, "Student deleted successfully");
   } catch (error) {
     return sendError(res, 500, "Failed to delete student", error);
+  }
+};
+
+exports.promoteStudent = async (req, res) => {
+  try {
+    const student = await studentService.promoteStudent(req.params.id, req.body, req.user);
+    return sendSuccess(res, 200, "Student promoted successfully", student);
+  } catch (error) {
+    return sendError(res, 500, "Failed to promote student", error);
+  }
+};
+
+exports.bulkPromoteStudents = async (req, res) => {
+  try {
+    const { studentIds, ...promotionData } = req.body;
+    await studentService.bulkPromoteStudents(studentIds, promotionData, req.user);
+    return sendSuccess(res, 200, "Students promoted successfully");
+  } catch (error) {
+    return sendError(res, 500, "Failed to promote students", error);
   }
 };

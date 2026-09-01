@@ -19,7 +19,6 @@ const teacherSchema = new mongoose.Schema(
     },
     assignedClasses: [{
       type: String,
-      enum: ["diniyat", "arabic", "contemporary"],
     }],
     mobile: {
       type: String,
@@ -41,6 +40,10 @@ const teacherSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    photo: {
+      type: String,
+      default: "",
     },
   },
   { timestamps: true }

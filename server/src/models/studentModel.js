@@ -19,6 +19,8 @@ const studentSchema = new mongoose.Schema(
       enum: ["diniyat", "arabic", "contemporary"],
       default: "diniyat",
     },
+    schoolClass: { type: String, trim: true, default: "" },
+    studentClass: { type: String, trim: true, default: "" },
     section: { type: String, trim: true, default: "" },
     rollNumber: { type: String, trim: true, default: "" },
     admissionNumber: { type: String, trim: true, default: "" },
@@ -44,6 +46,27 @@ const studentSchema = new mongoose.Schema(
     admissionDate: { type: Date, default: Date.now },
     attendancePercent: { type: Number, default: 0, min: 0, max: 100 },
     notes: { type: String, trim: true, default: "" },
+    promotionHistory: [
+      {
+        fromAcademicYear: { type: String },
+        toAcademicYear: { type: String },
+        fromClass: { type: String },
+        toClass: { type: String },
+        status: { type: String, enum: ["Promoted", "Failed", "Detained", "Not Promoted", ""] },
+        date: { type: Date, default: Date.now },
+        updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        notes: { type: String, trim: true, default: "" }
+      }
+    ],
+    feeHistory: [
+      {
+        academicYear: { type: String, required: true },
+        className: { type: String, required: true },
+        totalFee: { type: Number, required: true, default: 0 },
+        date: { type: Date, default: Date.now },
+        updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+      }
+    ]
   },
   {
     timestamps: true,

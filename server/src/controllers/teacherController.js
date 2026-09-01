@@ -58,10 +58,14 @@ exports.createTeacher = async (req, res) => {
 
     try {
       // Create Teacher profile linked to User
-      const teacher = await Teacher.create({
+      const payload = {
         ...teacherData,
         userId: user._id,
-      });
+      };
+      if (req.file) {
+        payload.photo = `/uploads/profiles/${req.file.filename}`;
+      }
+      const teacher = await Teacher.create(payload);
       return sendSuccess(res, 201, "Teacher created successfully", teacher);
     } catch (teacherError) {
       // Rollback User creation if Teacher creation fails
@@ -75,7 +79,11 @@ exports.createTeacher = async (req, res) => {
 
 exports.updateTeacher = async (req, res) => {
   try {
-    const teacher = await Teacher.findByIdAndUpdate(req.params.id, req.body, {
+    const payload = { ...req.body };
+    if (req.file) {
+      payload.photo = `/uploads/profiles/${req.file.filename}`;
+    }
+    const teacher = await Teacher.findByIdAndUpdate(req.params.id, payload, {
       new: true,
       runValidators: true,
     });

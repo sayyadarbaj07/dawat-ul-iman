@@ -36,6 +36,7 @@ export const NAV_ITEMS = [
   { href: "/calendar", key: "calendar", icon: Calendar, group: "operations" },
   { href: "/reports", key: "reports", icon: BarChart, group: "operations" },
   { href: "/users", key: "users", icon: UserCog, group: "admin" },
+  { href: "/promotions", key: "promotions", icon: GraduationCap, group: "admin" },
   { href: "/audit", key: "auditLogs", icon: ScrollText, group: "admin" },
   { href: "/settings", key: "settings", icon: Settings, group: "admin" },
 ];

@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.VITE_API_URL || "https://dawat-ul-iman.onrender.com/api";
+export const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:5000/api" : "https://dawat-ul-iman.onrender.com/api");
 
 export async function request(path, options = {}) {
   const token = localStorage.getItem("dawat_token");

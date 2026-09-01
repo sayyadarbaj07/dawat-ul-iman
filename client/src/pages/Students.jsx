@@ -10,8 +10,9 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/ui/BackButton";
 import { Badge } from "@/components/ui/badge";
-import { studentApi, attendanceApi } from "@/lib/api";
+import { studentApi, attendanceApi, examApi, financeApi } from "@/lib/api";
 import {
   Search,
   Plus,
@@ -39,6 +40,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
+import { CLASS_TREE } from "@/lib/classTree";
+
 export default function Students() {
   const { tr } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
@@ -49,43 +52,71 @@ export default function Students() {
     fullName: "",
     fatherName: "",
     rollNumber: "",
-    className: "diniyat",
+    schoolClass: "",
+    className: "diniyat", // keeping legacy field for backward compatibility
+    studentClassCategory: "Shob-e-Deeniyat",
+    studentClassSub: "Awwal",
     residential: true,
     dateOfBirth: "",
+    photo: null,
   });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentAttendanceSummary, setStudentAttendanceSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [studentAcademicHistory, setStudentAcademicHistory] = useState([]);
+  const [loadingAcademicHistory, setLoadingAcademicHistory] = useState(false);
+  const [studentFinanceRecords, setStudentFinanceRecords] = useState([]);
+  const [loadingFinanceRecords, setLoadingFinanceRecords] = useState(false);
+  const [isExportingStudentPDF, setIsExportingStudentPDF] = useState(null);
   const [editFormData, setEditFormData] = useState({
     name: "",
     fatherName: "",
     rollNumber: "",
+    schoolClass: "",
     className: "diniyat",
+    studentClassCategory: "Shob-e-Deeniyat",
+    studentClassSub: "Awwal",
     residential: true,
     dateOfBirth: "",
+    photo: null,
   });
 
-  const loadStudents = async (term = "") => {
+  const [isPromoteModalOpen, setIsPromoteModalOpen] = useState(false);
+  const [promoteFormData, setPromoteFormData] = useState({
+    academicYear: new Date().getFullYear() + "-" + (new Date().getFullYear() + 1),
+    className: "diniyat",
+    studentClassCategory: "Shob-e-Deeniyat",
+    studentClassSub: "Awwal",
+    schoolClass: "",
+    notes: ""
+  });
+
+  const [isSearching, setIsSearching] = useState(false);
+
+  const loadStudents = async (term = "", isBackground = false) => {
     try {
-      setLoading(true);
+      if (isBackground) setIsSearching(true);
+      else setLoading(true);
       const res = await studentApi.list({ search: term });
       setStudents(res.data || []);
     } catch (error) {
       setStudents([]);
     } finally {
-      setLoading(false);
+      if (isBackground) setIsSearching(false);
+      else setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadStudents();
+    loadStudents("", false);
   }, []);
 
   useEffect(() => {
+    if (loading) return; // Skip initial render
     const timeout = setTimeout(() => {
-      loadStudents(searchTerm);
+      loadStudents(searchTerm, true);
     }, 300);
     return () => clearTimeout(timeout);
   }, [searchTerm]);
@@ -93,27 +124,35 @@ export default function Students() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
-      const payload = {
-        name: formData.fullName,
-        fatherName: formData.fatherName,
-        rollNumber: formData.rollNumber,
-        className: formData.className,
-        residential: formData.residential === "true" || formData.residential === true,
-      };
+      const payload = new FormData();
+      payload.append("name", formData.fullName);
+      payload.append("fatherName", formData.fatherName);
+      payload.append("rollNumber", formData.rollNumber);
+      payload.append("schoolClass", formData.schoolClass);
+      payload.append("className", formData.className);
+      payload.append("studentClass", `${formData.studentClassCategory} - ${formData.studentClassSub}`);
+      payload.append("residential", formData.residential === "true" || formData.residential === true);
       
       if (formData.dateOfBirth) {
-        payload.dateOfBirth = formData.dateOfBirth;
+        payload.append("dateOfBirth", formData.dateOfBirth);
+      }
+      if (formData.photo) {
+        payload.append("photo", formData.photo);
       }
 
-      await studentApi.create(payload);
+      await studentApi.createWithFile(payload);
       setIsAddModalOpen(false);
       setFormData({
         fullName: "",
         fatherName: "",
         rollNumber: "",
+        schoolClass: "",
         className: "diniyat",
+        studentClassCategory: "Shob-e-Deeniyat",
+        studentClassSub: "Awwal",
         residential: true,
         dateOfBirth: "",
+        photo: null,
       });
       loadStudents(searchTerm);
     } catch (error) {
@@ -132,11 +171,21 @@ export default function Students() {
 
   const openEditModal = (student) => {
     setSelectedStudent(student);
+    
+    let parsedCategory = "Shob-e-Deeniyat";
+    let parsedSub = "Awwal";
+    if (student.studentClass && student.studentClass.includes(" - ")) {
+      [parsedCategory, parsedSub] = student.studentClass.split(" - ");
+    }
+    
     setEditFormData({
       name: student.fullName || student.name || "",
       fatherName: student.fatherName || "",
       rollNumber: student.rollNumber || "",
+      schoolClass: student.schoolClass || "",
       className: student.className || "diniyat",
+      studentClassCategory: parsedCategory,
+      studentClassSub: parsedSub,
       residential: student.residential ?? true,
       dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth).toISOString().split('T')[0] : "",
     });
@@ -146,19 +195,55 @@ export default function Students() {
   const handleEditSubmit = async (event) => {
     event.preventDefault();
     try {
-      const payload = {
-        name: editFormData.name,
-        fatherName: editFormData.fatherName,
-        rollNumber: editFormData.rollNumber,
-        className: editFormData.className,
-        residential: editFormData.residential === "true" || editFormData.residential === true,
-      };
+      const payload = new FormData();
+      payload.append("name", editFormData.name);
+      payload.append("fatherName", editFormData.fatherName);
+      payload.append("rollNumber", editFormData.rollNumber);
+      payload.append("schoolClass", editFormData.schoolClass);
+      payload.append("className", editFormData.className);
+      payload.append("studentClass", `${editFormData.studentClassCategory} - ${editFormData.studentClassSub}`);
+      payload.append("residential", editFormData.residential === "true" || editFormData.residential === true);
+      
       if (editFormData.dateOfBirth) {
-        payload.dateOfBirth = editFormData.dateOfBirth;
+        payload.append("dateOfBirth", editFormData.dateOfBirth);
       }
+      if (editFormData.photo) {
+        payload.append("photo", editFormData.photo);
+      }
+
       const id = selectedStudent._id || selectedStudent.id || selectedStudent.studentId;
-      await studentApi.update(id, payload);
+      await studentApi.updateWithFile(id, payload);
       setIsEditModalOpen(false);
+      loadStudents(searchTerm);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const openPromoteModal = (student) => {
+    setSelectedStudent(student);
+    setPromoteFormData({
+      ...promoteFormData,
+      studentClassCategory: "Shob-e-Deeniyat",
+      studentClassSub: "Awwal",
+      schoolClass: "",
+      notes: ""
+    });
+    setIsPromoteModalOpen(true);
+  };
+
+  const handlePromoteSubmit = async (event) => {
+    event.preventDefault();
+    try {
+      const payload = {
+        toClass: `${promoteFormData.studentClassCategory} - ${promoteFormData.studentClassSub}`,
+        schoolClass: promoteFormData.schoolClass,
+        academicYear: promoteFormData.academicYear,
+        notes: promoteFormData.notes
+      };
+      const id = selectedStudent._id || selectedStudent.id || selectedStudent.studentId;
+      await studentApi.promote(id, payload);
+      setIsPromoteModalOpen(false);
       loadStudents(searchTerm);
     } catch (error) {
       console.error(error);
@@ -169,16 +254,91 @@ export default function Students() {
     setSelectedStudent(student);
     setIsViewModalOpen(true);
     setStudentAttendanceSummary(null);
+    setStudentAcademicHistory([]);
+    const studentId = student._id || student.id || student.studentId;
     try {
       setLoadingSummary(true);
-      const res = await attendanceApi.getStudentSummary(student._id || student.id || student.studentId);
+      const res = await attendanceApi.getStudentSummary(studentId);
       if (res.data) {
         setStudentAttendanceSummary(res.data);
       }
-    } catch (error) {
-      console.error("Failed to load attendance summary", error);
+      setStudentAttendanceSummary(res.data);
+    } catch (err) {
+      console.error(err);
+      setStudentAttendanceSummary(null);
     } finally {
       setLoadingSummary(false);
+    }
+  };
+
+  const loadStudentAcademicHistory = async (studentId) => {
+    try {
+      setLoadingAcademicHistory(true);
+      const res = await examApi.getStudentHistoricalResults(studentId);
+      setStudentAcademicHistory(res.data);
+    } catch(err) {
+      console.error(err);
+      setStudentAcademicHistory(null);
+    } finally {
+      setLoadingAcademicHistory(false);
+    }
+  };
+
+  const loadStudentFinanceRecords = async (studentId) => {
+    try {
+      setLoadingFinanceRecords(true);
+      const res = await financeApi.getStudentFeeRecords(studentId);
+      setStudentFinanceRecords(res.data);
+    } catch(err) {
+      console.error(err);
+      setStudentFinanceRecords(null);
+    } finally {
+      setLoadingFinanceRecords(false);
+    }
+  };
+
+  const handleViewProfile = (student) => {
+    openViewModal(student);
+    const id = student._id || student.id || student.studentId;
+    if (id) {
+      loadStudentAcademicHistory(id);
+      loadStudentFinanceRecords(id);
+    }
+  };
+
+  const exportStudentHistoricalPDF = async (studentId, examId) => {
+    setIsExportingStudentPDF(examId);
+    try {
+      await examApi.downloadPdf(`/pdf/student/${studentId}/report-card?examId=${examId}`, `Report_Card_${studentId}.pdf`);
+    } catch(e) {
+      console.error(e);
+      alert(e.message === "403 Forbidden" ? "Unauthorized to export PDF" : "Failed to export PDF");
+    } finally {
+      setIsExportingStudentPDF(null);
+    }
+  };
+
+  const exportFullAcademicHistory = async (studentId) => {
+    setIsExportingStudentPDF('full_history');
+    try {
+      await examApi.downloadPdf(`/pdf/student/${studentId}/academic-history`, `Academic_History_${studentId}.pdf`);
+    } catch(e) {
+      console.error(e);
+      alert(e.message === "403 Forbidden" ? "Unauthorized to export PDF" : "Failed to export full academic history");
+    } finally {
+      setIsExportingStudentPDF(null);
+    }
+  };
+
+  const exportYearlyResult = async (studentId, academicYear) => {
+    setIsExportingStudentPDF(`yearly_${academicYear}`);
+    try {
+      await examApi.downloadPdf(`/pdf/student/${studentId}/yearly-result?academicYear=${academicYear}`, `Yearly_Result_${studentId}_${academicYear}.pdf`);
+    } catch(e) {
+      console.error(e);
+      alert(e.message === "403 Forbidden" ? "Unauthorized to export PDF" : "Failed to export yearly result. Ensure exams exist for this year.");
+    } finally {
+      setIsExportingStudentPDF(null);
     }
   };
 
@@ -240,21 +400,52 @@ export default function Students() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="class">
-                    {tr("students", "departmentClass")}
-                  </Label>
+                  <Label htmlFor="department">Department</Label>
                   <select
-                    id="class"
-                    value={formData.className}
-                    onChange={(e) =>
-                      setFormData({ ...formData, className: e.target.value })
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    id="department"
+                    value={formData.studentClassCategory}
+                    onChange={(e) => {
+                      const category = e.target.value;
+                      setFormData({ 
+                        ...formData, 
+                        studentClassCategory: category,
+                        studentClassSub: CLASS_TREE[category][0]
+                      });
+                    }}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
-                    <option value="diniyat">Diniyat (dinyat)</option>
-                    <option value="arabic">Arabic (arabi)</option>
-                    <option value="contemporary">Contemporary</option>
+                    {Object.keys(CLASS_TREE).map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="subClass">Class / Grade</Label>
+                  <select
+                    id="subClass"
+                    value={formData.studentClassSub}
+                    onChange={(e) =>
+                      setFormData({ ...formData, studentClassSub: e.target.value })
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    {CLASS_TREE[formData.studentClassCategory]?.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="schoolClass">School Class (Optional)</Label>
+                  <Input
+                    id="schoolClass"
+                    placeholder="e.g. 5th Grade, Matric"
+                    value={formData.schoolClass}
+                    onChange={(e) =>
+                      setFormData({ ...formData, schoolClass: e.target.value })
+                    }
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="residential">
@@ -352,21 +543,52 @@ export default function Students() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-class">
-                    {tr("students", "departmentClass")}
-                  </Label>
+                  <Label htmlFor="edit-department">Department</Label>
                   <select
-                    id="edit-class"
-                    value={editFormData.className}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, className: e.target.value })
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    id="edit-department"
+                    value={editFormData.studentClassCategory}
+                    onChange={(e) => {
+                      const category = e.target.value;
+                      setEditFormData({ 
+                        ...editFormData, 
+                        studentClassCategory: category,
+                        studentClassSub: CLASS_TREE[category][0]
+                      });
+                    }}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
-                    <option value="diniyat">Diniyat (dinyat)</option>
-                    <option value="arabic">Arabic (arabi)</option>
-                    <option value="contemporary">Contemporary</option>
+                    {Object.keys(CLASS_TREE).map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-subClass">Class / Grade</Label>
+                  <select
+                    id="edit-subClass"
+                    value={editFormData.studentClassSub}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, studentClassSub: e.target.value })
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    {CLASS_TREE[editFormData.studentClassCategory]?.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-schoolClass">School Class (Optional)</Label>
+                  <Input
+                    id="edit-schoolClass"
+                    placeholder="e.g. 5th Grade, Matric"
+                    value={editFormData.schoolClass}
+                    onChange={(e) =>
+                      setEditFormData({ ...editFormData, schoolClass: e.target.value })
+                    }
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="edit-residential">
@@ -426,6 +648,88 @@ export default function Students() {
           </DialogContent>
         </Dialog>
 
+        {/* Promote Modal */}
+        <Dialog open={isPromoteModalOpen} onOpenChange={setIsPromoteModalOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Promote Student</DialogTitle>
+              <DialogDescription>
+                Promote {selectedStudent?.fullName || selectedStudent?.name} to a new class. This will preserve their academic history.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handlePromoteSubmit} className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="academicYear">Academic Year</Label>
+                <Input
+                  id="academicYear"
+                  value={promoteFormData.academicYear}
+                  onChange={(e) => setPromoteFormData({...promoteFormData, academicYear: e.target.value})}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="promote-department">New Department</Label>
+                  <select
+                    id="promote-department"
+                    value={promoteFormData.studentClassCategory}
+                    onChange={(e) => {
+                      const category = e.target.value;
+                      setPromoteFormData({ 
+                        ...promoteFormData, 
+                        studentClassCategory: category,
+                        studentClassSub: CLASS_TREE[category][0]
+                      });
+                    }}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    {Object.keys(CLASS_TREE).map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="promote-subClass">New Class / Grade</Label>
+                  <select
+                    id="promote-subClass"
+                    value={promoteFormData.studentClassSub}
+                    onChange={(e) =>
+                      setPromoteFormData({ ...promoteFormData, studentClassSub: e.target.value })
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    {CLASS_TREE[promoteFormData.studentClassCategory]?.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="promote-schoolClass">New School Class (Optional)</Label>
+                <Input
+                  id="promote-schoolClass"
+                  placeholder="e.g. 6th Grade, Inter"
+                  value={promoteFormData.schoolClass}
+                  onChange={(e) => setPromoteFormData({...promoteFormData, schoolClass: e.target.value})}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="promote-notes">Notes</Label>
+                <Input
+                  id="promote-notes"
+                  placeholder="e.g. Promoted with distinction"
+                  value={promoteFormData.notes}
+                  onChange={(e) => setPromoteFormData({...promoteFormData, notes: e.target.value})}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" type="button" onClick={() => setIsPromoteModalOpen(false)}>Cancel</Button>
+                <Button type="submit">Promote Student</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         {/* View Modal */}
         <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
           <DialogContent className="sm:max-w-[500px]">
@@ -436,7 +740,12 @@ export default function Students() {
               </DialogDescription>
             </DialogHeader>
             {selectedStudent && (
-              <div className="grid gap-4 py-4">
+              <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
+                {selectedStudent.photo && (
+                  <div className="flex justify-center mb-4">
+                    <img src={`http://localhost:5000${selectedStudent.photo}`} alt={selectedStudent.fullName || selectedStudent.name} className="h-24 w-24 rounded-full object-cover border" />
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/20 p-4 rounded-xl border border-border/50">
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Roll Number</span>
@@ -460,7 +769,12 @@ export default function Students() {
                   
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "departmentClass")}</span>
-                    <span className="font-medium text-foreground capitalize">{selectedStudent.className}</span>
+                    <span className="font-medium text-foreground capitalize">{selectedStudent.studentClass || selectedStudent.className}</span>
+                  </div>
+                  
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">School Class</span>
+                    <span className="font-medium text-foreground">{selectedStudent.schoolClass || "—"}</span>
                   </div>
                   
                   <div className="flex flex-col gap-1">
@@ -478,6 +792,35 @@ export default function Students() {
                     <span className="font-medium text-foreground">{selectedStudent.dateOfBirth ? new Date(selectedStudent.dateOfBirth).toLocaleDateString() : "—"}</span>
                   </div>
                 </div>
+
+                {/* Promotion History Section */}
+                {selectedStudent.promotionHistory && selectedStudent.promotionHistory.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <h4 className="text-sm font-semibold mb-3">Promotion History</h4>
+                    <div className="max-h-40 overflow-y-auto rounded border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs font-medium">Date</TableHead>
+                            <TableHead className="text-xs font-medium">Year</TableHead>
+                            <TableHead className="text-xs font-medium">From</TableHead>
+                            <TableHead className="text-xs font-medium">To</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedStudent.promotionHistory.map((hist, i) => (
+                            <TableRow key={i}>
+                              <TableCell className="py-2 text-xs">{new Date(hist.date).toLocaleDateString()}</TableCell>
+                              <TableCell className="py-2 text-xs">{hist.academicYear}</TableCell>
+                              <TableCell className="py-2 text-xs text-muted-foreground">{hist.fromClass}</TableCell>
+                              <TableCell className="py-2 text-xs font-medium">{hist.toClass}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
 
                 {/* Attendance Summary Section */}
                 <div className="mt-4 pt-4 border-t">
@@ -531,10 +874,127 @@ export default function Students() {
                     <div className="text-xs text-muted-foreground">No attendance records found.</div>
                   )}
                 </div>
+
+                {/* Finance Summary Section */}
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="text-sm font-semibold mb-3">Finance & Fees</h4>
+                  {loadingFinanceRecords ? (
+                    <div className="text-xs text-muted-foreground">Loading finance records...</div>
+                  ) : studentFinanceRecords && studentFinanceRecords.length > 0 ? (
+                    <div className="space-y-4">
+                      <div className="max-h-40 overflow-y-auto rounded border">
+                        <Table>
+                          <TableHeader className="bg-muted/30">
+                            <TableRow>
+                              <TableHead className="text-xs font-medium">Year</TableHead>
+                              <TableHead className="text-xs font-medium">Class</TableHead>
+                              <TableHead className="text-xs font-medium text-right">Total Fee</TableHead>
+                              <TableHead className="text-xs font-medium text-right">Paid</TableHead>
+                              <TableHead className="text-xs font-medium text-right">Pending</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {studentFinanceRecords.map((record, i) => (
+                              <TableRow key={i}>
+                                <TableCell className="py-2 text-xs">{record.academicYear}</TableCell>
+                                <TableCell className="py-2 text-xs">{record.className}</TableCell>
+                                <TableCell className="py-2 text-xs text-right font-medium">Rs {record.totalFee.toLocaleString()}</TableCell>
+                                <TableCell className="py-2 text-xs text-right text-green-600">Rs {record.paid.toLocaleString()}</TableCell>
+                                <TableCell className="py-2 text-xs text-right text-red-600">Rs {record.pending.toLocaleString()}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">No fee records found for this student.</div>
+                  )}
+                </div>
+
+                {/* Academic History Section */}
+                <div className="mt-4 pt-4 border-t">
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-sm font-semibold">Academic History</h4>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 text-xs"
+                      onClick={() => exportFullAcademicHistory(selectedStudent._id || selectedStudent.id || selectedStudent.studentId)}
+                      disabled={isExportingStudentPDF === 'full_history'}
+                    >
+                      {isExportingStudentPDF === 'full_history' ? "Downloading..." : "Export Full History PDF"}
+                    </Button>
+                  </div>
+                  {loadingAcademicHistory ? (
+                    <div className="text-xs text-muted-foreground">Loading academic history...</div>
+                  ) : studentAcademicHistory && studentAcademicHistory.length > 0 ? (
+                    <div className="max-h-48 overflow-y-auto rounded border">
+                      <Table>
+                        <TableHeader className="bg-muted/30">
+                          <TableRow>
+                            <TableHead className="text-xs font-medium">Year</TableHead>
+                            <TableHead className="text-xs font-medium">Class</TableHead>
+                            <TableHead className="text-xs font-medium">Exam</TableHead>
+                            <TableHead className="text-xs font-medium">%</TableHead>
+                            <TableHead className="text-xs font-medium">Grade</TableHead>
+                            <TableHead className="text-xs font-medium">Result</TableHead>
+                            <TableHead className="text-right text-xs font-medium">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {studentAcademicHistory.map((hist, i) => (
+                            <TableRow key={i}>
+                              <TableCell className="py-2 text-xs font-medium">
+                                {hist.academicYear}
+                                <div className="mt-1">
+                                  <Button 
+                                    variant="link" 
+                                    size="sm" 
+                                    className="h-4 p-0 text-[10px]"
+                                    onClick={() => exportYearlyResult(selectedStudent._id || selectedStudent.id || selectedStudent.studentId, hist.academicYear)}
+                                    disabled={isExportingStudentPDF === `yearly_${hist.academicYear}`}
+                                  >
+                                    Yearly PDF
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-2 text-xs">{hist.className}</TableCell>
+                              <TableCell className="py-2 text-xs">
+                                <div>{hist.examName}</div>
+                                <div className="text-[10px] text-muted-foreground">{hist.examType}</div>
+                              </TableCell>
+                              <TableCell className="py-2 text-xs font-semibold">{hist.percentage}%</TableCell>
+                              <TableCell className="py-2 text-xs font-bold">{hist.grade}</TableCell>
+                              <TableCell className="py-2 text-xs">
+                                <span className={hist.status === 'Pass' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                                  {hist.status}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-2 text-right">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-7 text-xs px-2"
+                                  onClick={() => exportStudentHistoricalPDF(selectedStudent._id || selectedStudent.id || selectedStudent.studentId, hist.examId)}
+                                  disabled={isExportingStudentPDF === hist.examId}
+                                >
+                                  {isExportingStudentPDF === hist.examId ? "Wait..." : "PDF"}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">No academic history found.</div>
+                  )}
+                </div>
               </div>
             )}
-            <DialogFooter>
-              <Button onClick={() => setIsViewModalOpen(false)}>Close</Button>
+            <DialogFooter className="sm:justify-start">
+              <BackButton onClick={() => setIsViewModalOpen(false)} />
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -543,10 +1003,10 @@ export default function Students() {
       <div className="bg-card rounded-lg border shadow-sm">
         <div className="p-4 border-b flex items-center justify-between">
           <div className="relative w-full max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder={tr("students", "searchPlaceholder")}
-              className="pl-8"
+              className="pl-9 rounded-full bg-muted/20 shadow-inner focus-visible:ring-primary/20"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -563,6 +1023,7 @@ export default function Students() {
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "studentName")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "fatherName")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "classLabel")}</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">School Class</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "status")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "admission")}</TableHead>
                 <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -587,19 +1048,19 @@ export default function Students() {
                     <TableCell className="text-sm text-muted-foreground">{student.fatherName}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted font-medium border-transparent">
-                        {student.className}
+                        {student.studentClass || student.className}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {student.schoolClass || "—"}
                     </TableCell>
                     <TableCell>
                       {student.residential ? (
-                        <Badge className="bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-transparent shadow-none">
+                        <Badge variant="soft-success">
                           {tr("students", "residential")}
                         </Badge>
                       ) : (
-                        <Badge
-                          variant="outline"
-                          className="text-muted-foreground border-border/60 bg-transparent shadow-none"
-                        >
+                        <Badge variant="soft">
                           {tr("students", "dayScholar")}
                         </Badge>
                       )}
@@ -637,6 +1098,11 @@ export default function Students() {
                           <DropdownMenuItem onClick={() => openEditModal(student)}>
                             <Edit className="mr-2 h-4 w-4" />
                             {tr("students", "editDetails")}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => openPromoteModal(student)}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Promote
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem

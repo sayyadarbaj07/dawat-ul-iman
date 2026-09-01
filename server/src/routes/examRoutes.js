@@ -13,10 +13,15 @@ router.route("/:id")
   .delete(authorize("admin", "teacher"), examController.deleteExam);
 
 router.route("/results")
-  .get(examController.getAllExamResults)
-  .post(authorize("admin", "teacher"), examController.createExamResult);
+  .get(examController.getAllExamResults);
 
-router.route("/results/:id")
-  .delete(authorize("admin", "teacher"), examController.deleteExamResult);
+router.route("/results/bulk")
+  .post(authorize("admin", "teacher"), examController.saveBulkMarks);
+
+router.route("/:examId/calculated")
+  .get(examController.getCalculatedResults);
+
+router.route("/results/student/:studentId")
+  .get(examController.getStudentHistoricalResults);
 
 module.exports = router;

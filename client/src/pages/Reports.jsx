@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/ui/BackButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLanguage } from "@/context/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -236,13 +238,11 @@ export default function Reports() {
 
   const renderSelectedReport = () => (
       <div className="space-y-4">
-          <Button 
-            variant="ghost" 
-            className="mb-2 print-hidden text-muted-foreground hover:text-primary pl-0" 
+          <BackButton 
+            className="mb-2 print-hidden pl-0" 
             onClick={() => setSelectedReport(null)}
-          >
-              <ChevronLeft className="w-4 h-4 mr-1" /> Back to Report Center
-          </Button>
+            label="Back to Report Center"
+          />
           
           <div className="print-hidden">
               <h2 className="text-2xl font-bold tracking-tight">{selectedReport.title}</h2>
@@ -271,40 +271,40 @@ export default function Reports() {
                       <p>Loading report data...</p>
                   </div>
               ) : selectedReport.id === "weak_students" && reportData ? (
-                  <div className="overflow-x-auto">
-                      <table className="w-full border-collapse border border-gray-200 text-sm">
-                          <thead className="bg-gray-50">
-                              <tr>
-                                  <th className="border p-2 text-left">Sr. No</th>
-                                  <th className="border p-2 text-left">Name</th>
-                                  <th className="border p-2 text-left">Class</th>
-                                  <th className="border p-2 text-left">Avg %</th>
-                                  <th className="border p-2 text-left">Attendance</th>
-                                  <th className="border p-2 text-left">Failed Subjects</th>
-                                  <th className="border p-2 text-left">Reason</th>
-                              </tr>
-                          </thead>
-                          <tbody>
+                  <div className="overflow-x-auto rounded-md border border-border/50">
+                      <Table className="min-w-[800px]">
+                          <TableHeader className="bg-muted/40">
+                              <TableRow className="hover:bg-transparent border-b-border/60">
+                                  <TableHead className="w-[80px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sr. No</TableHead>
+                                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</TableHead>
+                                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Class</TableHead>
+                                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Avg %</TableHead>
+                                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Attendance</TableHead>
+                                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Failed Subjects</TableHead>
+                                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Reason</TableHead>
+                              </TableRow>
+                          </TableHeader>
+                          <TableBody>
                               {reportData.map((student, idx) => (
-                                  <tr key={student._id}>
-                                      <td className="border p-2">{idx + 1}</td>
-                                      <td className="border p-2 font-medium">{student.name}</td>
-                                      <td className="border p-2">{student.className}</td>
-                                      <td className="border p-2 text-red-600">{student.averageMarks}%</td>
-                                      <td className="border p-2 text-orange-600">{student.attendancePercent}%</td>
-                                      <td className="border p-2">{student.failedSubjectsCount}</td>
-                                      <td className="border p-2">{student.reasons.join(", ")}</td>
-                                  </tr>
+                                  <TableRow key={student._id} className="hover:bg-muted/40 transition-colors duration-200">
+                                      <TableCell className="font-mono text-xs text-muted-foreground">{idx + 1}</TableCell>
+                                      <TableCell className="font-semibold text-sm">{student.name}</TableCell>
+                                      <TableCell className="capitalize text-sm">{student.className}</TableCell>
+                                      <TableCell className="font-bold text-red-600 text-sm">{student.averageMarks}%</TableCell>
+                                      <TableCell className="font-bold text-amber-600 text-sm">{student.attendancePercent}%</TableCell>
+                                      <TableCell className="text-sm">{student.failedSubjectsCount}</TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">{student.reasons.join(", ")}</TableCell>
+                                  </TableRow>
                               ))}
                               {reportData.length === 0 && (
-                                  <tr>
-                                      <td colSpan="7" className="border p-4 text-center text-gray-500">
+                                  <TableRow>
+                                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                                           No weak students found for the selected criteria.
-                                      </td>
-                                  </tr>
+                                      </TableCell>
+                                  </TableRow>
                               )}
-                          </tbody>
-                      </table>
+                          </TableBody>
+                      </Table>
                   </div>
               ) : selectedReport.id === "student_attendance" ? (
                   <div className="flex items-center justify-center h-full min-h-[300px] border-2 border-dashed border-green-100 rounded-lg bg-green-50/30">

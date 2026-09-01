@@ -9,6 +9,7 @@ import { studentApi, teacherApi, attendanceApi } from "@/lib/api";
 import { CalendarIcon, Check, X, Clock, AlertTriangle } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
+import { getAllClassesFlat } from "@/lib/classTree";
 
 export default function Attendance() {
   const { tr } = useLanguage();
@@ -34,7 +35,7 @@ export default function Attendance() {
   // History State
   const [historyMonth, setHistoryMonth] = useState(new Date().getMonth() + 1);
   const [historyYear, setHistoryYear] = useState(new Date().getFullYear());
-  const [historyClass, setHistoryClass] = useState("diniyat");
+  const [historyClass, setHistoryClass] = useState(getAllClassesFlat()[0]);
   const [historyData, setHistoryData] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
@@ -74,7 +75,7 @@ export default function Attendance() {
           setClassFilter("");
         }
       } else {
-        setAssignedClasses(["diniyat", "arabic", "contemporary"]);
+        setAssignedClasses(getAllClassesFlat());
       }
     } catch (error) {
       console.error("Failed to load users", error);
@@ -135,7 +136,7 @@ export default function Attendance() {
 
   const getFilteredUserList = () => {
     if (activeTab === "students") {
-      return classFilter === "all" ? students : students.filter(s => s.className?.toLowerCase() === classFilter);
+      return classFilter === "all" ? students : students.filter(s => (s.studentClass || s.className)?.toLowerCase() === classFilter.toLowerCase());
     }
     return teachers;
   };
@@ -153,7 +154,7 @@ export default function Attendance() {
         userType: isStudent ? "Student" : "Teacher",
         userId: u._id,
         status: attendanceData[u._id] || "Present", // Default to Present if unmarked
-        className: isStudent ? u.className : undefined,
+        className: isStudent ? (u.studentClass || u.className) : undefined,
       }));
 
       if (records.length === 0) {
@@ -178,7 +179,7 @@ export default function Attendance() {
 
   const filteredStudents = classFilter === "all"
     ? students
-    : students.filter((s) => s.className?.toLowerCase() === classFilter);
+    : students.filter((s) => (s.studentClass || s.className)?.toLowerCase() === classFilter.toLowerCase());
 
   const renderStatusButtons = (userId) => {
     const status = attendanceData[userId];
@@ -190,8 +191,8 @@ export default function Attendance() {
           onClick={() => handleMark(userId, "Present")}
           className={
             status === "Present"
-              ? "bg-green-100 text-green-800 border-green-300 shadow-sm"
-              : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+              ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/30 shadow-sm"
+              : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
           }
         >
           <Check className="h-4 w-4 mr-1 hidden sm:block" /> Present
@@ -202,7 +203,7 @@ export default function Attendance() {
           onClick={() => handleMark(userId, "Absent")}
           className={
             status === "Absent"
-              ? "bg-red-100 text-red-800 border-red-300 shadow-sm"
+              ? "bg-red-500/15 text-red-700 border-red-500/30 shadow-sm"
               : "text-muted-foreground hover:bg-red-50 hover:text-red-700 hover:border-red-200"
           }
         >
@@ -214,7 +215,7 @@ export default function Attendance() {
           onClick={() => handleMark(userId, "Late")}
           className={
             status === "Late"
-              ? "bg-amber-100 text-amber-800 border-amber-300 shadow-sm"
+              ? "bg-amber-500/15 text-amber-700 border-amber-500/30 shadow-sm"
               : "text-muted-foreground hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200"
           }
         >
@@ -276,9 +277,9 @@ export default function Attendance() {
                   className="flex h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
                 >
                   {user?.role === "admin" && <option value="all">{tr("attendance", "allClasses")}</option>}
-                  {assignedClasses.includes("diniyat") && <option value="diniyat">Diniyat</option>}
-                  {assignedClasses.includes("arabic") && <option value="arabic">Arabic</option>}
-                  {assignedClasses.includes("contemporary") && <option value="contemporary">Contemporary</option>}
+                  {assignedClasses.map(cls => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
                 </select>
               )}
               
@@ -326,39 +327,39 @@ export default function Attendance() {
               </div>
               
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[100px]">{tr("students", "id")}</TableHead>
-                      <TableHead>Name</TableHead>
-                      {activeTab === "students" ? <TableHead>Class</TableHead> : <TableHead>Subject</TableHead>}
-                      <TableHead className="text-center">Status</TableHead>
+                <Table className="min-w-[600px]">
+                  <TableHeader className="bg-muted/40">
+                    <TableRow className="hover:bg-transparent border-b-border/60">
+                      <TableHead className="w-[100px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "id")}</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Name</TableHead>
+                      {activeTab === "students" ? <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Class</TableHead> : <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Subject</TableHead>}
+                      <TableHead className="text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {activeTab === "students" ? (
                       filteredStudents.map((student) => (
-                        <TableRow key={student._id}>
-                          <TableCell className="font-medium text-muted-foreground text-xs">
+                        <TableRow key={student._id} className="hover:bg-muted/40 transition-colors duration-200">
+                          <TableCell className="font-medium text-muted-foreground text-xs font-mono">
                             {student.rollNumber || "—"}
                           </TableCell>
-                          <TableCell className="font-semibold">
+                          <TableCell className="font-semibold text-sm">
                             {student.fullName || student.name}
                           </TableCell>
-                          <TableCell className="capitalize">{student.className}</TableCell>
+                          <TableCell className="capitalize text-sm">{student.studentClass || student.className}</TableCell>
                           <TableCell>{renderStatusButtons(student._id)}</TableCell>
                         </TableRow>
                       ))
                     ) : (
                       teachers.map((teacher) => (
-                        <TableRow key={teacher._id}>
-                          <TableCell className="font-medium text-muted-foreground text-xs">
+                        <TableRow key={teacher._id} className="hover:bg-muted/40 transition-colors duration-200">
+                          <TableCell className="font-medium text-muted-foreground text-xs font-mono">
                             {(teacher._id || teacher.id).slice(-6).toUpperCase()}
                           </TableCell>
-                          <TableCell className="font-semibold">
+                          <TableCell className="font-semibold text-sm">
                             {teacher.fullName || teacher.name}
                           </TableCell>
-                          <TableCell>{teacher.subject || "—"}</TableCell>
+                          <TableCell className="text-sm">{teacher.subject || "—"}</TableCell>
                           <TableCell>{renderStatusButtons(teacher._id)}</TableCell>
                         </TableRow>
                       ))
@@ -402,9 +403,9 @@ export default function Attendance() {
                 onChange={(e) => setHistoryClass(e.target.value)}
                 className="flex h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
               >
-                <option value="diniyat">Diniyat</option>
-                <option value="arabic">Arabic</option>
-                <option value="contemporary">Contemporary</option>
+                {getAllClassesFlat().map(cls => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
               </select>
             </div>
             <div className="grid gap-1.5">
@@ -438,28 +439,28 @@ export default function Attendance() {
               <div className="text-xs text-muted-foreground uppercase font-semibold">Total Records</div>
               <div className="text-2xl font-bold mt-1">{historyTotal}</div>
             </Card>
-            <Card className="p-4 text-center border-green-200">
-              <div className="text-xs text-green-600 uppercase font-semibold">Present</div>
-              <div className="text-2xl font-bold mt-1 text-green-700">{historyPresent}</div>
+            <Card className="p-4 text-center border-emerald-500/20 bg-emerald-500/5">
+              <div className="text-xs text-emerald-700 uppercase font-semibold tracking-wider">Present</div>
+              <div className="text-2xl font-bold mt-1 text-emerald-700">{historyPresent}</div>
             </Card>
-            <Card className="p-4 text-center border-red-200">
-              <div className="text-xs text-red-600 uppercase font-semibold">Absent</div>
+            <Card className="p-4 text-center border-red-500/20 bg-red-500/5">
+              <div className="text-xs text-red-700 uppercase font-semibold tracking-wider">Absent</div>
               <div className="text-2xl font-bold mt-1 text-red-700">{historyAbsent}</div>
             </Card>
-            <Card className="p-4 text-center border-amber-200">
-              <div className="text-xs text-amber-600 uppercase font-semibold">Late</div>
+            <Card className="p-4 text-center border-amber-500/20 bg-amber-500/5">
+              <div className="text-xs text-amber-700 uppercase font-semibold tracking-wider">Late</div>
               <div className="text-2xl font-bold mt-1 text-amber-700">{historyLate}</div>
             </Card>
           </div>
 
           <Card>
             <div className="overflow-x-auto max-h-[500px]">
-              <Table>
-                <TableHeader className="sticky top-0 bg-white">
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Student Name</TableHead>
-                    <TableHead>Status</TableHead>
+              <Table className="min-w-[600px]">
+                <TableHeader className="sticky top-0 bg-muted/90 backdrop-blur z-10">
+                  <TableRow className="hover:bg-transparent border-b-border/60">
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Date</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Student Name</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -473,16 +474,16 @@ export default function Attendance() {
                     </TableRow>
                   ) : (
                     historyData.sort((a, b) => new Date(b.date) - new Date(a.date)).map((record) => (
-                      <TableRow key={record._id}>
-                        <TableCell className="font-medium whitespace-nowrap">
+                      <TableRow key={record._id} className="hover:bg-muted/40 transition-colors duration-200">
+                        <TableCell className="font-medium whitespace-nowrap text-sm">
                           {new Date(record.date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
                         </TableCell>
-                        <TableCell>{record.userId?.fullName || record.userId?.name || "Unknown"}</TableCell>
+                        <TableCell className="text-sm font-semibold">{record.userId?.fullName || record.userId?.name || "Unknown"}</TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            record.status === 'Present' ? 'bg-green-100 text-green-700' :
-                            record.status === 'Absent' ? 'bg-red-100 text-red-700' :
-                            'bg-amber-100 text-amber-700'
+                          <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border border-transparent ${
+                            record.status === 'Present' ? 'bg-emerald-500/15 text-emerald-700' :
+                            record.status === 'Absent' ? 'bg-red-500/15 text-red-700' :
+                            'bg-amber-500/15 text-amber-700'
                           }`}>
                             {record.status}
                           </span>

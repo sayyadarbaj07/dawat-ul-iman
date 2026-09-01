@@ -1,8 +1,12 @@
 const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const path = require("path");
 const Student = require("../models/studentModel");
 const Teacher = require("../models/teacherModel");
 const Transaction = require("../models/transactionModel");
 const Attendance = require("../models/attendanceModel");
+const Exam = require("../models/examModel");
+const ExamResult = require("../models/examResultModel");
 const { getTotalWorkingDays, getStudentAttendanceForPDF } = require("../services/attendanceService");
 
 // PDF generation utility
@@ -67,24 +71,245 @@ exports.generateStudentReportCard = async (req, res) => {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    generatePDF(res, `Report Card - ${student.name}`, (doc) => {
-      doc.fontSize(12).text(`Name: ${student.name}`);
-      doc.text(`Father's Name: ${student.fatherName}`);
-      doc.text(`Class: ${student.className}`);
-      doc.text(`Residential: ${student.residential ? 'Yes' : 'No'}`);
-      doc.text(`Attendance: ${student.attendancePercent}%`);
+    const examId = req.query.examId;
+    if (!examId) return res.status(400).json({ message: "examId query parameter is required" });
+
+    const exam = await Exam.findById(examId);
+    if (!exam) return res.status(404).json({ message: "Exam not found" });
+
+    const examResults = await ExamResult.find({ examId, studentId: student._id });
+
+    // Calculate marks
+    let obtainedMarks = 0;
+    let hasFailed = false;
+    let subjectMarks = {};
+    exam.subjects.forEach(sub => { subjectMarks[sub] = null; });
+
+    examResults.forEach(r => {
+      if (exam.subjects.includes(r.subject)) {
+        if (r.marks === -1) {
+          subjectMarks[r.subject] = "Absent";
+          hasFailed = true;
+        } else {
+          subjectMarks[r.subject] = r.marks;
+          obtainedMarks += r.marks;
+          if (r.marks < exam.passingMarks) hasFailed = true;
+        }
+      }
+    });
+
+    const totalMarks = exam.subjects.length * exam.maxMarks;
+    const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
+    
+    let grade = "F";
+    if (!hasFailed) {
+      if (percentage >= 90) grade = "A+";
+      else if (percentage >= 80) grade = "A";
+      else if (percentage >= 70) grade = "B";
+      else if (percentage >= 60) grade = "C";
+      else if (percentage >= 50) grade = "D";
+      else { grade = "F"; hasFailed = true; }
+    }
+    
+    exam.subjects.forEach(sub => {
+      if (subjectMarks[sub] === null) {
+        hasFailed = true;
+        grade = "F";
+      }
+    });
+
+    generatePDF(res, `Student Marksheet`, (doc) => {
+      doc.fontSize(14).font("Helvetica-Bold").text("STUDENT PROFILE", { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(10).font("Helvetica");
+      doc.text(`Name: ${student.fullName || student.name}`);
+      doc.text(`Roll Number: ${student.rollNumber || "—"}`);
+      doc.text(`Class: ${student.studentClass || student.className}`);
+      doc.text(`Academic Year: ${exam.academicYear}`);
       doc.moveDown();
-      doc.text("Academic Performance:", { underline: true });
-      doc.text("Currently unavailable as grades are not fully tracked yet.");
+
+      doc.fontSize(14).font("Helvetica-Bold").text("EXAM DETAILS", { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(10).font("Helvetica");
+      doc.text(`Exam Name: ${exam.name || exam.examName || "Unnamed Exam"}`);
+      doc.text(`Exam Type: ${exam.examType}`);
+      doc.moveDown();
+
+      // Subjects Table Header
+      const tableTop = doc.y;
+      doc.font("Helvetica-Bold");
+      doc.text("Subject", 50, tableTop);
+      doc.text("Max Marks", 250, tableTop);
+      doc.text("Obtained Marks", 400, tableTop);
+      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+      
+      let y = tableTop + 20;
+      doc.font("Helvetica");
+
+      exam.subjects.forEach(sub => {
+        doc.text(sub, 50, y);
+        doc.text(exam.maxMarks.toString(), 250, y);
+        const m = subjectMarks[sub];
+        doc.text(m === null || m === "Absent" ? "Absent" : m.toString(), 400, y);
+        y += 20;
+      });
+
+      doc.moveTo(50, y).lineTo(550, y).stroke();
+      y += 10;
+
+      // Summary
+      doc.font("Helvetica-Bold");
+      doc.text(`Total Marks: ${totalMarks}`, 50, y);
+      doc.text(`Obtained Marks: ${obtainedMarks}`, 250, y);
+      y += 20;
+      doc.text(`Percentage: ${percentage.toFixed(2)}%`, 50, y);
+      doc.text(`Grade: ${grade}`, 250, y);
+      y += 20;
+      doc.text(`Result: ${hasFailed ? 'FAIL' : 'PASS'}`, 50, y);
     });
   } catch (error) {
     res.status(500).json({ message: "Error generating PDF", error: error.message });
   }
 };
 
+exports.generateClassResultPDF = async (req, res) => {
+  try {
+    const { examId } = req.query;
+    if (!examId) return res.status(400).json({ message: "examId is required" });
+
+    const exam = await Exam.findById(examId);
+    if (!exam) return res.status(404).json({ message: "Exam not found" });
+
+    if (req.user && req.user.role === "teacher") {
+      const teacher = await Teacher.findOne({ userId: req.user._id });
+      if (!teacher || !teacher.assignedClasses.includes(exam.class)) {
+        return res.status(403).json({ message: "You are not authorized to export results for this class" });
+      }
+    }
+
+    const students = await Student.find({
+      $or: [{ studentClass: exam.class }, { className: exam.class }]
+    }).lean();
+
+    const results = await ExamResult.find({ examId }).lean();
+
+    const calculated = students.map(student => {
+      const studentResults = results.filter(r => String(r.studentId) === String(student._id));
+      let obtainedMarks = 0;
+      let hasFailed = false;
+      let subjectMarks = {};
+
+      exam.subjects.forEach(sub => { subjectMarks[sub] = null; });
+      studentResults.forEach(r => {
+        if (exam.subjects.includes(r.subject)) {
+          if (r.marks === -1) {
+            subjectMarks[r.subject] = "Absent";
+            hasFailed = true;
+          } else {
+            subjectMarks[r.subject] = r.marks;
+            obtainedMarks += r.marks;
+            if (r.marks < exam.passingMarks) hasFailed = true;
+          }
+        }
+      });
+
+      const totalMarks = exam.subjects.length * exam.maxMarks;
+      const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
+      
+      let grade = "F";
+      if (!hasFailed) {
+        if (percentage >= 90) grade = "A+";
+        else if (percentage >= 80) grade = "A";
+        else if (percentage >= 70) grade = "B";
+        else if (percentage >= 60) grade = "C";
+        else if (percentage >= 50) grade = "D";
+        else { grade = "F"; hasFailed = true; }
+      }
+      
+      exam.subjects.forEach(sub => {
+        if (subjectMarks[sub] === null) {
+          hasFailed = true;
+          grade = "F";
+        }
+      });
+
+      return {
+        rollNumber: student.rollNumber,
+        name: student.fullName || student.name,
+        obtainedMarks,
+        totalMarks,
+        percentage: percentage.toFixed(2),
+        grade,
+        status: hasFailed ? "Fail" : "Pass"
+      };
+    });
+
+    // Sort by roll number or name
+    calculated.sort((a, b) => {
+      if (a.rollNumber && b.rollNumber) return String(a.rollNumber).localeCompare(String(b.rollNumber));
+      return a.name.localeCompare(b.name);
+    });
+
+    generatePDF(res, `Class Result - ${exam.class}`, (doc) => {
+      doc.fontSize(12).font("Helvetica");
+      doc.text(`Exam: ${exam.name || exam.examName || "Unnamed"} (${exam.examType})`);
+      doc.text(`Academic Year: ${exam.academicYear}`);
+      doc.moveDown();
+
+      const tableTop = doc.y;
+      doc.font("Helvetica-Bold").fontSize(9);
+      doc.text("Roll No", 50, tableTop);
+      doc.text("Name", 120, tableTop);
+      doc.text("Obtained/Total", 300, tableTop);
+      doc.text("%", 400, tableTop);
+      doc.text("Grade", 450, tableTop);
+      doc.text("Status", 500, tableTop);
+      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+      let y = tableTop + 20;
+      doc.font("Helvetica");
+
+      calculated.forEach(c => {
+        if (y > 700) {
+          doc.addPage();
+          y = 50;
+        }
+        doc.text(c.rollNumber || "-", 50, y);
+        doc.text(c.name, 120, y);
+        doc.text(`${c.obtainedMarks}/${c.totalMarks}`, 300, y);
+        doc.text(c.percentage, 400, y);
+        doc.text(c.grade, 450, y);
+        doc.text(c.status, 500, y);
+        y += 20;
+      });
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error generating class result PDF", error: error.message });
+  }
+};
+
 exports.generateFinanceSummary = async (req, res) => {
   try {
-    const transactions = await Transaction.find().sort({ date: -1 });
+    const { startDate, endDate, academicYear, status, type } = req.query;
+
+    let filter = { status: "Completed" };
+    if (status) filter.status = status;
+    if (type) filter.type = type;
+    if (academicYear) filter.academicYear = academicYear;
+    
+    let dateStr = "All Time";
+    if (startDate && endDate) {
+        filter.date = {
+            $gte: new Date(startDate),
+            $lte: new Date(endDate)
+        };
+        dateStr = `${startDate} to ${endDate}`;
+    }
+
+    const transactions = await Transaction.find(filter)
+      .populate("recordedBy", "name")
+      .sort({ date: -1 })
+      .lean();
     
     let totalIncome = 0;
     let totalExpense = 0;
@@ -96,22 +321,105 @@ exports.generateFinanceSummary = async (req, res) => {
 
     const currentBalance = totalIncome - totalExpense;
 
-    generatePDF(res, "Finance Summary", (doc) => {
-      doc.fontSize(12);
+    generatePDF(res, "Finance Report", (doc) => {
+      doc.fontSize(10).font("Helvetica");
+      doc.text(`Date Range: ${dateStr}`);
+      if (academicYear) doc.text(`Academic Year: ${academicYear}`);
+      doc.moveDown();
+
+      // Summary Header
+      doc.fontSize(12).font("Helvetica-Bold");
       doc.text(`Total Income: Rs ${totalIncome}`, { continued: true }).text(` | Total Expense: Rs ${totalExpense}`, { align: "right" });
       doc.moveDown();
       doc.fontSize(14).text(`Current Balance: Rs ${currentBalance}`, { underline: true });
       doc.moveDown(2);
       
-      doc.fontSize(12).text("Recent Transactions", { underline: true });
+      // Transactions Table
+      const tableTop = doc.y;
+      doc.fontSize(9).font("Helvetica-Bold");
+      doc.text("Date", 50, tableTop);
+      doc.text("Description", 120, tableTop);
+      doc.text("Category", 300, tableTop);
+      doc.text("Mode", 380, tableTop);
+      doc.text("Amount", 450, tableTop, { align: "right" });
+      doc.moveTo(50, tableTop + 12).lineTo(550, tableTop + 12).stroke();
+      
+      let y = tableTop + 20;
+      doc.font("Helvetica");
+
+      transactions.forEach(tx => {
+        if (y > 700) {
+          doc.addPage();
+          y = 50;
+        }
+        
+        const txDate = new Date(tx.date).toLocaleDateString();
+        doc.fillColor(tx.type === "income" ? "green" : "red");
+        
+        doc.text(txDate, 50, y);
+        doc.text(tx.description, 120, y, { width: 170 });
+        doc.text(tx.category || "-", 300, y);
+        doc.text(tx.paymentMode || "Cash", 380, y);
+        
+        const sign = tx.type === "income" ? "+" : "-";
+        doc.text(`${sign} Rs ${tx.amount}`, 450, y, { align: "right" });
+        
+        y += 15;
+      });
+
+      doc.fillColor("black");
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error generating PDF", error: error.message });
+  }
+};
+
+exports.generateFeeReceiptPDF = async (req, res) => {
+  try {
+    const tx = await Transaction.findById(req.params.id)
+      .populate("recordedBy", "name")
+      .populate("referenceId") // Student
+      .lean();
+
+    if (!tx) {
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+
+    generatePDF(res, "Fee Receipt", (doc) => {
+      doc.fontSize(12).font("Helvetica-Bold").text(`Receipt No: ${tx._id}`, { align: "right" });
+      doc.fontSize(10).font("Helvetica").text(`Date: ${new Date(tx.date).toLocaleDateString()}`, { align: "right" });
+      doc.moveDown(2);
+
+      doc.fontSize(14).font("Helvetica-Bold").text("PAYMENT DETAILS", { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(12).font("Helvetica");
+
+      if (tx.referenceId) {
+        doc.text(`Student Name: ${tx.referenceId.name || tx.referenceId.fullName}`);
+        doc.text(`Roll Number: ${tx.referenceId.rollNumber || "N/A"}`);
+        doc.text(`Class: ${tx.className || tx.referenceId.studentClass || "N/A"}`);
+      }
+
+      doc.text(`Academic Year: ${tx.academicYear || "N/A"}`);
       doc.moveDown();
       
-      transactions.slice(0, 20).forEach(tx => {
-        doc.text(`${new Date(tx.date).toLocaleDateString()} - ${tx.description}`);
-        doc.text(`Type: ${tx.type.toUpperCase()} | Amount: Rs ${tx.amount}`, { align: "right" });
-        doc.moveDown(0.5);
-      });
+      doc.font("Helvetica-Bold");
+      doc.text(`Amount Paid: Rs ${tx.amount}`);
+      doc.font("Helvetica");
+      doc.text(`Category: ${tx.category}`);
+      doc.text(`Payment Mode: ${tx.paymentMode}`);
+      doc.text(`Description: ${tx.description}`);
+      if (tx.remarks) doc.text(`Remarks: ${tx.remarks}`);
+      if (tx.status === "Cancelled") {
+        doc.moveDown();
+        doc.fillColor("red").text(`STATUS: CANCELLED`, { underline: true }).fillColor("black");
+      }
+
+      doc.moveDown(4);
+      doc.text("_________________________", { align: "right" });
+      doc.text("Authorized Signature", { align: "right" });
     });
+
   } catch (error) {
     res.status(500).json({ message: "Error generating PDF", error: error.message });
   }
@@ -353,7 +661,7 @@ exports.generateStudentAttendancePDF = async (req, res) => {
       // ── Date-wise table ───────────────────────────────────────────────────
       if (records.length === 0) {
         doc.font("Helvetica").fontSize(10)
-           .text("No attendance records found for the selected period.", 50, doc.y, { align: "center" });
+           .text("No attendance records found.", 50, doc.y, { align: "center" });
         return;
       }
 
@@ -423,5 +731,248 @@ exports.generateStudentAttendancePDF = async (req, res) => {
   } catch (error) {
     const status = error.status || 500;
     res.status(status).json({ message: error.message || "Error generating Student Attendance PDF" });
+  }
+};
+
+exports.generateAcademicHistoryPDF = async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    // Enforce teacher RBAC
+    if (req.user && req.user.role === "teacher") {
+      const teacher = await Teacher.findOne({ userId: req.user._id });
+      if (!teacher || !teacher.assignedClasses.includes(student.studentClass || student.className)) {
+         return res.status(403).json({ message: "Unauthorized to view this student's history" });
+      }
+    }
+
+    const allExams = await Exam.find().lean();
+    const allResults = await ExamResult.find({ studentId: student._id }).lean();
+    
+    // Group results by exam
+    const historyMap = {};
+    for (const exam of allExams) {
+      const results = allResults.filter(r => String(r.examId) === String(exam._id));
+      if (results.length > 0) {
+        let obtainedMarks = 0;
+        let hasFailed = false;
+        
+        results.forEach(r => {
+          if (r.marks === -1) {
+            hasFailed = true;
+          } else {
+            obtainedMarks += r.marks;
+            if (r.marks < exam.passingMarks) hasFailed = true;
+          }
+        });
+        
+        const totalMarks = exam.subjects.length * exam.maxMarks;
+        const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
+        
+        let grade = "F";
+        if (!hasFailed) {
+          if (percentage >= 90) grade = "A+";
+          else if (percentage >= 80) grade = "A";
+          else if (percentage >= 70) grade = "B";
+          else if (percentage >= 60) grade = "C";
+          else if (percentage >= 50) grade = "D";
+          else { grade = "F"; hasFailed = true; }
+        }
+        
+        // If they missed a subject
+        const subjectsFound = new Set(results.map(r => r.subject));
+        exam.subjects.forEach(sub => {
+          if (!subjectsFound.has(sub)) {
+            hasFailed = true;
+            grade = "F";
+          }
+        });
+
+        historyMap[exam._id] = {
+          academicYear: exam.academicYear,
+          className: exam.class,
+          examName: exam.name || exam.examName || "Unnamed",
+          examType: exam.examType,
+          percentage: percentage.toFixed(2),
+          grade,
+          status: hasFailed ? "Fail" : "Pass"
+        };
+      }
+    }
+
+    const historyData = Object.values(historyMap).sort((a, b) => b.academicYear.localeCompare(a.academicYear));
+
+    generatePDF(res, "Academic History Report", (doc) => {
+      doc.fontSize(14).font("Helvetica-Bold").text("STUDENT PROFILE", { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(10).font("Helvetica");
+      doc.text(`Name: ${student.fullName || student.name}`);
+      doc.text(`Roll Number: ${student.rollNumber || "—"}`);
+      doc.text(`Current Class: ${student.studentClass || student.className}`);
+      doc.moveDown();
+
+      doc.fontSize(14).font("Helvetica-Bold").text("ACADEMIC HISTORY", { underline: true });
+      doc.moveDown(0.5);
+      
+      const tableTop = doc.y;
+      doc.font("Helvetica-Bold");
+      doc.text("Academic Year", 50, tableTop);
+      doc.text("Class", 150, tableTop);
+      doc.text("Exam", 280, tableTop);
+      doc.text("%", 400, tableTop);
+      doc.text("Grade", 450, tableTop);
+      doc.text("Status", 500, tableTop);
+      doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+      
+      let y = tableTop + 20;
+      doc.font("Helvetica");
+
+      historyData.forEach(hist => {
+        if (y > 700) {
+          doc.addPage();
+          y = 50;
+        }
+        doc.text(hist.academicYear, 50, y);
+        doc.text(hist.className, 150, y, { width: 120 });
+        doc.text(`${hist.examName} (${hist.examType})`, 280, y, { width: 110 });
+        doc.text(`${hist.percentage}%`, 400, y);
+        doc.text(hist.grade, 450, y);
+        doc.text(hist.status, 500, y);
+        y += 20;
+      });
+
+      doc.moveTo(50, y).lineTo(550, y).stroke();
+      y += 10;
+      doc.text(`Total Records: ${historyData.length}`, 50, y);
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Error generating PDF", error: error.message });
+  }
+};
+
+exports.generateYearlyResultPDF = async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    // Enforce teacher RBAC
+    if (req.user && req.user.role === "teacher") {
+      const teacher = await Teacher.findOne({ userId: req.user._id });
+      if (!teacher || !teacher.assignedClasses.includes(student.studentClass || student.className)) {
+         return res.status(403).json({ message: "Unauthorized to view this student's result" });
+      }
+    }
+
+    const { academicYear } = req.query;
+    if (!academicYear) return res.status(400).json({ message: "Academic Year is required" });
+
+    const exams = await Exam.find({ 
+      academicYear, 
+      class: { $in: [student.studentClass, student.className].filter(Boolean) }
+    }).lean();
+
+    if (exams.length === 0) {
+      return res.status(404).json({ message: "No exams found for this academic year" });
+    }
+
+    // Filter to only Yearly exam if exists, otherwise aggregate all
+    let targetExams = exams;
+    const yearlyExam = exams.find(e => e.examType === "Yearly");
+    if (yearlyExam) targetExams = [yearlyExam];
+
+    const examIds = targetExams.map(e => e._id);
+    const results = await ExamResult.find({ studentId: student._id, examId: { $in: examIds } }).lean();
+
+    // Summing up logic (simplified for Yearly Result: if there's a Yearly exam, we use it. Otherwise, combine)
+    // Actually, "Do not blindly combine all exams... use only exams/results belonging to requested student+year+class"
+    // Let's use the Yearly exam if present. If not, just list the exams they have.
+    
+    generatePDF(res, "Yearly Result", (doc) => {
+      doc.fontSize(14).font("Helvetica-Bold").text("STUDENT PROFILE", { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(10).font("Helvetica");
+      doc.text(`Name: ${student.fullName || student.name}`);
+      doc.text(`Roll Number: ${student.rollNumber || "—"}`);
+      doc.text(`Class: ${student.studentClass || student.className}`);
+      doc.text(`Academic Year: ${academicYear}`);
+      doc.moveDown();
+
+      targetExams.forEach(exam => {
+        const studentResults = results.filter(r => String(r.examId) === String(exam._id));
+        if (studentResults.length === 0) return;
+
+        doc.fontSize(12).font("Helvetica-Bold").text(`${exam.name || exam.examName || exam.examType}`, { underline: true });
+        doc.moveDown(0.5);
+        
+        let obtainedMarks = 0;
+        let hasFailed = false;
+        let subjectMarks = {};
+        
+        exam.subjects.forEach(sub => { subjectMarks[sub] = null; });
+        studentResults.forEach(r => {
+          if (exam.subjects.includes(r.subject)) {
+            if (r.marks === -1) {
+              subjectMarks[r.subject] = "Absent";
+              hasFailed = true;
+            } else {
+              subjectMarks[r.subject] = r.marks;
+              obtainedMarks += r.marks;
+              if (r.marks < exam.passingMarks) hasFailed = true;
+            }
+          }
+        });
+
+        const totalMarks = exam.subjects.length * exam.maxMarks;
+        const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
+        
+        let grade = "F";
+        if (!hasFailed) {
+          if (percentage >= 90) grade = "A+";
+          else if (percentage >= 80) grade = "A";
+          else if (percentage >= 70) grade = "B";
+          else if (percentage >= 60) grade = "C";
+          else if (percentage >= 50) grade = "D";
+          else { grade = "F"; hasFailed = true; }
+        }
+
+        exam.subjects.forEach(sub => {
+          if (subjectMarks[sub] === null) {
+            hasFailed = true;
+            grade = "F";
+          }
+        });
+
+        // Subjects Table Header
+        const tableTop = doc.y;
+        doc.font("Helvetica-Bold").fontSize(10);
+        doc.text("Subject", 50, tableTop);
+        doc.text("Max Marks", 250, tableTop);
+        doc.text("Obtained", 400, tableTop);
+        doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+        
+        let y = tableTop + 20;
+        doc.font("Helvetica");
+
+        exam.subjects.forEach(sub => {
+          if (y > 700) { doc.addPage(); y = 50; }
+          doc.text(sub, 50, y);
+          doc.text(exam.maxMarks.toString(), 250, y);
+          const m = subjectMarks[sub];
+          doc.text(m === null || m === "Absent" ? "Absent" : m.toString(), 400, y);
+          y += 20;
+        });
+
+        doc.moveTo(50, y).lineTo(550, y).stroke();
+        y += 10;
+        doc.font("Helvetica-Bold");
+        doc.text(`Total Marks: ${totalMarks}  |  Obtained: ${obtainedMarks}  |  Percentage: ${percentage.toFixed(2)}%  |  Grade: ${grade}  |  Result: ${hasFailed ? 'FAIL' : 'PASS'}`, 50, y);
+        doc.moveDown(2);
+      });
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Error generating PDF", error: error.message });
   }
 };

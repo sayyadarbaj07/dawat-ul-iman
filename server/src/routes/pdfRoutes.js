@@ -9,8 +9,20 @@ router.use(protect);
 router.route("/student/:id/report-card")
   .get(authorize("admin", "teacher"), pdfController.generateStudentReportCard);
 
+router.route("/student/:id/yearly-result")
+  .get(authorize("admin", "teacher"), pdfController.generateYearlyResultPDF);
+
+router.route("/student/:id/academic-history")
+  .get(authorize("admin", "teacher"), pdfController.generateAcademicHistoryPDF);
+
+router.route("/class/result")
+  .get(authorize("admin", "teacher"), pdfController.generateClassResultPDF);
+
 router.route("/finance/summary")
   .get(authorize("admin", "accountant"), pdfController.generateFinanceSummary);
+
+router.route("/finance/receipt/:id")
+  .get(authorize("admin", "accountant"), pdfController.generateFeeReceiptPDF);
 router.route("/weak-students")
   .get(authorize("admin", "teacher", "accountant"), pdfController.generateWeakStudentsReport);
 

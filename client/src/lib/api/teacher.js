@@ -16,6 +16,18 @@ export const teacherApi = {
       body: JSON.stringify(payload),
     });
   },
+  createWithFile(formData) {
+    return request("/teachers", {
+      method: "POST",
+      body: formData,
+    });
+  },
+  updateWithFile(id, formData) {
+    return request(`/teachers/${id}`, {
+      method: "PUT",
+      body: formData,
+    });
+  },
   remove(id) {
     return request(`/teachers/${id}`, { method: "DELETE" });
   }
