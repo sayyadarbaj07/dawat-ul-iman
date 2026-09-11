@@ -1,6 +1,9 @@
 const Exam = require("../models/examModel");
 const ExamResult = require("../models/examResultModel");
 const Student = require("../models/studentModel");
+const Class = require("../models/classModel");
+const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
+const ActivityNotificationService = require("../services/activityNotificationService");
 
 const sendSuccess = (res, statusCode, message, data = null) => {
   const payload = { success: true, message };
@@ -25,12 +28,19 @@ exports.getAllExams = async (req, res) => {
     if (req.user && req.user.role === "teacher") {
       const Teacher = require("../models/teacherModel");
       const teacher = await Teacher.findOne({ userId: req.user._id });
-      if (teacher && teacher.assignedClasses.length > 0) {
-        // If a specific class was requested, ensure it's in their assigned list
-        if (filter.class && !teacher.assignedClasses.includes(filter.class)) {
-          return sendSuccess(res, 200, "Exams fetched successfully", []);
-        } else if (!filter.class) {
-          filter.class = { $in: teacher.assignedClasses };
+      if (teacher && (teacher.assignedClasses.length > 0 || teacher.assignedClassIds.length > 0)) {
+        if (filter.class) {
+          // If a specific class was requested, ensure it's in their assigned list
+          const hasAccess = await verifyTeacherClassAccess(req.user, req.query.classId, filter.class);
+          if (!hasAccess) {
+             return sendSuccess(res, 200, "Exams fetched successfully", []);
+          }
+        } else {
+           // If no specific class is requested, restrict exams to assigned classes or assigned classIds
+           filter.$or = [
+              { class: { $in: teacher.assignedClasses } },
+              { classId: { $in: teacher.assignedClassIds } }
+           ];
         }
       } else {
         return sendSuccess(res, 200, "Exams fetched successfully", []);
@@ -46,19 +56,184 @@ exports.getAllExams = async (req, res) => {
 
 exports.createExam = async (req, res) => {
   try {
+    if (req.body.classId) {
+       const classDoc = await Class.findById(req.body.classId);
+       if (!classDoc) {
+          return sendError(res, 400, "Invalid classId: Class not found.");
+       }
+       if (classDoc.status !== 'active') {
+          return sendError(res, 400, "Invalid classId: Class is inactive.");
+       }
+       // Derive class string automatically, ignoring frontend value
+       req.body.class = classDoc.fullName;
+    }
+
+    if (req.user && req.user.role === "teacher") {
+      const hasAccess = await verifyTeacherClassAccess(
+        req.user,
+        req.body.classId,
+        req.body.class
+      );
+      if (!hasAccess) {
+        return sendError(res, 403, "You are not authorized to manage exams for this class.");
+      }
+    }
+
+    // Proactive Duplicate Check
+    let duplicateQuery = { name: req.body.name, academicYear: req.body.academicYear };
+    if (req.body.classId) {
+      duplicateQuery.classId = req.body.classId;
+    } else {
+      duplicateQuery.classId = { $exists: false };
+      duplicateQuery.class = req.body.class;
+    }
+    const existingExam = await Exam.findOne(duplicateQuery);
+    if (existingExam) {
+      return sendError(res, 400, "An exam with this name already exists for this class in this academic year.");
+    }
+
     const exam = await Exam.create(req.body);
+
+    ActivityNotificationService.dispatchActivityEvent({
+      user: req.user,
+      action: "EXAM_CREATED",
+      description: `Created exam: ${exam.name} for class ${exam.class}`,
+      moduleName: "Exams",
+      notification: {
+        title: "New Exam Created",
+        message: `${exam.name} has been scheduled for class ${exam.class}.`,
+        type: "success",
+        link: `/exams`,
+        relatedEntity: { entityId: exam._id, entityModel: "Exam" }
+      },
+      notifyAdmins: true,
+      classId: exam.classId
+    });
+
     return sendSuccess(res, 201, "Exam created successfully", exam);
   } catch (error) {
+    if (error.code === 11000) {
+      return sendError(res, 400, "An exam with this name already exists for this class in this academic year.");
+    }
     return sendError(res, 500, "Failed to create exam", error);
   }
 };
 
+exports.updateExam = async (req, res) => {
+  try {
+    const exam = await Exam.findById(req.params.id);
+    if (!exam) return sendError(res, 404, "Exam not found");
+
+    if (req.user && req.user.role === "teacher") {
+      const Teacher = require("../models/teacherModel");
+      const teacher = await Teacher.findOne({ userId: req.user._id });
+      
+      const hasClassIdAuth = exam.classId && teacher.assignedClassIds && teacher.assignedClassIds.some(id => id.toString() === exam.classId.toString());
+      const hasClassStringAuth = teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
+      
+      if (!teacher || (!hasClassIdAuth && !hasClassStringAuth)) {
+        return sendError(res, 403, "You are not authorized to edit this exam");
+      }
+    }
+
+    const { name, examType, examName, date, academicYear, maxMarks, passingMarks, subjects } = req.body;
+
+    // Validation
+    if (maxMarks <= 0) return sendError(res, 400, "Max marks must be greater than 0");
+    if (passingMarks < 0) return sendError(res, 400, "Passing marks cannot be negative");
+    if (passingMarks > maxMarks) return sendError(res, 400, "Passing marks cannot exceed max marks");
+
+    // Check if maxMarks is being reduced dangerously
+    if (maxMarks < exam.maxMarks) {
+      const existingHighMarks = await ExamResult.findOne({ examId: exam._id, marks: { $gt: maxMarks } });
+      if (existingHighMarks) {
+        return sendError(res, 400, "Cannot reduce max marks: some students have already scored higher than the new max marks limit");
+      }
+    }
+
+    // Apply safe updates
+    if (name !== undefined) exam.name = name;
+    if (examType !== undefined) exam.examType = examType;
+    if (examName !== undefined) exam.examName = examName;
+    if (date !== undefined) exam.date = date;
+    if (academicYear !== undefined) exam.academicYear = academicYear;
+    if (maxMarks !== undefined) exam.maxMarks = maxMarks;
+    if (passingMarks !== undefined) exam.passingMarks = passingMarks;
+    if (subjects !== undefined) exam.subjects = subjects;
+
+    // Proactive Duplicate Check for Update
+    let duplicateQuery = { 
+      _id: { $ne: exam._id },
+      name: exam.name, 
+      academicYear: exam.academicYear 
+    };
+    if (exam.classId) {
+      duplicateQuery.classId = exam.classId;
+    } else {
+      duplicateQuery.classId = { $exists: false };
+      duplicateQuery.class = exam.class;
+    }
+    const existingExam = await Exam.findOne(duplicateQuery);
+    if (existingExam) {
+      return sendError(res, 400, "An exam with this name already exists for this class in this academic year.");
+    }
+
+    await exam.save();
+
+    ActivityNotificationService.dispatchActivityEvent({
+      user: req.user,
+      action: "EXAM_UPDATED",
+      description: `Updated exam: ${exam.name}`,
+      moduleName: "Exams",
+      notification: {
+        title: "Exam Updated",
+        message: `${exam.name} details have been updated.`,
+        type: "info",
+        link: `/exams`,
+        relatedEntity: { entityId: exam._id, entityModel: "Exam" }
+      },
+      notifyAdmins: true,
+      classId: exam.classId
+    });
+
+    return sendSuccess(res, 200, "Exam updated successfully", exam);
+  } catch (error) {
+    if (error.code === 11000) {
+      return sendError(res, 400, "An exam with this name already exists for this class in this academic year.");
+    }
+    return sendError(res, 500, "Failed to update exam", error);
+  }
+};
+
+
 exports.deleteExam = async (req, res) => {
   try {
-    const exam = await Exam.findByIdAndDelete(req.params.id);
+    const exam = await Exam.findById(req.params.id);
     if (!exam) return sendError(res, 404, "Exam not found");
+
+    if (req.user && req.user.role === "teacher") {
+      const hasAccess = await verifyTeacherClassAccess(
+        req.user,
+        exam.classId,
+        exam.class
+      );
+      if (!hasAccess) {
+        return sendError(res, 403, "You are not authorized to delete this exam.");
+      }
+    }
+
+    await exam.deleteOne();
     // Also delete associated results
     await ExamResult.deleteMany({ examId: req.params.id });
+
+    ActivityNotificationService.dispatchActivityEvent({
+      user: req.user,
+      action: "EXAM_DELETED",
+      description: `Deleted exam: ${exam.name}`,
+      moduleName: "Exams",
+      notifyAdmins: true
+    });
+
     return sendSuccess(res, 200, "Exam deleted successfully");
   } catch (error) {
     return sendError(res, 500, "Failed to delete exam", error);
@@ -93,7 +268,11 @@ exports.saveBulkMarks = async (req, res) => {
     if (req.user && req.user.role === "teacher") {
       const Teacher = require("../models/teacherModel");
       const teacher = await Teacher.findOne({ userId: req.user._id });
-      if (!teacher || !teacher.assignedClasses.includes(exam.class)) {
+      
+      const hasClassIdAuth = exam.classId && teacher.assignedClassIds && teacher.assignedClassIds.some(id => id.toString() === exam.classId.toString());
+      const hasClassStringAuth = teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
+      
+      if (!teacher || (!hasClassIdAuth && !hasClassStringAuth)) {
         return sendError(res, 403, "You are not authorized to manage marks for this class");
       }
     }
@@ -121,6 +300,22 @@ exports.saveBulkMarks = async (req, res) => {
       );
     }
 
+    ActivityNotificationService.dispatchActivityEvent({
+      user: req.user,
+      action: "EXAM_MARKS_UPDATED",
+      description: `Updated marks for exam: ${exam.name} (${subject})`,
+      moduleName: "Exams",
+      notification: {
+        title: "Exam Marks Updated",
+        message: `Marks have been updated for ${exam.name} (${subject}).`,
+        type: "info",
+        link: `/results`,
+        relatedEntity: { entityId: exam._id, entityModel: "Exam" }
+      },
+      notifyAdmins: true,
+      classId: exam.classId
+    });
+
     return sendSuccess(res, 200, "Bulk marks saved successfully");
   } catch (error) {
     return sendError(res, 500, "Failed to save bulk marks", error);
@@ -136,7 +331,11 @@ exports.getCalculatedResults = async (req, res) => {
     if (req.user && req.user.role === "teacher") {
       const Teacher = require("../models/teacherModel");
       const teacher = await Teacher.findOne({ userId: req.user._id });
-      if (!teacher || !teacher.assignedClasses.includes(exam.class)) {
+
+      const hasClassIdAuth = exam.classId && teacher.assignedClassIds && teacher.assignedClassIds.some(id => id.toString() === exam.classId.toString());
+      const hasClassStringAuth = teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
+
+      if (!teacher || (!hasClassIdAuth && !hasClassStringAuth)) {
         return sendError(res, 403, "You are not authorized to view results for this class");
       }
     }
@@ -145,6 +344,7 @@ exports.getCalculatedResults = async (req, res) => {
     // studentClass takes precedence, fallback to className
     const students = await Student.find({
       $or: [
+        { classId: exam.classId },
         { studentClass: exam.class },
         { className: exam.class }
       ]

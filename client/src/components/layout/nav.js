@@ -14,6 +14,7 @@ import {
   Settings,
   ScrollText,
   UserCog,
+  Database,
 } from "lucide-react";
 
 export const NAV_GROUPS = [
@@ -37,7 +38,10 @@ export const NAV_ITEMS = [
   { href: "/reports", key: "reports", icon: BarChart, group: "operations" },
   { href: "/users", key: "users", icon: UserCog, group: "admin" },
   { href: "/promotions", key: "promotions", icon: GraduationCap, group: "admin" },
+  { href: "/data-resolution", key: "dataResolution", icon: Database, group: "admin" },
   { href: "/audit", key: "auditLogs", icon: ScrollText, group: "admin" },
+  { href: "/classes", key: "classes", icon: BookOpen, group: "admin" },
+  { href: "/class-attendance", key: "classAttendanceOverview", icon: CalendarCheck, group: "admin" },
   { href: "/settings", key: "settings", icon: Settings, group: "admin" },
 ];
 

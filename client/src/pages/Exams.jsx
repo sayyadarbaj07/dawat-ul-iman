@@ -19,11 +19,12 @@ import {
 } from "@/components/ui/dialog";
 import { FileEdit, CalendarDays, Plus, CheckCircle2, XCircle } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { formatLocalizedDate, formatLocalizedNumber, formatLocalizedPercent, getLocalizedStudentName } from "@/utils/localizationUtils";
 import { examApi, studentApi } from "@/lib/api";
 import { CLASS_TREE, getAllClassesFlat } from "@/lib/classTree";
 
 export default function Exams() {
-  const { tr } = useLanguage();
+  const { tr, language } = useLanguage();
   const [activeTab, setActiveTab] = useState("exams");
 
   const [exams, setExams] = useState([]);
@@ -127,16 +128,16 @@ export default function Exams() {
     e.preventDefault();
     try {
       const subjectArray = examForm.subjects.split(",").map(s => s.trim()).filter(Boolean);
-      if (subjectArray.length === 0) return alert("Please enter at least one subject.");
+      if (subjectArray.length === 0) return alert(tr("exams", "pleaseEnterSubject"));
 
       const finalExamType = examForm.examType === "Other" ? examForm.customExamType : examForm.examType;
       if (examForm.examType === "Other" && !finalExamType.trim()) {
-        return alert("Please enter the custom exam type.");
+        return alert(tr("exams", "pleaseEnterCustomExamType"));
       }
 
       const finalClassSub = examForm.studentClassSub === "Other" ? examForm.customStudentClassSub : examForm.studentClassSub;
       if (examForm.studentClassSub === "Other" && !finalClassSub.trim()) {
-        return alert("Please enter the custom class name.");
+        return alert(tr("exams", "pleaseEnterCustomClassName"));
       }
 
       const payload = {
@@ -157,7 +158,7 @@ export default function Exams() {
       loadExams();
     } catch (err) {
       console.error(err);
-      alert("Failed to create exam");
+      alert(tr("exams", "failedToCreateExam"));
     }
   };
 
@@ -200,7 +201,7 @@ export default function Exams() {
   };
 
   const handleSaveBulkMarks = async () => {
-    if (!selectedExamIdMarks || !selectedSubject) return alert("Select exam and subject.");
+    if (!selectedExamIdMarks || !selectedSubject) return alert(tr("exams", "selectExamAndSubject"));
     
     const payloadRecords = Object.keys(marksData).map(studentId => ({
       studentId,
@@ -213,10 +214,10 @@ export default function Exams() {
         subject: selectedSubject,
         records: payloadRecords
       });
-      alert("Marks saved successfully!");
+      alert(tr("exams", "marksSavedSuccess"));
     } catch (err) {
       console.error(err);
-      alert("Failed to save marks. Check max marks limit.");
+      alert(tr("exams", "failedToSaveMarks"));
     }
   };
 
@@ -234,9 +235,9 @@ export default function Exams() {
     } catch (err) {
       console.error(err);
       if (err.response?.status === 403) {
-        setResultsError("403 Unauthorized: You do not have permission to view results for this class.");
+        setResultsError(tr("exams", "unauthorizedResults"));
       } else {
-        setResultsError("Failed to load results.");
+        setResultsError(tr("exams", "failedToLoadResults"));
       }
     } finally {
       setIsLoadingResults(false);
@@ -267,7 +268,7 @@ export default function Exams() {
       document.body.removeChild(link);
     } catch(e) {
       console.error(e);
-      alert("Failed to export to CSV");
+      alert(tr("exams", "failedToExportCsv"));
     } finally {
       setIsExportingCSV(false);
     }
@@ -277,10 +278,10 @@ export default function Exams() {
     if (!selectedExamIdResults) return;
     setIsExportingPDF(true);
     try {
-      await examApi.downloadPdf(`/pdf/class/result?examId=${selectedExamIdResults}`, `Class_Result_${selectedExamIdResults}.pdf`);
+      await examApi.downloadPdf(`/pdf/class/result?examId=${selectedExamIdResults}&language=${language}`, `Class_Result_${selectedExamIdResults}_${language}.pdf`);
     } catch(e) {
       console.error(e);
-      alert(e.message === "403 Forbidden" ? "Unauthorized to export PDF for this class" : "Failed to export PDF");
+      alert(e.message === "403 Forbidden" ? tr("exams", "unauthorizedPdf") : tr("exams", "failedToExportPdf"));
     } finally {
       setIsExportingPDF(false);
     }
@@ -290,10 +291,10 @@ export default function Exams() {
     if (!selectedExamIdResults) return;
     setIsExportingStudentPDF(true);
     try {
-      await examApi.downloadPdf(`/pdf/student/${studentId}/report-card?examId=${selectedExamIdResults}`, `Report_Card_${studentId}.pdf`);
+      await examApi.downloadPdf(`/pdf/student/${studentId}/report-card?examId=${selectedExamIdResults}&language=${language}`, `Report_Card_${studentId}_${language}.pdf`);
     } catch(e) {
       console.error(e);
-      alert(e.message === "403 Forbidden" ? "Unauthorized to export PDF" : "Failed to export PDF");
+      alert(e.message === "403 Forbidden" ? tr("exams", "failedToExportPdf") : tr("exams", "failedToExportPdf"));
     } finally {
       setIsExportingStudentPDF(false);
     }
@@ -315,9 +316,9 @@ export default function Exams() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="exams">Exams</TabsTrigger>
-          <TabsTrigger value="marks">Enter Marks</TabsTrigger>
-          <TabsTrigger value="results">Results</TabsTrigger>
+          <TabsTrigger value="exams">{tr("exams", "tabExams")}</TabsTrigger>
+          <TabsTrigger value="marks">{tr("exams", "tabEnterMarks")}</TabsTrigger>
+          <TabsTrigger value="results">{tr("exams", "tabResults")}</TabsTrigger>
         </TabsList>
 
         {/* --- EXAMS TAB --- */}
@@ -325,24 +326,24 @@ export default function Exams() {
           <Card>
             <CardHeader className="flex flex-row justify-between items-center">
               <div>
-                <CardTitle>Manage Exams</CardTitle>
-                <CardDescription>Create and view scheduled exams.</CardDescription>
+                <CardTitle>{tr("exams", "manageExams")}</CardTitle>
+                <CardDescription>{tr("exams", "createViewExams")}</CardDescription>
               </div>
               <Dialog open={isAddExamOpen} onOpenChange={setIsAddExamOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm">
-                    <Plus className="mr-2 h-4 w-4" /> Create Exam
+                    <Plus className="mr-2 h-4 w-4" /> {tr("exams", "createExam")}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-xl">
                   <DialogHeader>
-                    <DialogTitle>Create New Exam</DialogTitle>
-                    <DialogDescription>Add a new exam to the schedule.</DialogDescription>
+                   <DialogTitle>{tr("exams", "createNewExam")}</DialogTitle>
+                     <DialogDescription>{tr("exams", "addNewExamToSchedule")}</DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleCreateExam} className="space-y-4 py-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Exam Type</Label>
+                        <Label>{tr("exams", "examType")}</Label>
                         <select
                           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                           value={examForm.examType}
@@ -499,7 +500,7 @@ export default function Exams() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {new Date(exam.date).toLocaleDateString()}
+                        {formatLocalizedDate(exam.date, language)}
                       </TableCell>
                       <TableCell className="text-right font-medium">{exam.maxMarks}</TableCell>
                     </TableRow>
@@ -650,7 +651,7 @@ export default function Exams() {
                       ) : studentsForMarks.length > 0 ? studentsForMarks.map(student => (
                         <TableRow key={student._id}>
                           <TableCell className="font-mono text-xs">{student.rollNumber || "-"}</TableCell>
-                          <TableCell className="font-medium">{student.fullName || student.name}</TableCell>
+                          <TableCell className="font-medium">{getLocalizedStudentName(student, language)}</TableCell>
                           <TableCell className="text-right">
                             <Input
                               type="number"
@@ -828,8 +829,8 @@ export default function Exams() {
                         <TableRow key={res.studentId}>
                           <TableCell className="font-mono text-xs">{res.rollNumber || "-"}</TableCell>
                           <TableCell className="font-semibold">{res.fullName}</TableCell>
-                          <TableCell className="font-medium text-emerald-700">{res.obtainedMarks} / {res.totalMarks}</TableCell>
-                          <TableCell className="font-bold">{res.percentage}%</TableCell>
+                          <TableCell className="font-medium text-emerald-700">{formatLocalizedNumber(res.obtainedMarks, language)} / {formatLocalizedNumber(res.totalMarks, language)}</TableCell>
+                          <TableCell className="font-bold">{formatLocalizedPercent(res.percentage, language)}</TableCell>
                           <TableCell className="font-bold text-lg">{res.grade}</TableCell>
                           <TableCell>
                             {res.status === "Pass" ? (
@@ -881,13 +882,13 @@ export default function Exams() {
                   <p className="text-sm text-muted-foreground">{selectedStudentResult.studentClass}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Roll No</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "rollNumber") || "Roll No"}</p>
                   <p className="font-mono">{selectedStudentResult.rollNumber || "—"}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <h4 className="text-sm font-semibold">Subject Wise Marks</h4>
+                <h4 className="text-sm font-semibold">{tr("exams", "details")}</h4>
                 <div className="border rounded-md overflow-hidden">
                   <Table>
                     <TableBody>
@@ -895,7 +896,7 @@ export default function Exams() {
                         <TableRow key={subj}>
                           <TableCell className="py-2 text-sm font-medium">{subj}</TableCell>
                           <TableCell className="py-2 text-sm text-right">
-                            {mks === null || mks === "Absent" ? <span className="text-red-500 font-semibold text-xs uppercase tracking-wider">Absent</span> : mks}
+                            {mks === null || mks === "Absent" ? <span className="text-red-500 font-semibold text-xs uppercase tracking-wider">{tr("attendance", "absent") || "Absent"}</span> : mks}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -906,19 +907,19 @@ export default function Exams() {
 
               <div className="grid grid-cols-3 gap-4 pt-4 border-t text-center">
                 <div className="bg-muted/30 p-3 rounded-lg">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Total Marks</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{tr("exams", "maxMarks")}</p>
                   <p className="text-xl font-bold mt-1">{selectedStudentResult.obtainedMarks} <span className="text-sm text-muted-foreground font-normal">/ {selectedStudentResult.totalMarks}</span></p>
                 </div>
                 <div className="bg-muted/30 p-3 rounded-lg">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Percentage</p>
-                  <p className="text-xl font-bold mt-1">{selectedStudentResult.percentage}%</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{tr("exams", "percentage")}</p>
+                  <p className="text-xl font-bold mt-1">{formatLocalizedPercent(selectedStudentResult.percentage, language)}</p>
                 </div>
                 <div className="bg-muted/30 p-3 rounded-lg">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Grade</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">{tr("exams", "grade")}</p>
                   <p className="text-xl font-bold mt-1">{selectedStudentResult.grade}</p>
                 </div>
                 <div className={`col-span-3 p-3 rounded-lg ${selectedStudentResult.status === 'Pass' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                  <p className={`text-[10px] uppercase font-bold tracking-wider ${selectedStudentResult.status === 'Pass' ? 'text-green-700' : 'text-red-700'}`}>Status</p>
+                  <p className={`text-[10px] uppercase font-bold tracking-wider ${selectedStudentResult.status === 'Pass' ? 'text-green-700' : 'text-red-700'}`}>{tr("common", "status")}</p>
                   <p className={`text-xl font-bold mt-1 ${selectedStudentResult.status === 'Pass' ? 'text-green-700' : 'text-red-700'}`}>{selectedStudentResult.status}</p>
                 </div>
               </div>

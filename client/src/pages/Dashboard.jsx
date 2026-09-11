@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatRs, useDashboardData } from "@/hooks/useDashboardData";
+import { formatLocalizedNumber, formatLocalizedPercent } from "@/utils/localizationUtils";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
 import { AttendanceOverview } from "@/components/dashboard/AttendanceOverview";
 import { UpcomingExams } from "@/components/dashboard/UpcomingExams";
@@ -25,24 +26,24 @@ import { sectionMotion } from "@/components/dashboard/primitives";
 function DashboardSkeleton() {
   return (
     <div className="space-y-6 pb-8 sm:space-y-8">
-      <Skeleton className="h-52 w-full rounded-2xl sm:h-56" />
-      <div className="grid gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
+      <Skeleton className="h-52 w-full rounded-[16px] sm:h-56" />
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4 md:gap-6">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-[140px] rounded-2xl" />
+          <Skeleton key={i} className="h-[140px] rounded-[16px]" />
         ))}
       </div>
-      <div className="grid gap-5 lg:grid-cols-12 lg:gap-6">
-        <Skeleton className="h-80 rounded-2xl lg:col-span-7" />
-        <Skeleton className="h-80 rounded-2xl lg:col-span-5" />
+      <div className="grid gap-5 lg:grid-cols-3 lg:gap-6">
+        <Skeleton className="h-80 rounded-[16px] lg:col-span-2" />
+        <Skeleton className="h-80 rounded-[16px] lg:col-span-1" />
       </div>
-      <div className="grid gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 md:gap-6">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-80 rounded-2xl" />
+          <Skeleton key={i} className="h-80 rounded-[16px]" />
         ))}
       </div>
-      <div className="grid gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 md:gap-6">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-72 rounded-2xl" />
+          <Skeleton key={i} className="h-72 rounded-[16px]" />
         ))}
       </div>
     </div>
@@ -50,7 +51,7 @@ function DashboardSkeleton() {
 }
 
 export default function Dashboard() {
-  const { tr } = useLanguage();
+  const { tr, language } = useLanguage();
   const { user } = useAuth();
   const { loading, data } = useDashboardData(user);
 
@@ -60,10 +61,10 @@ export default function Dashboard() {
 
   const canAccess = data.canAccess;
   const attendanceValue = data.attendance.marked
-    ? `${data.attendance.present}/${data.attendance.enrolled || data.attendance.present + data.attendance.absent}`
+    ? `${formatLocalizedNumber(data.attendance.present, language)}/${formatLocalizedNumber(data.attendance.enrolled || data.attendance.present + data.attendance.absent, language)}`
     : "—";
   const attendanceSubtitle = data.attendance.marked
-    ? `${data.attendance.present} ${tr("attendance", "present")} · ${data.attendance.absent} ${tr("attendance", "absent")}`
+    ? `${formatLocalizedNumber(data.attendance.present, language)} ${tr("attendance", "present")} · ${formatLocalizedNumber(data.attendance.absent, language)} ${tr("attendance", "absent")}`
     : tr("dashboard", "noAttendanceToday");
 
   return (
@@ -82,7 +83,7 @@ export default function Dashboard() {
 
       <motion.div
         variants={sectionMotion}
-        className="grid auto-rows-fr gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-4"
+        className="grid auto-rows-fr gap-5 md:grid-cols-2 xl:grid-cols-4 md:gap-6"
       >
         {data.studentCount != null && (
           <StatCard
@@ -97,8 +98,9 @@ export default function Dashboard() {
             }
             sparkline={data.studentSpark}
             icon={<Users />}
-            iconClassName="bg-primary/10 text-primary"
-            className="bg-gradient-to-br from-card to-primary/5"
+            iconClassName="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
+            accentClassName="bg-emerald-500"
+            className=""
             delay={0}
           />
         )}
@@ -107,8 +109,9 @@ export default function Dashboard() {
             title={tr("dashboard", "activeTeachers")}
             value={data.teacherCount}
             icon={<GraduationCap />}
-            iconClassName="bg-chart-4/10 text-chart-4"
-            className="bg-gradient-to-br from-card to-chart-4/5"
+            iconClassName="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
+            accentClassName="bg-blue-500"
+            className=""
             delay={0.06}
           />
         )}
@@ -120,32 +123,34 @@ export default function Dashboard() {
             trend={
               data.attendance.marked && data.attendance.percent != null
                 ? {
-                    value: `${data.attendance.percent}%`,
+                    value: formatLocalizedPercent(data.attendance.percent, language),
                     isPositive: data.attendance.percent >= 75,
                   }
                 : undefined
             }
             icon={<CheckCircle2 />}
-            iconClassName="bg-accent/20 text-accent-foreground"
-            className="bg-gradient-to-br from-card to-accent/10"
+            iconClassName="bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400"
+            accentClassName="bg-orange-500"
+            className=""
             delay={0.12}
           />
         )}
         {data.canShowFinance && data.balance != null && (
           <StatCard
             title={tr("dashboard", "accountBalance")}
-            value={formatRs(data.balance)}
+            value={formatRs(data.balance, language)}
             icon={<Wallet />}
-            iconClassName="bg-gold/15 text-gold"
-            className="bg-gradient-to-br from-card via-card to-gold/10 border-gold/20"
+            iconClassName="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
+            accentClassName="bg-amber-500"
+            className=""
             delay={0.18}
           />
         )}
       </motion.div>
 
-      <motion.div variants={sectionMotion} className="grid min-w-0 items-stretch gap-5 lg:grid-cols-12 lg:gap-6">
+      <motion.div variants={sectionMotion} className="grid min-w-0 items-stretch gap-5 lg:grid-cols-3 lg:gap-6">
         {data.attendanceOk && (
-          <div className="min-w-0 lg:col-span-7">
+          <div className="min-w-0 lg:col-span-2">
             <AttendanceOverview
               attendance={data.attendance}
               canAccess={canAccess}
@@ -153,7 +158,7 @@ export default function Dashboard() {
           </div>
         )}
         {data.examsOk && (
-          <div className={data.attendanceOk ? "min-w-0 lg:col-span-5" : "min-w-0 lg:col-span-12"}>
+          <div className={data.attendanceOk ? "min-w-0 lg:col-span-1" : "min-w-0 lg:col-span-3"}>
             <UpcomingExams exams={data.upcomingExams} canAccess={canAccess} />
           </div>
         )}
@@ -161,7 +166,7 @@ export default function Dashboard() {
 
       <motion.div
         variants={sectionMotion}
-        className="grid min-w-0 items-stretch gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-3"
+        className="grid min-w-0 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-[1fr_1.35fr_1fr] md:gap-6"
       >
         {data.studentListOk && (
           <StudentMixChart mix={data.studentMix} total={data.studentCount} />
@@ -178,7 +183,7 @@ export default function Dashboard() {
 
       <motion.div
         variants={sectionMotion}
-        className="grid min-w-0 items-stretch gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-3"
+        className="grid min-w-0 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3 md:gap-6"
       >
         {data.studentListOk && (
           <ResidentialCard

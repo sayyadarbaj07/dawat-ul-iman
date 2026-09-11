@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 
 export const dashCardClass =
-  "h-full rounded-2xl border border-border/40 bg-card shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.1)]";
+  "h-full rounded-[16px] sm:rounded-[18px] border border-slate-800/[0.06] dark:border-white/10 bg-card shadow-[0_2px_8px_rgba(15,23,42,0.04),0_12px_30px_rgba(15,23,42,0.04)] transition-all duration-[200ms] ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-[2px] hover:shadow-[0_4px_12px_rgba(15,23,42,0.06),0_16px_40px_rgba(15,23,42,0.06)]";
 
 export function DashCard({ className, children, ...props }) {
   return (
@@ -23,7 +23,7 @@ export function DashHeader({ title, description, action, className }) {
     <CardHeader className={cn("space-y-1.5 p-6 pb-4 sm:p-7 sm:pb-5", className)}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1.5">
-          <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">
+          <CardTitle className="text-base font-bold tracking-tight sm:text-lg text-foreground/90">
             {title}
           </CardTitle>
           {description ? (
@@ -40,21 +40,21 @@ export function DashHeader({ title, description, action, className }) {
 
 export function DashEmpty({ icon: Icon, message, description, action }) {
   return (
-    <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center rounded-xl bg-muted/40 px-5 py-8 text-center">
+    <div className="flex min-h-[160px] flex-1 flex-col items-center justify-center rounded-[14px] bg-slate-50/50 dark:bg-slate-900/50 px-5 py-8 text-center border border-slate-100 dark:border-slate-800">
       {Icon ? (
-        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" strokeWidth={1.75} />
+        <div className="mb-4 flex h-[46px] w-[46px] items-center justify-center rounded-[12px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+          <Icon className="h-[22px] w-[22px]" strokeWidth={2} />
         </div>
       ) : null}
-      <p className="max-w-[260px] text-sm font-semibold leading-relaxed text-foreground">
+      <p className="max-w-[260px] text-[14.5px] font-semibold leading-relaxed text-slate-700 dark:text-slate-300">
         {message}
       </p>
       {description ? (
-        <p className="mt-1.5 max-w-[260px] text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-1.5 max-w-[260px] text-[13px] font-medium leading-relaxed text-slate-500 dark:text-slate-400">
           {description}
         </p>
       ) : null}
-      {action ? <div className="mt-4">{action}</div> : null}
+      {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );
 }
@@ -63,14 +63,14 @@ export function SoftProgress({ value = 0, className, colorClass = "bg-primary" }
   const safe = Math.min(Math.max(Number(value) || 0, 0), 100);
   return (
     <div
-      className={cn("h-2 w-full overflow-hidden rounded-full bg-muted", className)}
+      className={cn("h-[8px] sm:h-[10px] w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800", className)}
       role="progressbar"
       aria-valuenow={safe}
       aria-valuemin={0}
       aria-valuemax={100}
     >
       <div
-        className={cn("h-full rounded-full transition-[width] duration-500 ease-out", colorClass)}
+        className={cn("h-full rounded-full transition-[width] duration-500 ease-[cubic-bezier(0.2,0,0,1)]", colorClass)}
         style={{ width: `${safe}%` }}
       />
     </div>
@@ -82,24 +82,24 @@ export function ChartTooltipBox({ active, payload, label, valueFormatter }) {
   const showLabel = Boolean(label) && payload.length > 1;
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card px-3 py-2.5 shadow-md">
+    <div className="rounded-[12px] border border-border/60 bg-card px-4 py-3 shadow-lg">
       {showLabel ? (
-        <p className="mb-1.5 text-[11px] font-semibold text-foreground">{label}</p>
+        <p className="mb-2 text-[12px] font-bold text-slate-600 dark:text-slate-400">{label}</p>
       ) : null}
-      <ul className="space-y-1">
+      <ul className="space-y-1.5">
         {payload.map((entry) => (
           <li
             key={entry.dataKey || entry.name}
-            className="flex items-center justify-between gap-4 text-xs"
+            className="flex items-center justify-between gap-5 text-[13px]"
           >
-            <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="flex items-center gap-2 font-medium text-slate-700 dark:text-slate-300">
               <span
                 className="h-2 w-2 rounded-full"
                 style={{ background: entry.color || entry.fill }}
               />
               {entry.name}
             </span>
-            <span className="font-semibold tabular-nums text-foreground">
+            <span className="font-bold tabular-nums text-foreground">
               {valueFormatter ? valueFormatter(entry.value, entry) : entry.value}
             </span>
           </li>
@@ -110,10 +110,11 @@ export function ChartTooltipBox({ active, payload, label, valueFormatter }) {
 }
 
 export const sectionMotion = {
-  hidden: { opacity: 0, y: 8 },
+  hidden: { opacity: 0, y: 10 },
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] },
   },
 };
+

@@ -20,8 +20,27 @@ const sendError = (res, statusCode, message, error = null) => {
 // @access  Private
 const getEvents = async (req, res) => {
   try {
-    const events = await Event.find().sort({ date: 1 });
-    return sendSuccess(res, 200, "Events fetched successfully", events);
+    const { page = 1, limit = 50 } = req.query;
+    const parsedPage = Math.max(1, parseInt(page, 10));
+    const parsedLimit = Math.min(parseInt(limit, 10), 500);
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const total = await Event.countDocuments();
+    const events = await Event.find()
+      .sort({ date: 1 })
+      .skip(skip)
+      .limit(parsedLimit)
+      .lean();
+
+    return sendSuccess(res, 200, "Events fetched successfully", {
+      data: events,
+      meta: {
+        total,
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(total / parsedLimit)
+      }
+    });
   } catch (error) {
     return sendError(res, 500, "Failed to fetch events", error);
   }
@@ -43,6 +62,28 @@ const createEvent = async (req, res) => {
     });
 
     await logActivity(req.user, "CREATE_EVENT", `Created calendar event: ${title}`, "Calendar");
+
+    try {
+      const NotificationService = require("../services/notificationService");
+      await NotificationService.notifyUniqueByRole(
+        ["admin", "teacher", "accountant"],
+        { 
+          "relatedEntity.entityId": event._id 
+        },
+        {
+          title: `New Event: ${title}`,
+          message: description || `A new event has been scheduled for ${new Date(date).toLocaleDateString()}.`,
+          type: type === "holiday" ? "success" : (type === "exam" ? "warning" : "info"),
+          link: "/calendar",
+          relatedEntity: {
+            entityId: event._id,
+            entityModel: "Event"
+          }
+        }
+      );
+    } catch (notifErr) {
+      console.error("Failed to send event notifications:", notifErr);
+    }
 
     return sendSuccess(res, 201, "Event created successfully", event);
   } catch (error) {

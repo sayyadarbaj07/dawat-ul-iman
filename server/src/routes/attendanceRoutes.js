@@ -6,8 +6,8 @@ const { protect, authorize } = require("../middleware/authMiddleware");
 // Protected routes
 router.use(protect);
 
-router.get("/", attendanceController.getAttendanceByDate);
-router.post("/batch", attendanceController.saveBatchAttendance);
+router.get("/", authorize("admin", "teacher"), attendanceController.getAttendanceByDate);
+router.post("/batch", authorize("admin", "teacher"), attendanceController.saveBatchAttendance);
 router.get("/class", authorize("admin", "teacher"), attendanceController.getClassAttendance);
 router.get("/student/:studentId", authorize("admin", "teacher", "student", "parent"), attendanceController.getStudentAttendanceSummary);
 router.get("/teacher/:teacherId", authorize("admin", "teacher"), attendanceController.getTeacherAttendanceSummary);

@@ -8,12 +8,10 @@ export function BackButton({ onClick, fallbackRoute, className = "", label = "Ba
 
   const handleBack = () => {
     if (onClick) {
-      // For modals, dialogs, or custom state handling
       onClick();
       return;
     }
     
-    // For full page routing: Check if we can safely go back in browser history
     if (window.history.length > 2) {
       window.history.back();
     } else if (fallbackRoute) {
@@ -25,12 +23,13 @@ export function BackButton({ onClick, fallbackRoute, className = "", label = "Ba
 
   return (
     <Button 
-      variant="ghost" 
-      className={`pl-2 pr-4 hover:bg-muted ${className}`} 
+      variant="outline" 
+      className={`group min-h-[44px] h-11 px-4 py-2 bg-white hover:bg-muted border border-border/80 shadow-sm text-foreground font-medium rounded-xl transition-all duration-200 hover:-translate-x-0.5 ${className}`} 
       onClick={handleBack}
       type="button"
     >
-      <ArrowLeft className="w-4 h-4 mr-2" /> {label}
+      <ArrowLeft className="w-[18px] h-[18px] me-2 text-muted-foreground group-hover:text-foreground transition-colors rtl:rotate-180" /> 
+      {label}
     </Button>
   );
 }

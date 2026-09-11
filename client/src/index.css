@@ -100,21 +100,22 @@
 
 /* LIGHT MODE */
 :root {
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
+  --button-outline: rgba(0, 0, 0, .10);
+  --badge-outline: rgba(0, 0, 0, .05);
   --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
+  --elevate-1: rgba(0, 0, 0, .03);
+  --elevate-2: rgba(0, 0, 0, .08);
 
   /* Dawat ul Iman — forest green + paper white */
-  --background: 150 10% 98%;
+  --background: 140 20% 96%;
+  /* #F3F8F5 approx */
   --foreground: 152 28% 10%;
 
-  --border: 150 12% 92%;
-  
+  --border: 215 15% 90%;
+
   --card: 0 0% 100%;
   --card-foreground: 152 28% 10%;
-  --card-border: 150 12% 92%;
+  --card-border: 215 15% 92%;
 
   --sidebar: 152 48% 26%;
   --sidebar-foreground: 0 0% 100%;
@@ -159,17 +160,17 @@
   --app-font-sans: 'Inter', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
-  --radius: 1rem; 
+  --radius: 1rem;
 
   /* Modern softer shadows */
-  --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,0.01);
-  --shadow-xs: 0px 1px 2px 0px rgba(0,0,0,0.02);
-  --shadow-sm: 0px 2px 8px 0px rgba(0,0,0,0.02), 0px 1px 2px -1px rgba(0,0,0,0.01);
-  --shadow: 0px 4px 12px 0px rgba(0,0,0,0.03), 0px 1px 3px -1px rgba(0,0,0,0.02);
-  --shadow-md: 0px 12px 32px -4px rgba(0,0,0,0.04), 0px 4px 12px -4px rgba(0,0,0,0.02);
-  --shadow-lg: 0px 20px 48px -4px rgba(0,0,0,0.05), 0px 8px 16px -5px rgba(0,0,0,0.03);
-  --shadow-xl: 0px 30px 60px -8px rgba(0,0,0,0.06), 0px 12px 24px -8px rgba(0,0,0,0.03);
-  --shadow-2xl: 0px 40px 80px -15px rgba(0,0,0,0.08);
+  --shadow-2xs: 0px 1px 2px 0px rgba(15, 23, 42, 0.02);
+  --shadow-xs: 0px 1px 2px 0px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0px 2px 8px 0px rgba(15, 23, 42, 0.04), 0px 1px 2px -1px rgba(15, 23, 42, 0.02);
+  --shadow: 0px 4px 12px 0px rgba(15, 23, 42, 0.04), 0px 2px 8px -1px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0px 12px 30px -4px rgba(15, 23, 42, 0.04), 0px 4px 12px -4px rgba(15, 23, 42, 0.02);
+  --shadow-lg: 0px 20px 48px -4px rgba(15, 23, 42, 0.05), 0px 8px 16px -5px rgba(15, 23, 42, 0.03);
+  --shadow-xl: 0px 30px 60px -8px rgba(15, 23, 42, 0.06), 0px 12px 24px -8px rgba(15, 23, 42, 0.03);
+  --shadow-2xl: 0px 40px 80px -15px rgba(15, 23, 42, 0.08);
   --tracking-normal: -0.015em;
   --spacing: 0.25rem;
 
@@ -183,11 +184,11 @@
 }
 
 .dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
+  --button-outline: rgba(255, 255, 255, .10);
+  --badge-outline: rgba(255, 255, 255, .05);
   --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
+  --elevate-1: rgba(255, 255, 255, .04);
+  --elevate-2: rgba(255, 255, 255, .09);
 
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
@@ -232,14 +233,14 @@
   --gold: 38 72% 52%;
   --gold-foreground: 222.2 84% 4.9%;
 
-  --shadow-2xs: 0px 1px 2px 0px rgba(0,0,0,0.5);
-  --shadow-xs: 0px 1px 2px 0px rgba(0,0,0,0.5);
-  --shadow-sm: 0px 1px 2px 0px rgba(0,0,0,0.5), 0px 1px 2px -1px rgba(0,0,0,0.5);
-  --shadow: 0px 1px 3px 0px rgba(0,0,0,0.5), 0px 1px 2px -1px rgba(0,0,0,0.5);
-  --shadow-md: 0px 4px 6px -1px rgba(0,0,0,0.5), 0px 2px 4px -2px rgba(0,0,0,0.5);
-  --shadow-lg: 0px 10px 15px -3px rgba(0,0,0,0.5), 0px 4px 6px -4px rgba(0,0,0,0.5);
-  --shadow-xl: 0px 20px 25px -5px rgba(0,0,0,0.5), 0px 8px 10px -6px rgba(0,0,0,0.5);
-  --shadow-2xl: 0px 25px 50px -12px rgba(0,0,0,0.5);
+  --shadow-2xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.5);
+  --shadow-xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0px 1px 2px 0px rgba(0, 0, 0, 0.5), 0px 1px 2px -1px rgba(0, 0, 0, 0.5);
+  --shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.5), 0px 1px 2px -1px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0px 4px 6px -1px rgba(0, 0, 0, 0.5), 0px 2px 4px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0px 10px 15px -3px rgba(0, 0, 0, 0.5), 0px 4px 6px -4px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0px 20px 25px -5px rgba(0, 0, 0, 0.5), 0px 8px 10px -6px rgba(0, 0, 0, 0.5);
+  --shadow-2xl: 0px 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
 @layer base {

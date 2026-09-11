@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatRs } from "@/hooks/useDashboardData";
+import { toUrduDigits } from "@/utils/localizationUtils";
 import { DashCard, DashEmpty, DashHeader } from "./primitives";
 
 export function ActivityFeed({
@@ -29,10 +30,10 @@ export function ActivityFeed({
   const txItems = (transactions || []).map((tx) => ({
     id: tx._id,
     title: tx.description,
-    meta: formatRs(tx.amount),
+    meta: formatRs(tx.amount, language),
     date: tx.date,
     tone: tx.type === "income" ? "up" : "down",
-    icon: tx.type === "income" ? ArrowUpRight : ArrowDownRight,
+    icon: tx.type === "income" ? ArrowDownRight : ArrowUpRight,
   }));
 
   const eventItems = (events || []).map((event) => ({
@@ -85,41 +86,54 @@ export function ActivityFeed({
             description={tr("dashboard", "noActivityHint")}
           />
         ) : (
-          <ul className="flex-1 space-y-0.5">
+          <ul className="flex-1 flex flex-col gap-1.5">
             {items.slice(0, 5).map((item) => (
               <li
                 key={item.id}
-                className="flex items-start gap-3 rounded-xl px-2 py-2.5 transition-colors duration-200 hover:bg-muted/50"
+                className="flex items-center gap-3.5 rounded-[12px] px-2.5 py-2.5 transition-colors duration-200 hover:bg-slate-50 dark:hover:bg-slate-900/50"
               >
                 <div
                   className={cn(
-                    "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                    "flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px]",
                     item.tone === "up"
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
                       : item.tone === "down"
-                        ? "bg-gold/10 text-gold"
-                        : "bg-muted text-primary",
+                        ? "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400"
+                        : "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400",
                   )}
                 >
-                  <item.icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  <item.icon className="h-[18px] w-[18px]" strokeWidth={2.5} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-1 text-sm font-medium leading-snug">{item.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {item.meta ? `${item.meta} · ` : ""}
-                    {item.date
-                      ? new Date(item.date).toLocaleDateString(locale, {
-                          day: "numeric",
-                          month: "short",
-                        })
-                      : ""}
-                    {item.date &&
-                    (titleKey === "recentActivity" || titleKey === "recentTransactions")
-                      ? ` · ${new Date(item.date).toLocaleTimeString(locale, {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}`
-                      : ""}
+                  <p className="line-clamp-1 text-[13.5px] font-bold text-slate-800 dark:text-slate-200 leading-tight">{item.title}</p>
+                  <p className="mt-0.5 text-[12px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    {item.meta && (
+                      <>
+                        <span className="truncate max-w-[120px] inline-block align-bottom">{item.meta}</span>
+                        <span className="opacity-50">•</span>
+                      </>
+                    )}
+                    <span className="whitespace-nowrap">
+                      {item.date
+                        ? (() => {
+                            const raw = new Date(item.date).toLocaleDateString(locale, {
+                              day: "numeric",
+                              month: "short",
+                            });
+                            return language === "ur" ? toUrduDigits(raw) : raw;
+                          })()
+                        : ""}
+                      {item.date &&
+                      (titleKey === "recentActivity" || titleKey === "recentTransactions")
+                        ? (() => {
+                            const raw = new Date(item.date).toLocaleTimeString(locale, {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            });
+                            return ` ${tr("dashboard", "at")} ${language === "ur" ? toUrduDigits(raw) : raw}`;
+                          })()
+                        : ""}
+                    </span>
                   </p>
                 </div>
               </li>
@@ -127,7 +141,7 @@ export function ActivityFeed({
           </ul>
         )}
         {canAccess(href) && (
-          <Button asChild variant="outline" size="sm" className="mt-auto w-full rounded-xl">
+          <Button asChild variant="outline" className="mt-auto w-full min-h-[40px] rounded-[12px] border-slate-200 dark:border-slate-800 bg-transparent hover:bg-slate-50 dark:hover:bg-slate-900 font-bold transition-all text-slate-700 dark:text-slate-300">
             <Link href={href}>{tr("common", "viewAll")}</Link>
           </Button>
         )}

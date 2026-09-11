@@ -6,6 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { StatCard } from "@/components/ui/StatCard";
 import { ArrowUpRight, ArrowDownRight, Download, Plus, Search, CheckCircle, XCircle, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { BackButton } from "@/components/ui/BackButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,16 +22,17 @@ import {
 } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useLanguage } from "@/context/LanguageContext";
-import { financeApi, studentApi, settingsApi } from "@/lib/api";
+import { formatLocalizedNumber, formatLocalizedDate } from "@/utils/localizationUtils";
+import { financeApi, settingsApi } from "@/lib/api";
 
-const INCOME_CATEGORIES = ["Fees", "Kafalat", "Atiya", "Zakat", "Sadqa", "Isale Sawab", "Other"];
+const INCOME_CATEGORIES = ["Kafalat", "Atiya", "Zakat", "Sadqa", "Isale Sawab", "Other"];
 const EXPENSE_CATEGORIES = ["Tankha", "Food", "Medical", "Wazifa", "Other"];
 const PAYMENT_MODES = ["Cash", "Bank", "Online"];
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
 
 export default function Finance() {
-  const { tr } = useLanguage();
+  const { tr, language } = useLanguage();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, currentBalance: 0, categorySummary: {} });
@@ -50,10 +53,6 @@ export default function Finance() {
     receiptPhoto: null,
   });
 
-  // Students for Fees
-  const [students, setStudents] = useState([]);
-  const [studentSearch, setStudentSearch] = useState("");
-
   // Preview Modals
   const [previewImage, setPreviewImage] = useState(null);
   const [receiptPreviewData, setReceiptPreviewData] = useState(null);
@@ -62,7 +61,6 @@ export default function Finance() {
     loadSettings();
     loadTransactions();
     loadSummary();
-    if (activeTab === "fees") loadStudents();
   }, [activeTab]);
 
   const loadSettings = async () => {
@@ -78,7 +76,12 @@ export default function Finance() {
     try {
       setLoading(true);
       const res = await financeApi.list();
-      setTransactions(res.data || []);
+      // Handle the new paginated API response { data: { data: [...], meta: {...} } }
+      if (res.data && res.data.meta) {
+        setTransactions(res.data.data || []);
+      } else {
+        setTransactions(res.data || []);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -95,14 +98,6 @@ export default function Finance() {
     }
   };
 
-  const loadStudents = async () => {
-    try {
-      const res = await studentApi.list({ status: "active" });
-      setStudents(res.data || []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const handleCreateTransaction = async (e) => {
     e.preventDefault();
@@ -181,26 +176,26 @@ export default function Finance() {
       }
     } catch (err) {
       console.error(err);
-      alert(err.message || "Failed to save transaction.");
+      alert(err.message || tr("finance", "failedToSave"));
     }
   };
 
   const handleVoidTransaction = async (id) => {
-    if (!window.confirm("Are you sure you want to void this transaction? This action cannot be fully undone (it marks it as Cancelled).")) return;
+    if (!window.confirm(tr("finance", "deleteTransactionConfirm"))) return;
     try {
       await financeApi.voidTransaction(id);
       loadTransactions();
       loadSummary();
     } catch (err) {
-      alert("Failed to void transaction");
+      alert(tr("finance", "failedToVoid"));
     }
   };
 
   const exportSummaryPDF = async () => {
     try {
-      await financeApi.downloadPdf('/pdf/finance/summary', 'Finance_Summary.pdf');
+      await financeApi.downloadPdf(`/pdf/finance/summary?language=${language}`, `Finance_Summary_${language}.pdf`);
     } catch(err) {
-      alert("Failed to download PDF");
+      alert(tr("finance", "failedToDownload"));
     }
   };
 
@@ -209,10 +204,9 @@ export default function Finance() {
   const exportReceiptPDF = async (id) => {
     try {
       setExportingId(id);
-      await financeApi.downloadPdf(`/pdf/finance/receipt/${id}`, `Receipt_${id}.pdf`);
-      // Do not close the modal automatically so the user knows it finished.
+      await financeApi.downloadPdf(`/pdf/finance/receipt/${id}?language=${language}`, `Receipt_${id}_${language}.pdf`);
     } catch(err) {
-      alert(err.message === "403 Forbidden" ? "Unauthorized to export PDF" : "Failed to download Receipt. Please try again.");
+      alert(err.message === "403 Forbidden" ? tr("common", "unauthorizedExport") : tr("finance", "failedToDownloadReceipt"));
     } finally {
       setExportingId(null);
     }
@@ -245,23 +239,23 @@ export default function Finance() {
         <Table className="min-w-[1000px]">
           <TableHeader className="bg-muted/40">
             <TableRow>
-              <TableHead className="w-[100px] text-xs">Date</TableHead>
-              <TableHead className="text-xs">Description</TableHead>
-              <TableHead className="text-xs">Category</TableHead>
-              <TableHead className="text-xs">Mode</TableHead>
+              <TableHead className="w-[100px] text-xs">{tr("common", "date")}</TableHead>
+              <TableHead className="text-xs">{tr("finance", "description")}</TableHead>
+              <TableHead className="text-xs">{tr("finance", "category")}</TableHead>
+              <TableHead className="text-xs">{tr("finance", "paymentMode")}</TableHead>
               <TableHead className="text-xs">Ref/Receipt</TableHead>
-              <TableHead className="text-xs">Status</TableHead>
-              <TableHead className="text-right text-xs">Amount</TableHead>
-              <TableHead className="text-right text-xs">Action</TableHead>
+              <TableHead className="text-xs">{tr("common", "status")}</TableHead>
+              <TableHead className="text-end text-xs">{tr("finance", "amount")}</TableHead>
+              <TableHead className="text-end text-xs">{tr("common", "actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={8} className="text-center h-24">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center h-24">{tr("common", "loading")}</TableCell></TableRow>
             ) : filtered.length > 0 ? (
               filtered.map((tx) => (
                 <TableRow key={tx._id} className={tx.status === 'Cancelled' ? "opacity-60 bg-red-50/50" : "hover:bg-muted/40 transition-colors"}>
-                  <TableCell className="text-sm">{new Date(tx.date).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-sm">{formatLocalizedDate(tx.date, language)}</TableCell>
                   <TableCell className="font-semibold text-sm max-w-[200px] truncate" title={tx.description}>
                     {tx.description}
                     {tx.referenceId && <div className="text-[11px] text-primary mt-0.5">{tx.referenceId.name || tx.referenceId.fullName}</div>}
@@ -288,14 +282,14 @@ export default function Finance() {
                     </div>
                   </TableCell>
                   <TableCell className="text-xs">
-                    {tx.status === 'Cancelled' ? <span className="text-red-600 font-bold flex items-center gap-1"><XCircle className="w-3 h-3"/> Voided</span> : <span className="text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Ok</span>}
+                    {tx.status === 'Cancelled' ? <span className="text-red-600 font-bold flex items-center gap-1"><XCircle className="w-3 h-3"/> {tr("finance", "statusVoided")}</span> : <span className="text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> {tr("finance", "statusOk")}</span>}
                   </TableCell>
-                  <TableCell className={`text-right font-bold ${tx.type === "income" ? "text-green-600" : "text-red-600"}`}>
-                    {tx.type === "income" ? "+" : "-"}Rs {tx.amount.toLocaleString()}
+                  <TableCell className={`text-end font-bold ${tx.type === "income" ? "text-green-600" : "text-red-600"}`}>
+                    {tx.type === "income" ? "+" : "-"}Rs {formatLocalizedNumber(tx.amount, language)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openReceiptPreview(tx)}>Receipt</Button>
+                       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openReceiptPreview(tx)}>{tr("finance", "viewReceipt")}</Button>
                       {tx.status !== 'Cancelled' && (
                         <>
                           <Button 
@@ -304,11 +298,11 @@ export default function Finance() {
                             className="h-7 w-7 text-muted-foreground hover:text-primary" 
                             disabled={exportingId === tx._id} 
                             onClick={() => exportReceiptPDF(tx._id)} 
-                            title="Download Receipt PDF"
+                            title={tr("finance", "downloadReceipt")}
                           >
                             {exportingId === tx._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                           </Button>
-                          <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleVoidTransaction(tx._id)}>Void</Button>
+                          <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleVoidTransaction(tx._id)}>{tr("finance", "void")}</Button>
                         </>
                       )}
                     </div>
@@ -316,7 +310,15 @@ export default function Finance() {
                 </TableRow>
               ))
             ) : (
-              <TableRow><TableCell colSpan={8} className="text-center h-24 text-muted-foreground">No transactions found.</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={8} className="p-0">
+                  <EmptyState 
+                    title={tr("finance", "noTransactions")}
+                    description={tr("finance", "noTransactionsDesc")}
+                    icon={FileText}
+                  />
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>
@@ -326,31 +328,33 @@ export default function Finance() {
 
   return (
     <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Finance Management</h2>
-          <p className="text-muted-foreground mt-1">Manage income, expenses, fees, and accounting.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={exportSummaryPDF}>
-            <Download className="mr-2 h-4 w-4" /> Export Report
-          </Button>
+      <PageHeader 
+        title={tr("finance", "pageTitle")}
+        description={tr("finance", "pageSubtitle")}
+        showBack={true}
+        backLabel={tr("common", "backToDashboard")}
+        actions={
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={exportSummaryPDF} className="w-full sm:w-auto">
+              <Download className="me-2 h-4 w-4" /> {tr("finance", "export")}
+            </Button>
+            <Button onClick={() => setIsModalOpen(true)} className="w-full sm:w-auto">
+              <Plus className="me-2 h-4 w-4" /> {tr("finance", "newTransaction")}
+            </Button>
+          </div>
+        }
+      />
 
-          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" /> New Transaction
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Add Transaction</DialogTitle>
-                <DialogDescription>Record a new income or expense entry.</DialogDescription>
+                <DialogTitle>{tr("finance", "addTransaction")}</DialogTitle>
+                <DialogDescription>{tr("finance", "pageSubtitle")}</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreateTransaction} className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Transaction Type</Label>
+                    <Label>{tr("finance", "typeLabel")}</Label>
                     <select
                       className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                       value={formData.type}
@@ -363,12 +367,12 @@ export default function Finance() {
                         });
                       }}
                     >
-                      <option value="income">Income</option>
-                      <option value="expense">Expense</option>
+                      <option value="income">{tr("finance", "incomeType")}</option>
+                      <option value="expense">{tr("finance", "expenseType")}</option>
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Category</Label>
+                    <Label>{tr("finance", "category")}</Label>
                     <select
                       className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                       value={formData.category}
@@ -383,23 +387,23 @@ export default function Finance() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Amount (Rs)</Label>
-                    <Input type="number" required min="1" placeholder="Amount" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} />
+                  <Label>{tr("finance", "amount")} (Rs)</Label>
+                    <Input type="number" required min="1" placeholder={tr("finance", "enterAmount")} value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} dir="ltr" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Date</Label>
+                    <Label>{tr("common", "date")}</Label>
                     <Input type="date" required value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Description / Payee</Label>
-                  <Input required placeholder="Brief description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+                    <Label>{tr("finance", "description")}</Label>
+                  <Input required placeholder={tr("finance", "enterDescription")} value={formData.description} dir="auto" onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Payment Mode</Label>
+                    <Label>{tr("finance", "paymentMode")}</Label>
                     <select
                       className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                       value={formData.paymentMode}
@@ -409,53 +413,50 @@ export default function Finance() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Remarks</Label>
-                    <Input placeholder="Additional notes" value={formData.remarks} onChange={(e) => setFormData({ ...formData, remarks: e.target.value })} />
+                    <Label>{tr("finance", "remarks")}</Label>
+                    <Input dir="auto" placeholder={tr("finance", "enterDescription")} value={formData.remarks} onChange={(e) => setFormData({ ...formData, remarks: e.target.value })} />
                   </div>
                 </div>
 
                 {formData.type === "income" && (
                   <div className="grid grid-cols-2 gap-4 bg-muted/20 p-3 rounded-lg border border-dashed border-emerald-500/50">
                     <div className="space-y-2">
-                      <Label className="text-xs">Receipt ID (Optional)</Label>
+                      <Label className="text-xs">{tr("finance", "receiptId")} ({tr("common", "optional")})</Label>
                       <Input placeholder="REC-1029" value={formData.receiptId} onChange={(e) => setFormData({ ...formData, receiptId: e.target.value })} />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs">Receipt Photo (Optional)</Label>
+                      <Label className="text-xs">{tr("finance", "receiptPhoto")} ({tr("common", "optional")})</Label>
                       <Input type="file" accept="image/*" onChange={(e) => { if (e.target.files && e.target.files[0]) setFormData({ ...formData, receiptPhoto: e.target.files[0] }); }} />
                     </div>
                   </div>
                 )}
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                  <Button type="submit">Save Transaction</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>{tr("common", "cancel")}</Button>
+                  <Button type="submit">{tr("finance", "save")}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full sm:w-auto overflow-x-auto justify-start border-b rounded-none pb-0 h-auto bg-transparent">
-          <TabsTrigger value="dashboard" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none shadow-none">Dashboard</TabsTrigger>
-          <TabsTrigger value="income" className="data-[state=active]:border-b-2 data-[state=active]:border-emerald-500 rounded-none shadow-none text-emerald-600">Income Ledger</TabsTrigger>
-          <TabsTrigger value="expense" className="data-[state=active]:border-b-2 data-[state=active]:border-red-500 rounded-none shadow-none text-red-600">Expense Ledger</TabsTrigger>
-          <TabsTrigger value="fees" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none shadow-none">Student Fees</TabsTrigger>
+          <TabsTrigger value="dashboard" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none shadow-none">{tr("finance", "dashboard")}</TabsTrigger>
+          <TabsTrigger value="income" className="data-[state=active]:border-b-2 data-[state=active]:border-emerald-500 rounded-none shadow-none text-emerald-600">{tr("finance", "incomeType")}</TabsTrigger>
+          <TabsTrigger value="expense" className="data-[state=active]:border-b-2 data-[state=active]:border-red-500 rounded-none shadow-none text-red-600">{tr("finance", "expenseType")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-6 space-y-6">
           <div className="grid gap-4 md:grid-cols-3">
-            <StatCard title="Total Income" value={`Rs ${summary.totalIncome.toLocaleString()}`} icon={<ArrowUpRight className="h-6 w-6" />} className="border-emerald-500/20 bg-emerald-500/5 shadow-sm" />
-            <StatCard title="Total Expenses" value={`Rs ${summary.totalExpense.toLocaleString()}`} icon={<ArrowDownRight className="h-6 w-6" />} className="border-red-500/20 bg-red-500/5 shadow-sm" />
-            <StatCard title="Current Balance" value={`Rs ${summary.currentBalance.toLocaleString()}`} icon={<ArrowUpRight className="h-6 w-6" />} className="border-primary/20 bg-primary/5 shadow-sm" />
+            <StatCard title={tr("finance", "totalIncome")} value={`Rs ${formatLocalizedNumber(summary.totalIncome, language)}`} iconClassName="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400" accentClassName="bg-emerald-500" />
+            <StatCard title={tr("finance", "totalExpenses")} value={`Rs ${formatLocalizedNumber(summary.totalExpense, language)}`} iconClassName="bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400" accentClassName="bg-rose-500" />
+            <StatCard title={tr("finance", "currentBalance")} value={`Rs ${formatLocalizedNumber(summary.currentBalance, language)}`} iconClassName="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400" accentClassName="bg-blue-500" />
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
             <Card className="md:col-span-2 shadow-sm border">
               <CardHeader>
-                <CardTitle>Income vs Expenses</CardTitle>
-                <CardDescription>Monthly overview of financial flow.</CardDescription>
+                <CardTitle>{tr("finance", "incomeVsExpenses")}</CardTitle>
+                <CardDescription>{tr("finance", "incomeVsExpensesDescription")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px] w-full">
@@ -472,7 +473,7 @@ export default function Finance() {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">No chart data available.</div>
+                    <div className="flex items-center justify-center h-full text-muted-foreground">{tr("finance", "noChartData")}</div>
                   )}
                 </div>
               </CardContent>
@@ -480,20 +481,20 @@ export default function Finance() {
 
             <Card className="md:col-span-1 shadow-sm border">
               <CardHeader>
-                <CardTitle>Category Breakdown</CardTitle>
+                <CardTitle>{tr("finance", "categoryBreakdown")}</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y max-h-[300px] overflow-y-auto">
                   {Object.entries(summary.categorySummary || {}).map(([cat, data]) => (
                     <div key={cat} className="p-4 flex justify-between items-center hover:bg-muted/30 transition-colors">
                       <span className="font-medium text-sm text-foreground/80">{cat}</span>
-                      <span className={`font-bold text-sm ${data.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
-                        Rs {data.amount.toLocaleString()}
+                  <span className={`font-bold text-sm ${data.type === "income" ? "text-emerald-600" : "text-red-600"}`}>
+                        Rs {formatLocalizedNumber(data.amount, language)}
                       </span>
                     </div>
                   ))}
                   {Object.keys(summary.categorySummary || {}).length === 0 && (
-                    <div className="p-4 text-center text-sm text-muted-foreground">No category data.</div>
+                    <div className="p-4 text-center text-sm text-muted-foreground">{tr("finance", "noCategoryData")}</div>
                   )}
                 </div>
               </CardContent>
@@ -502,8 +503,8 @@ export default function Finance() {
           
           <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
-               <h3 className="text-lg font-bold">Recent Transactions (Ledger)</h3>
-               <Button variant="ghost" size="sm" onClick={() => setActiveTab("income")}>View All</Button>
+               <h3 className="text-lg font-bold">{tr("finance", "recentActivity")}</h3>
+               <Button variant="ghost" size="sm" onClick={() => setActiveTab("income")}>{tr("common", "viewAll")}</Button>
             </div>
             {renderTransactionTable("all", 10)}
           </div>
@@ -515,49 +516,6 @@ export default function Finance() {
 
         <TabsContent value="expense" className="mt-6">
           {renderTransactionTable("expense")}
-        </TabsContent>
-
-        <TabsContent value="fees" className="mt-6">
-          <Card className="border shadow-sm">
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="relative w-full max-w-sm">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search students..."
-                  className="pl-9 rounded-full bg-muted/20 focus:bg-background transition-colors"
-                  value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
-                />
-              </div>
-            </div>
-            <Table>
-              <TableHeader className="bg-muted/40">
-                <TableRow>
-                  <TableHead>Roll No</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.filter(s => s.name.toLowerCase().includes(studentSearch.toLowerCase()) || (s.rollNumber || "").toLowerCase().includes(studentSearch.toLowerCase())).slice(0, 50).map(s => (
-                  <TableRow key={s._id} className="hover:bg-muted/40">
-                    <TableCell className="font-medium text-sm">{s.rollNumber || "—"}</TableCell>
-                    <TableCell className="text-sm font-semibold">{s.name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{s.studentClass || s.className}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => window.location.href = `/students?id=${s._id}`}>
-                        View Profile
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {students.length === 0 && (
-                  <TableRow><TableCell colSpan={4} className="text-center h-24 text-muted-foreground">No students found.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </Card>
         </TabsContent>
 
       </Tabs>
@@ -573,7 +531,7 @@ export default function Finance() {
       <Dialog open={!!receiptPreviewData} onOpenChange={(open) => !open && setReceiptPreviewData(null)}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Receipt Preview</DialogTitle>
+            <DialogTitle>{tr("finance", "receiptPreview")}</DialogTitle>
           </DialogHeader>
           {receiptPreviewData && (
             <div className="mt-2 p-6 border rounded-lg bg-card shadow-sm space-y-6 relative overflow-y-auto flex-1 min-h-0">
@@ -585,22 +543,22 @@ export default function Finance() {
                  {settings?.instituteNameUrdu && <h3 className="text-lg font-urdu mt-1">{settings.instituteNameUrdu}</h3>}
                  <p className="text-xs text-muted-foreground mt-1">{settings?.address || "Address details here"}</p>
                  <div className="mt-3 inline-block bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                    Official Receipt
-                 </div>
+                     {tr("finance", "officialReceipt")}
+                  </div>
                </div>
 
                <div className="grid grid-cols-2 gap-y-4 text-sm">
                  <div>
-                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Receipt No</p>
+                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{tr("finance", "receiptNo")}</p>
                    <p className="font-mono font-semibold">{receiptPreviewData.receiptId || receiptPreviewData._id.slice(-6).toUpperCase()}</p>
                  </div>
-                 <div className="text-right">
-                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Date</p>
-                   <p className="font-semibold">{new Date(receiptPreviewData.date).toLocaleDateString()}</p>
+                 <div className="text-end">
+                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{tr("common", "date")}</p>
+                   <p className="font-semibold">{formatLocalizedDate(receiptPreviewData.date, language)}</p>
                  </div>
                  
                  <div className="col-span-2 pt-2">
-                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Payer / Student Name</p>
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{tr("finance", "payerName")}</p>
                    <p className="font-medium text-base">
                      {receiptPreviewData.referenceId ? (receiptPreviewData.referenceId.name || receiptPreviewData.referenceId.fullName) : (receiptPreviewData.description || "N/A")}
                    </p>
@@ -608,7 +566,7 @@ export default function Finance() {
                  </div>
 
                  <div className="pt-2">
-                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Academic Year / Class</p>
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{tr("finance", "academicYearClass")}</p>
                    <p className="font-medium">
                      {receiptPreviewData.academicYear || "N/A"} 
                      {receiptPreviewData.className && ` / ${receiptPreviewData.className}`}
@@ -616,32 +574,32 @@ export default function Finance() {
                    </p>
                  </div>
 
-                 <div className="pt-2 text-right">
-                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Category</p>
+                 <div className="pt-2 text-end">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{tr("finance", "category")}</p>
                    <p className="font-medium">{receiptPreviewData.category}</p>
                  </div>
                  <div className="pt-2">
-                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Payment Mode</p>
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{tr("finance", "paymentMode")}</p>
                    <p className="font-medium">{receiptPreviewData.paymentMode}</p>
                  </div>
                </div>
 
                <div className="bg-muted/30 p-4 rounded-lg flex justify-between items-center border border-border/50 mt-4">
-                 <span className="font-bold uppercase tracking-wider text-sm">Amount Paid</span>
-                 <span className="text-2xl font-bold text-primary">Rs {receiptPreviewData.amount.toLocaleString()}</span>
+                  <span className="font-bold uppercase tracking-wider text-sm">{tr("finance", "amountPaid")}</span>
+                  <span className="text-2xl font-bold text-primary">Rs {formatLocalizedNumber(receiptPreviewData.amount, language)}</span>
                </div>
 
                {receiptPreviewData.remarks && (
-                 <div className="text-xs text-muted-foreground italic">
-                   Note: {receiptPreviewData.remarks}
-                 </div>
+                  <div className="text-xs text-muted-foreground italic">
+                    {tr("finance", "note")}: {receiptPreviewData.remarks}
+                  </div>
                )}
                
                {receiptPreviewData.receiptPhoto && (
                  <div className="mt-4 pt-4 border-t">
-                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-2 flex items-center gap-1">
-                     <ImageIcon className="w-3 h-3" /> Attached Receipt Photo
-                   </p>
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-2 flex items-center gap-1">
+                      <ImageIcon className="w-3 h-3" /> {tr("finance", "attachedReceiptPhoto")}
+                    </p>
                    <img src={`${API_BASE_URL}${receiptPreviewData.receiptPhoto}`} alt="Attached Receipt" className="h-24 w-auto rounded border object-contain" loading="lazy" />
                  </div>
                )}
@@ -659,8 +617,8 @@ export default function Finance() {
             <BackButton onClick={() => setReceiptPreviewData(null)} />
             {receiptPreviewData && receiptPreviewData.status !== 'Cancelled' && (
               <Button disabled={exportingId === receiptPreviewData._id} onClick={() => exportReceiptPDF(receiptPreviewData._id)}>
-                {exportingId === receiptPreviewData._id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                {exportingId === receiptPreviewData._id ? "Downloading..." : "Download Final PDF"}
+                {exportingId === receiptPreviewData._id ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : <Download className="w-4 h-4 me-2" />}
+                {exportingId === receiptPreviewData._id ? tr("finance", "downloadingPdf") : tr("finance", "downloadFinalPdf")}
               </Button>
             )}
           </DialogFooter>

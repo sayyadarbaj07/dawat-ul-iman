@@ -11,6 +11,7 @@ import {
   reportApi,
 } from "@/lib/api";
 import { ROLE_PERMISSIONS } from "@/context/AuthContext";
+import { formatLocalizedNumber } from "@/utils/localizationUtils";
 
 export const CLASS_KEYS = ["diniyat", "arabic", "contemporary"];
 
@@ -32,17 +33,22 @@ export function daysFromToday(value) {
   return Math.round(diff / 86400000);
 }
 
-export function formatRs(amount) {
+export function formatRs(amount, language = "en") {
   const n = Number(amount) || 0;
-  return `Rs ${n.toLocaleString()}`;
+  return `Rs ${formatLocalizedNumber(n, language)}`;
 }
 
 function unwrap(result) {
   if (result.status !== "fulfilled" || result.value == null) return null;
   const value = result.value;
   if (Array.isArray(value)) return value;
-  if (value.data !== undefined) return value.data;
-  return value;
+  // Unwrap primary data wrapper
+  let unwrapped = value.data !== undefined ? value.data : value;
+  // Unwrap secondary data wrapper if paginated { data, meta }
+  if (unwrapped && unwrapped.data !== undefined && Array.isArray(unwrapped.data)) {
+      return unwrapped.data;
+  }
+  return unwrapped;
 }
 
 function monthSparkline(items, getDate) {
@@ -96,10 +102,9 @@ export function useDashboardData(user) {
       const today = localISODate();
 
       try {
-        const [studentRes, teacherRes, attendanceRes, reportRes] = await Promise.allSettled([
+        const [studentRes, teacherRes, reportRes] = await Promise.allSettled([
           studentApi.list(),
           teacherApi.list(),
-          attendanceApi.getByDate(today, "Student"),
           reportApi.getSummary(),
         ]);
 
@@ -107,8 +112,34 @@ export function useDashboardData(user) {
 
         const students = unwrap(studentRes) || [];
         const teachers = unwrap(teacherRes) || [];
-        const attendance = unwrap(attendanceRes) || [];
         const reportSummary = unwrap(reportRes);
+
+        let attendanceRes = { status: "rejected" };
+        let shouldFetchAttendance = false;
+
+        if (role === "admin") {
+          shouldFetchAttendance = true;
+        } else if (role === "teacher") {
+          const me = teachers.find((t) => t.userId?._id === user?.id || t.userId === user?.id);
+          const hasClassIds = me && me.assignedClassIds && me.assignedClassIds.length > 0;
+          const hasLegacyClasses = me && me.assignedClasses && me.assignedClasses.length > 0;
+          if (hasClassIds || hasLegacyClasses) {
+            shouldFetchAttendance = true;
+          }
+        }
+
+        if (shouldFetchAttendance) {
+          try {
+            const res = await attendanceApi.getByDate(today, "Student");
+            attendanceRes = { status: "fulfilled", value: res };
+          } catch (e) {
+            attendanceRes = { status: "rejected", reason: e };
+          }
+        }
+
+        if (cancelled) return;
+
+        const attendance = unwrap(attendanceRes) || [];
 
         const studentListOk = studentRes.status === "fulfilled";
         const teacherListOk = teacherRes.status === "fulfilled";
@@ -205,9 +236,11 @@ export function useDashboardData(user) {
         setLoading(false);
 
         // PHASE 2: Secondary Data (Finance, Exams, Events, Logs)
+        const canAccessFinance = role === "admin" || role === "accountant";
+
         const [financeRes, financeSumRes, examRes, eventRes, logRes, meetingRes] = await Promise.allSettled([
-          financeApi.list(),
-          financeApi.summary(),
+          canAccessFinance ? financeApi.list() : Promise.reject(new Error("Unauthorized")),
+          canAccessFinance ? financeApi.summary() : Promise.reject(new Error("Unauthorized")),
           examApi.listExams(),
           eventApi.list(),
           role === "admin" ? activityLogApi.list() : Promise.resolve({ data: [] }),

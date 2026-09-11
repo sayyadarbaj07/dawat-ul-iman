@@ -19,8 +19,27 @@ const sendError = (res, statusCode, message, error = null) => {
 // @access  Private (Admin)
 const getLogs = async (req, res) => {
   try {
-    const logs = await ActivityLog.find().sort({ createdAt: -1 }).limit(100);
-    return sendSuccess(res, 200, "Activity logs fetched successfully", logs);
+    const { page = 1, limit = 50 } = req.query;
+    const parsedPage = Math.max(1, parseInt(page, 10));
+    const parsedLimit = Math.min(parseInt(limit, 10), 500);
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const total = await ActivityLog.countDocuments();
+    const logs = await ActivityLog.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parsedLimit)
+      .lean();
+
+    return sendSuccess(res, 200, "Activity logs fetched successfully", {
+      data: logs,
+      meta: {
+        total,
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(total / parsedLimit)
+      }
+    });
   } catch (error) {
     return sendError(res, 500, "Failed to fetch activity logs", error);
   }

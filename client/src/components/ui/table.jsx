@@ -1,6 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
-const Table = React.forwardRef(({ className, ...props }, ref) => (<div className="relative w-full overflow-auto">
+const Table = React.forwardRef(({ className, ...props }, ref) => (<div className="relative w-full overflow-x-auto">
     <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props}/>
   </div>));
 Table.displayName = "Table";
@@ -12,7 +12,7 @@ const TableFooter = React.forwardRef(({ className, ...props }, ref) => (<tfoot r
 TableFooter.displayName = "TableFooter";
 const TableRow = React.forwardRef(({ className, ...props }, ref) => (<tr ref={ref} className={cn("border-b transition-colors duration-200 hover:bg-primary/5 data-[state=selected]:bg-muted", className)} {...props}/>));
 TableRow.displayName = "TableRow";
-const TableHead = React.forwardRef(({ className, ...props }, ref) => (<th ref={ref} className={cn("h-10 px-2 text-left align-middle font-medium text-muted-foreground uppercase tracking-wider text-xs [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]", className)} {...props}/>));
+const TableHead = React.forwardRef(({ className, ...props }, ref) => (<th ref={ref} className={cn("h-10 px-2 text-start align-middle font-medium text-muted-foreground uppercase tracking-wider text-xs [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]", className)} {...props}/>));
 TableHead.displayName = "TableHead";
 const TableCell = React.forwardRef(({ className, ...props }, ref) => (<td ref={ref} className={cn("p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]", className)} {...props}/>));
 TableCell.displayName = "TableCell";

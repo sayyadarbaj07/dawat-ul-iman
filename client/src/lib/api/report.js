@@ -6,4 +6,17 @@ export const reportApi = {
     const query = new URLSearchParams(filters).toString();
     return request(`/reports/weak-students?${query}`);
   },
+  getDetailedFinance: (filters = {}) => {
+    const query = new URLSearchParams(filters).toString();
+    return request(`/reports/finance/detailed?${query}`);
+  },
+
+  getStudentList: (filters = {}) => {
+    const query = new URLSearchParams(filters).toString();
+    return request(`/reports/students/list?${query}`);
+  },
+  getExamAnalytics: (filters = {}) => {
+    const query = new URLSearchParams(filters).toString();
+    return request(`/reports/exams/analytics?${query}`);
+  },
 };

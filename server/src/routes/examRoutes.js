@@ -10,6 +10,7 @@ router.route("/")
   .post(authorize("admin", "teacher"), examController.createExam);
 
 router.route("/:id")
+  .put(authorize("admin", "teacher"), examController.updateExam)
   .delete(authorize("admin", "teacher"), examController.deleteExam);
 
 router.route("/results")

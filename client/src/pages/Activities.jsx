@@ -20,7 +20,7 @@ export default function Activities() {
           <p className="text-muted-foreground mt-1">{tr("activities", "pageSubtitle")}</p>
         </div>
         <Button>
-          <Award className="mr-2 h-4 w-4"/> {tr("activities", "addAchievement")}
+          <Award className="me-2 h-4 w-4"/> {tr("activities", "addAchievement")}
         </Button>
       </div>
 
@@ -28,25 +28,25 @@ export default function Activities() {
         <Card className="md:col-span-2 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Mic className="h-5 w-5 text-primary"/> Next Bazm Activity
+              <Mic className="h-5 w-5 text-primary"/> {tr("activities", "nextBazmActivity")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col md:flex-row gap-6">
               <div className="flex-1 space-y-4">
                 <div>
-                  <h3 className="text-2xl font-bold text-primary">Bazm-e-Tariq bin Ziyad</h3>
-                  <p className="text-muted-foreground text-lg">Weekly Speech Competition</p>
+                  <h3 className="text-2xl font-bold text-primary" dir="auto">Bazm-e-Tariq bin Ziyad</h3>
+                  <p className="text-muted-foreground text-lg" dir="auto">{tr("activities", "weeklyCompetition")}</p>
                 </div>
                 <div className="flex items-center gap-4 text-sm font-medium">
-                  <div className="bg-white px-3 py-1.5 rounded-md shadow-sm border">
-                    📅 Next Saturday
+                  <div className="bg-white px-3 py-1.5 rounded-md shadow-sm border" dir="ltr">
+                    📅 {tr("activities", "nextSaturday")}
                   </div>
-                  <div className="bg-white px-3 py-1.5 rounded-md shadow-sm border">
+                  <div className="bg-white px-3 py-1.5 rounded-md shadow-sm border" dir="ltr">
                     ⏰ 10:00 AM
                   </div>
                 </div>
-                <Button className="mt-2">Register Participants</Button>
+                <Button className="mt-2">{tr("activities", "registerParticipants")}</Button>
               </div>
               <div className="hidden md:flex w-32 items-center justify-center bg-white rounded-xl shadow-sm border border-primary/10">
                 <Users className="h-12 w-12 text-primary/40"/>
@@ -58,7 +58,7 @@ export default function Activities() {
         <Card className="md:col-span-1 bg-amber-50/50 border-amber-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-amber-800">
-              <Trophy className="h-5 w-5"/> Recent Awards
+              <Trophy className="h-5 w-5"/> {tr("activities", "recentAwards")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -68,8 +68,8 @@ export default function Activities() {
                   <span className="text-lg">🥇</span>
                 </div>
                 <div>
-                  <p className="font-semibold text-sm">Best Speaker Award</p>
-                  <p className="text-xs text-muted-foreground">Muhammad Umar (Diniyat)</p>
+                  <p className="font-semibold text-sm">{tr("activities", "bestSpeakerAward")}</p>
+                  <p className="text-xs text-muted-foreground" dir="auto">Muhammad Umar (Diniyat)</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -77,37 +77,37 @@ export default function Activities() {
                   <span className="text-lg">🥈</span>
                 </div>
                 <div>
-                  <p className="font-semibold text-sm">Naat Competition runner-up</p>
-                  <p className="text-xs text-muted-foreground">Abdul Rahman (Arabic)</p>
+                  <p className="font-semibold text-sm">{tr("activities", "naatRunnerUp")}</p>
+                  <p className="text-xs text-muted-foreground" dir="auto">Abdul Rahman (Arabic)</p>
                 </div>
               </div>
             </div>
-            <Button variant="outline" className="w-full mt-6 bg-white">View All Awards</Button>
+            <Button variant="outline" className="w-full mt-6 bg-white">{tr("activities", "viewAllAwards")}</Button>
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Participation Records</CardTitle>
-          <CardDescription>History of student participation in various activities.</CardDescription>
+          <CardTitle>{tr("activities", "participationRecords")}</CardTitle>
+          <CardDescription>{tr("activities", "participationDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Student Name</TableHead>
-                <TableHead>Class</TableHead>
-                <TableHead>Activity</TableHead>
-                <TableHead>Position/Role</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead>{tr("activities", "studentName")}</TableHead>
+                <TableHead>{tr("activities", "class")}</TableHead>
+                <TableHead>{tr("activities", "activity")}</TableHead>
+                <TableHead>{tr("activities", "positionRole")}</TableHead>
+                <TableHead>{tr("activities", "date")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {records.map((record, idx) => (<TableRow key={idx}>
-                  <TableCell className="font-medium">{record.student}</TableCell>
-                  <TableCell>{record.class}</TableCell>
-                  <TableCell>{record.activity}</TableCell>
+                  <TableCell className="font-medium" dir="auto">{record.student}</TableCell>
+                  <TableCell dir="auto">{record.class}</TableCell>
+                  <TableCell dir="auto">{record.activity}</TableCell>
                   <TableCell>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${record.position.includes('1st') ? 'bg-amber-100 text-amber-800' :
                 record.position.includes('2nd') ? 'bg-gray-200 text-gray-800' :
@@ -116,7 +116,7 @@ export default function Activities() {
                       {record.position}
                     </span>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{record.date}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm" dir="ltr">{record.date}</TableCell>
                 </TableRow>))}
             </TableBody>
           </Table>

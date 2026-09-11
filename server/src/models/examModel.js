@@ -22,6 +22,11 @@ const examSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    classId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Class',
+      required: false,
+    },
     date: {
       type: Date,
       required: true,
@@ -47,6 +52,18 @@ const examSchema = new mongoose.Schema(
     },
   },
   { timestamps: true }
+);
+
+// Canonical Exam Unique Index
+examSchema.index(
+  { classId: 1, name: 1, academicYear: 1 },
+  { unique: true, partialFilterExpression: { classId: { $exists: true } } }
+);
+
+// Legacy Exam Unique Index
+examSchema.index(
+  { class: 1, name: 1, academicYear: 1 },
+  { unique: true, partialFilterExpression: { classId: { $exists: false } } }
 );
 
 module.exports = mongoose.model("Exam", examSchema);

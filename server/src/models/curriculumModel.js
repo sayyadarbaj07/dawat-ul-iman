@@ -5,7 +5,12 @@ const curriculumSchema = new mongoose.Schema(
     department: {
       type: String,
       required: true,
-      enum: ["diniyat", "arabic", "contemporary"],
+      enum: ["diniyat", "hifz", "alimiyat", "qirat", "contemporary", "arabic"],
+    },
+    classId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Class',
+      default: null,
     },
     subject: {
       type: String,

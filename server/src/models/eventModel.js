@@ -11,4 +11,7 @@ const eventSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// NEW: Index to optimize the common `.sort({ date: 1 })` query
+eventSchema.index({ date: 1 });
+
 module.exports = mongoose.model("Event", eventSchema);

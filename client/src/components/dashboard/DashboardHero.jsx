@@ -12,49 +12,52 @@ export function DashboardHero({ userName, canAccess }) {
   const { islamic, gregorian } = formatHeaderDates(language);
 
   return (
-    <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[hsl(152,38%,36%)] via-primary to-[hsl(152,52%,18%)] px-5 py-7 text-primary-foreground shadow-md sm:px-8 sm:py-9 lg:px-10 lg:py-11">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_end,rgba(255,255,255,0.16),transparent_46%)]" />
-      <div className="pointer-events-none absolute end-[-12%] top-[-30%] h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-28%] start-[-8%] h-48 w-48 rounded-full bg-black/10 blur-3xl" />
+    <section className="relative overflow-hidden rounded-[16px] sm:rounded-[20px] bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-950 px-5 py-6 text-white shadow-lg sm:px-8 sm:py-8 lg:px-10 lg:py-8">
+      {/* Subtle Premium Grid Pattern */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:24px_24px] opacity-40" />
+      
+      {/* Lighting Effects */}
+      <div className="pointer-events-none absolute end-[-10%] top-[-20%] h-64 w-64 rounded-full bg-[#34D399] opacity-10 blur-[80px]" />
+      <div className="pointer-events-none absolute bottom-[-30%] start-[-10%] h-56 w-56 rounded-full bg-[#059669] opacity-20 blur-[80px]" />
 
-      <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-12">
+      <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
         <div className="min-w-0 max-w-2xl space-y-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary-foreground/70">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-100/70">
             {t("appSubtitle")}
           </p>
-          <div className="space-y-2.5">
-            <h1 className="text-[1.75rem] font-semibold leading-tight tracking-tight sm:text-[2.15rem] lg:text-4xl">
+          <div className="space-y-2">
+            <h1 className="text-[24px] font-bold leading-tight tracking-tight sm:text-[28px] lg:text-[32px]">
               {tr("dashboard", "welcomeName", { name: userName })}
             </h1>
-            <p className="max-w-lg text-sm leading-relaxed text-primary-foreground/80 sm:text-[15px]">
+            <p className="max-w-lg text-[14px] leading-relaxed text-emerald-50/80 sm:text-[15px]">
               {tr("dashboard", "heroTagline")}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/12 px-3 py-1.5 text-xs font-medium">
-              <CalendarDays className="h-3.5 w-3.5 opacity-80" />
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11.5px] font-semibold backdrop-blur-sm border border-white/10">
+              <CalendarDays className="h-3.5 w-3.5 text-emerald-200" />
               {islamic}
             </span>
-            <span className="rounded-full bg-black/15 px-3 py-1.5 text-xs font-medium">
+            <span className="rounded-full bg-black/20 px-3 py-1.5 text-[11.5px] font-semibold backdrop-blur-sm border border-black/10">
               {gregorian}
             </span>
             {settings?.academicYear ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/12 px-3 py-1.5 text-xs font-medium">
-                <GraduationCap className="h-3.5 w-3.5 opacity-80" />
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11.5px] font-semibold backdrop-blur-sm border border-white/10">
+                <GraduationCap className="h-3.5 w-3.5 text-emerald-200" />
                 {tr("dashboard", "academicYear", { year: settings.academicYear })}
               </span>
             ) : null}
           </div>
 
-          <div className="flex flex-wrap gap-2.5 pt-1">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2.5 pt-1 w-full sm:w-auto">
             {canAccess("/attendance") && (
               <Button
                 asChild
-                className="h-10 rounded-xl bg-white px-4 font-semibold text-primary shadow-sm transition-[background-color,box-shadow,transform] duration-200 hover:bg-white/92 hover:shadow-md"
+                className="w-full sm:w-auto min-h-[44px] rounded-[12px] bg-white px-5 font-bold text-emerald-950 shadow-[0_4px_14px_0_rgba(255,255,255,0.25)] transition-all duration-[200ms] ease-[cubic-bezier(0.2,0,0,1)] hover:bg-emerald-50 hover:shadow-[0_6px_20px_rgba(255,255,255,0.3)] hover:-translate-y-[2px]"
               >
                 <Link href="/attendance">
-                  <CalendarCheck className="h-4 w-4" />
+                  <CalendarCheck className="h-4 w-4 mr-2" />
                   {tr("dashboard", "markAttendance")}
                 </Link>
               </Button>
@@ -63,10 +66,10 @@ export function DashboardHero({ userName, canAccess }) {
               <Button
                 asChild
                 variant="outline"
-                className="h-10 rounded-xl border-white/25 bg-white/5 px-4 font-semibold text-primary-foreground shadow-none transition-[background-color,box-shadow] duration-200 hover:bg-white/12"
+                className="w-full sm:w-auto min-h-[44px] rounded-[12px] border-white/20 bg-white/5 px-5 font-bold text-white shadow-none backdrop-blur-sm transition-all duration-[200ms] ease-[cubic-bezier(0.2,0,0,1)] hover:bg-white/15 hover:border-white/30 hover:-translate-y-[2px]"
               >
                 <Link href="/students">
-                  <Users className="h-4 w-4" />
+                  <Users className="h-4 w-4 mr-2" />
                   {tr("dashboard", "addStudent")}
                 </Link>
               </Button>
@@ -74,13 +77,13 @@ export function DashboardHero({ userName, canAccess }) {
           </div>
         </div>
 
-        <div className="hidden shrink-0 sm:block">
-          <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 shadow-sm">
+        <div className="hidden shrink-0 lg:block">
+          <div className="rounded-[16px] border border-white/10 bg-white/5 p-5 shadow-2xl backdrop-blur-md max-w-[200px]">
             <BrandLogo
-              className="text-primary-foreground"
-              size="lg"
-              textClassName="text-primary-foreground"
-              imageClassName="object-contain"
+              className="text-white flex-col gap-2"
+              size="sm"
+              textClassName="text-white text-center text-sm"
+              imageClassName="object-contain drop-shadow-md mx-auto"
             />
           </div>
         </div>

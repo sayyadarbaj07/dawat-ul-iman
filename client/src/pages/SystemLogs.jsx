@@ -1,12 +1,16 @@
+import { useLanguage } from "@/context/LanguageContext";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Activity } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { activityLogApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SystemLogs() {
+  const { tr } = useLanguage();
     const { toast } = useToast();
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -15,9 +19,9 @@ export default function SystemLogs() {
       const fetchLogs = async () => {
         try {
           const response = await activityLogApi.list();
-          setLogs(response.data || []);
+          setLogs(response.data?.data || response.data || []);
         } catch (error) {
-          toast({ title: "Error", description: "Failed to load system logs", variant: "destructive" });
+          toast({ title: tr("common", "error"), description: tr("systemLogs", "noLogsDesc"), variant: "destructive" });
         } finally {
           setLoading(false);
         }
@@ -27,43 +31,47 @@ export default function SystemLogs() {
 
     return (
       <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">System Audit Logs</h2>
-          <p className="text-muted-foreground mt-1">Track user actions and system changes</p>
-        </div>
-      </div>
+      <PageHeader 
+        title={tr("systemLogs", "pageTitle")}
+        description={tr("systemLogs", "pageDescription")}
+        showBack={true}
+        backLabel={tr("common", "backToDashboard")}
+      />
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> Activity Trail</CardTitle>
-          <CardDescription>Recent system events (Admins Only)</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Activity className="h-5 w-5 text-primary" /> {tr("systemLogs", "activityTrail")}</CardTitle>
+          <CardDescription>{tr("systemLogs", "adminsOnly")}</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="py-8 text-center text-muted-foreground">Loading audit logs...</div>
+            <div className="py-8 text-center text-muted-foreground">{tr("systemLogs", "loading")}</div>
           ) : logs.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">No activity logs found.</div>
+            <EmptyState 
+              title={tr("systemLogs", "noLogs")}
+              description={tr("systemLogs", "noLogsDesc")}
+              icon={Activity}
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date / Time</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Module</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead>{tr("systemLogs", "dateTime")}</TableHead>
+                    <TableHead>{tr("systemLogs", "user")}</TableHead>
+                    <TableHead>{tr("systemLogs", "role")}</TableHead>
+                    <TableHead>{tr("systemLogs", "action")}</TableHead>
+                    <TableHead>{tr("systemLogs", "module")}</TableHead>
+                    <TableHead>{tr("common", "description")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {logs.map((log) => (
+                  {(Array.isArray(logs) ? logs : []).map((log) => (
                     <TableRow key={log._id}>
-                      <TableCell className="whitespace-nowrap text-muted-foreground text-sm">
+                      <TableCell className="whitespace-nowrap text-muted-foreground text-sm" dir="ltr">
                         {new Date(log.createdAt).toLocaleString()}
                       </TableCell>
-                      <TableCell className="font-medium">{log.username}</TableCell>
+                      <TableCell className="font-medium" dir="auto">{log.username}</TableCell>
                       <TableCell>
                         <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 capitalize">
                           {log.role}
@@ -78,8 +86,8 @@ export default function SystemLogs() {
                           {log.action}
                         </span>
                       </TableCell>
-                      <TableCell>{log.module || "System"}</TableCell>
-                      <TableCell>{log.description}</TableCell>
+                      <TableCell>{log.module || tr("systemLogs", "system")}</TableCell>
+                      <TableCell dir="auto">{log.description}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

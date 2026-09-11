@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { useSettings } from "@/context/SettingsContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -93,12 +94,12 @@ export default function InstituteSettings() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-bold tracking-tight">Institute Settings</h2>
-        <p className="text-muted-foreground">
-          Manage Madrasa profile, contact info, and logo for reports.
-        </p>
-      </div>
+      <PageHeader 
+        title="Institute Settings"
+        description="Manage Madrasa profile, contact info, and logo for reports."
+        showBack={true}
+        backLabel="Back to Dashboard"
+      />
 
       <Card>
         <CardHeader>

@@ -3,16 +3,19 @@ import { motion } from "framer-motion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { BackButton } from "@/components/ui/BackButton";
 import { Search, Plus, MoreVertical, Edit, Trash, FileText, Phone } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
-import { teacherApi, attendanceApi } from "@/lib/api";
+import { formatLocalizedNumber, formatLocalizedDate, formatLocalizedPercent } from "@/utils/localizationUtils";
+import { teacherApi, attendanceApi, classApi } from "@/lib/api";
 
 export default function Teachers() {
-    const { tr } = useLanguage();
+    const { tr, language } = useLanguage();
     const [searchTerm, setSearchTerm] = useState("");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -31,7 +34,7 @@ export default function Teachers() {
       mobile: "",
       salary: "",
       classesAssigned: "",
-      assignedClasses: [],
+      assignedClassIds: [],
       username: "",
       password: "",
       confirmPassword: "",
@@ -45,17 +48,27 @@ export default function Teachers() {
       mobile: "",
       salary: "",
       classesAssigned: "",
-      assignedClasses: [],
+      assignedClassIds: [],
       photo: null,
     });
 
-    const CLASS_OPTIONS = [
-      { id: "diniyat", label: "Diniyat" },
-      { id: "arabic", label: "Arabic" },
-      { id: "contemporary", label: "Contemporary" }
-    ];
+    // CLASS_OPTIONS removed in favor of dynamic apiClasses
 
     const [isSearching, setIsSearching] = useState(false);
+    const [apiClasses, setApiClasses] = useState([]);
+    
+    useEffect(() => {
+      const loadData = async () => {
+        try {
+          const res = await classApi.getClasses();
+          // Filter out inactive classes for new selection
+          setApiClasses(res.data?.filter(c => c.status === "active") || []);
+        } catch (err) {
+          console.error("Failed to fetch classes:", err);
+        }
+      };
+      loadData();
+    }, []);
 
     const loadTeachers = async (isBackground = false) => {
       try {
@@ -79,7 +92,7 @@ export default function Teachers() {
       event.preventDefault();
       setErrorMsg("");
       if (formData.password !== formData.confirmPassword) {
-        setErrorMsg("Passwords do not match!");
+        setErrorMsg(tr("teachers", "passwordsDoNotMatch"));
         return;
       }
       try {
@@ -89,7 +102,7 @@ export default function Teachers() {
         payload.append("mobile", formData.mobile);
         payload.append("salary", Number(formData.salary));
         payload.append("classesAssigned", Number(formData.classesAssigned));
-        formData.assignedClasses.forEach(c => payload.append("assignedClasses[]", c));
+        formData.assignedClassIds.forEach(c => payload.append("assignedClassIds[]", c));
         payload.append("username", formData.username);
         payload.append("password", formData.password);
         payload.append("isActive", formData.isActive);
@@ -100,12 +113,12 @@ export default function Teachers() {
         await teacherApi.createWithFile(payload);
         setIsAddModalOpen(false);
         setFormData({
-          name: "", subject: "", mobile: "", salary: "", classesAssigned: "", assignedClasses: [],
+          name: "", subject: "", mobile: "", salary: "", classesAssigned: "", assignedClassIds: [],
           username: "", password: "", confirmPassword: "", isActive: true, photo: null
         });
         loadTeachers();
       } catch (error) {
-        setErrorMsg(error.message || "Failed to create teacher account");
+        setErrorMsg(error.message || tr("teachers", "failedToCreateAccount"));
       }
     };
 
@@ -134,7 +147,7 @@ export default function Teachers() {
         mobile: teacher.mobile || "",
         salary: teacher.salary || "",
         classesAssigned: teacher.classesAssigned || "",
-        assignedClasses: teacher.assignedClasses || [],
+        assignedClassIds: teacher.assignedClassIds || [],
       });
       setIsEditModalOpen(true);
     };
@@ -148,7 +161,7 @@ export default function Teachers() {
         payload.append("mobile", editFormData.mobile);
         payload.append("salary", Number(editFormData.salary));
         payload.append("classesAssigned", Number(editFormData.classesAssigned));
-        editFormData.assignedClasses.forEach(c => payload.append("assignedClasses[]", c));
+        editFormData.assignedClassIds.forEach(c => payload.append("assignedClassIds[]", c));
         if (editFormData.photo) {
           payload.append("photo", editFormData.photo);
         }
@@ -161,7 +174,7 @@ export default function Teachers() {
     };
 
     const handleDelete = async (id) => {
-      if (!confirm("Are you sure you want to delete this teacher?")) return;
+      if (!confirm(tr("teachers", "deleteTeacherConfirm"))) return;
       try {
         await teacherApi.remove(id);
         loadTeachers();
@@ -177,106 +190,107 @@ export default function Teachers() {
 
     return (
       <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">{tr("teachers", "pageTitle")}</h2>
-            <p className="text-muted-foreground mt-1">{tr("teachers", "pageSubtitle")}</p>
-          </div>
-          
-          <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-            <DialogTrigger asChild>
-              <Button className="shrink-0">
-                <Plus className="mr-2 h-4 w-4"/> {tr("teachers", "addTeacher")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <PageHeader 
+          title={tr("teachers", "pageTitle")}
+          description={tr("teachers", "pageSubtitle")}
+          showBack={true}
+          backLabel="Back to Dashboard"
+          actions={
+            <Button onClick={() => setIsAddModalOpen(true)} className="shrink-0 w-full sm:w-auto">
+              <Plus className="me-2 h-4 w-4"/> {tr("teachers", "addTeacher")}
+            </Button>
+          }
+        />
+        
+        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{tr("teachers", "addTeacher")}</DialogTitle>
                 <DialogDescription>
-                  Create a new teacher profile and provision their login account.
+                  {tr("teachers", "addTeacherDescription")}
                 </DialogDescription>
               </DialogHeader>
               {errorMsg && <div className="text-red-500 text-sm p-2 bg-red-50 rounded">{errorMsg}</div>}
               
               <form onSubmit={handleSubmit}>
                 <div className="grid gap-4 py-2">
-                  <div className="font-semibold text-sm border-b pb-1">Profile Details</div>
+                  <div className="font-semibold text-sm border-b pb-1">{tr("teachers", "profileDetails")}</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="name">{tr("teachers", "fullName")}</Label>
-                      <Input id="name" required placeholder="Maulana Abdullah" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
+                      <Input dir="auto" id="name" required placeholder="Maulana Abdullah" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="subject">{tr("teachers", "primarySubject")}</Label>
-                      <Input id="subject" required placeholder="Fiqh" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})}/>
+                      <Input dir="auto" id="subject" required placeholder="Fiqh" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})}/>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="mobile">{tr("teachers", "mobileNumber")}</Label>
-                      <Input id="mobile" required placeholder="03xx-xxxxxxx" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})}/>
+                      <Input dir="ltr" id="mobile" required placeholder="03xx-xxxxxxx" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="salary">{tr("teachers", "salary")}</Label>
-                      <Input id="salary" required type="number" placeholder="25000" value={formData.salary} onChange={e => setFormData({...formData, salary: e.target.value})}/>
+                      <Input dir="ltr" id="salary" required type="number" placeholder="25000" value={formData.salary} onChange={e => setFormData({...formData, salary: e.target.value})}/>
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="classes">Classes Count (Numeric)</Label>
-                    <Input id="classes" required type="number" placeholder="4" value={formData.classesAssigned} onChange={e => setFormData({...formData, classesAssigned: e.target.value})}/>
+                    <Label htmlFor="classes">{tr("teachers", "classesCount")}</Label>
+                    <Input dir="ltr" id="classes" required type="number" placeholder="4" value={formData.classesAssigned} onChange={e => setFormData({...formData, classesAssigned: e.target.value})}/>
                   </div>
                   <div className="grid gap-2">
-                    <Label>Assign Classes to Teacher</Label>
+                    <Label>{tr("teachers", "assignClasses")}</Label>
                     <div className="flex flex-wrap gap-4 mt-1">
-                      {CLASS_OPTIONS.map((cls) => (
-                        <label key={cls.id} className="flex items-center space-x-2 text-sm">
+                      {apiClasses.map((cls) => (
+                        <label key={cls._id} className="flex items-center space-x-2 text-sm">
                           <input 
                             type="checkbox" 
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            checked={formData.assignedClasses.includes(cls.id)}
+                            checked={formData.assignedClassIds.includes(cls._id)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setFormData({...formData, assignedClasses: [...formData.assignedClasses, cls.id]});
+                                setFormData({...formData, assignedClassIds: [...formData.assignedClassIds, cls._id]});
                               } else {
-                                setFormData({...formData, assignedClasses: formData.assignedClasses.filter(c => c !== cls.id)});
+                                setFormData({...formData, assignedClassIds: formData.assignedClassIds.filter(c => c !== cls._id)});
                               }
                             }}
                           />
-                          <span>{cls.label}</span>
+                          <span>{cls.fullName}</span>
                         </label>
                       ))}
                     </div>
                   </div>
                   <div className="grid gap-2 mt-4">
-                    <Label htmlFor="photo">Profile Photo</Label>
+                    <Label htmlFor="photo">{tr("teachers", "profilePhoto")}</Label>
                     <Input id="photo" type="file" accept="image/*" onChange={e => setFormData({...formData, photo: e.target.files[0]})} />
                   </div>
 
-                  <div className="font-semibold text-sm border-b pb-1 mt-4">Login Credentials</div>
+                  <div className="font-semibold text-sm border-b pb-1 mt-4">{tr("teachers", "loginCredentials")}</div>
                   <div className="grid gap-2">
-                    <Label htmlFor="username">Username / Email</Label>
-                    <Input id="username" required placeholder="teacher@example.com" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})}/>
+                    <Label htmlFor="username">{tr("teachers", "usernameEmail")}</Label>
+                    <Input dir="ltr" id="username" required placeholder="teacher@example.com" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})}/>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="password">Password</Label>
-                      <Input id="password" required type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
+                      <Label htmlFor="password">{tr("teachers", "password")}</Label>
+                      <Input dir="ltr" id="password" required type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="confirmPassword">Confirm Password</Label>
-                      <Input id="confirmPassword" required type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})}/>
+                      <Label htmlFor="confirmPassword">{tr("teachers", "confirmPassword")}</Label>
+                      <Input dir="ltr" id="confirmPassword" required type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})}/>
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="isActive">Account Status</Label>
+                    <Label htmlFor="isActive">{tr("teachers", "accountStatus")}</Label>
                     <select
                       id="isActive"
                       value={String(formData.isActive)}
                       onChange={e => setFormData({...formData, isActive: e.target.value === "true"})}
                       className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <option value="true">Active</option>
-                      <option value="false">Inactive</option>
+                      <option value="true">{tr("teachers", "active")}</option>
+                      <option value="false">{tr("teachers", "inactive")}</option>
                     </select>
                   </div>
                 </div>
@@ -294,7 +308,7 @@ export default function Teachers() {
               <DialogHeader>
                 <DialogTitle>{tr("teachers", "editDetails")}</DialogTitle>
                 <DialogDescription>
-                  Update the teacher's profile information.
+                  {tr("teachers", "editTeacherDescription")}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleEditSubmit}>
@@ -302,57 +316,57 @@ export default function Teachers() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="edit-name">{tr("teachers", "fullName")}</Label>
-                      <Input id="edit-name" required value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})}/>
+                      <Input dir="auto" id="edit-name" required value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="edit-subject">{tr("teachers", "primarySubject")}</Label>
-                      <Input id="edit-subject" required value={editFormData.subject} onChange={e => setEditFormData({...editFormData, subject: e.target.value})}/>
+                      <Input dir="auto" id="edit-subject" required value={editFormData.subject} onChange={e => setEditFormData({...editFormData, subject: e.target.value})}/>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label htmlFor="edit-mobile">{tr("teachers", "mobileNumber")}</Label>
-                      <Input id="edit-mobile" required value={editFormData.mobile} onChange={e => setEditFormData({...editFormData, mobile: e.target.value})}/>
+                      <Input dir="ltr" id="edit-mobile" required value={editFormData.mobile} onChange={e => setEditFormData({...editFormData, mobile: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="edit-salary">{tr("teachers", "salary")}</Label>
-                      <Input id="edit-salary" required type="number" value={editFormData.salary} onChange={e => setEditFormData({...editFormData, salary: e.target.value})}/>
+                      <Input dir="ltr" id="edit-salary" required type="number" value={editFormData.salary} onChange={e => setEditFormData({...editFormData, salary: e.target.value})}/>
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="edit-classes">Classes Count (Numeric)</Label>
-                    <Input id="edit-classes" required type="number" value={editFormData.classesAssigned} onChange={e => setEditFormData({...editFormData, classesAssigned: e.target.value})}/>
+                    <Label htmlFor="edit-classes">{tr("teachers", "classesCount")}</Label>
+                    <Input dir="ltr" id="edit-classes" required type="number" value={editFormData.classesAssigned} onChange={e => setEditFormData({...editFormData, classesAssigned: e.target.value})}/>
                   </div>
                   <div className="grid gap-2 mt-2">
-                    <Label>Assign Classes to Teacher</Label>
+                    <Label>{tr("teachers", "assignClasses")}</Label>
                     <div className="flex flex-wrap gap-4 mt-1">
-                      {CLASS_OPTIONS.map((cls) => (
-                        <label key={cls.id} className="flex items-center space-x-2 text-sm">
+                      {apiClasses.map((cls) => (
+                        <label key={cls._id} className="flex items-center space-x-2 text-sm">
                           <input 
                             type="checkbox" 
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            checked={editFormData.assignedClasses.includes(cls.id)}
+                            checked={editFormData.assignedClassIds.includes(cls._id)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setEditFormData({...editFormData, assignedClasses: [...editFormData.assignedClasses, cls.id]});
+                                setEditFormData({...editFormData, assignedClassIds: [...editFormData.assignedClassIds, cls._id]});
                               } else {
-                                setEditFormData({...editFormData, assignedClasses: editFormData.assignedClasses.filter(c => c !== cls.id)});
+                                setEditFormData({...editFormData, assignedClassIds: editFormData.assignedClassIds.filter(c => c !== cls._id)});
                               }
                             }}
                           />
-                          <span>{cls.label}</span>
+                          <span>{cls.fullName}</span>
                         </label>
                       ))}
                     </div>
                   </div>
                   <div className="grid gap-2 mt-4">
-                    <Label htmlFor="edit-photo">Profile Photo (Leave empty to keep current)</Label>
+                    <Label htmlFor="edit-photo">{tr("teachers", "profilePhotoEdit")}</Label>
                     <Input id="edit-photo" type="file" accept="image/*" onChange={e => setEditFormData({...editFormData, photo: e.target.files[0]})} />
                   </div>
                 </div>
                 <DialogFooter className="mt-6">
                   <Button variant="outline" type="button" onClick={() => setIsEditModalOpen(false)}>{tr("teachers", "cancel")}</Button>
-                  <Button type="submit">Save Changes</Button>
+                  <Button type="submit">{tr("teachers", "saveTeacher")}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -364,7 +378,7 @@ export default function Teachers() {
               <DialogHeader>
                 <DialogTitle>{tr("teachers", "viewProfile")}</DialogTitle>
                 <DialogDescription>
-                  Detailed information for {selectedTeacher?.name}
+                  {tr("teachers", "viewProfile")} - {selectedTeacher?.name}
                 </DialogDescription>
               </DialogHeader>
               {selectedTeacher && (
@@ -381,7 +395,7 @@ export default function Teachers() {
                     </div>
                     
                     <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Username / Email</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "usernameEmail")}</span>
                       <span className="font-medium text-foreground">{selectedTeacher.userId?.username || "—"}</span>
                     </div>
                     
@@ -403,54 +417,59 @@ export default function Teachers() {
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "classesAssigned")}</span>
                       <span className="font-medium text-foreground">
-                        {selectedTeacher.assignedClasses && selectedTeacher.assignedClasses.length > 0 
-                          ? selectedTeacher.assignedClasses.join(", ") 
-                          : selectedTeacher.classesAssigned}
+                        {selectedTeacher.assignedClassIds && selectedTeacher.assignedClassIds.length > 0
+                          ? selectedTeacher.assignedClassIds.map(id => {
+                              const match = apiClasses.find(c => c._id === id);
+                              return match ? match.fullName : id.slice(-6).toUpperCase();
+                            }).join(", ")
+                          : selectedTeacher.assignedClasses && selectedTeacher.assignedClasses.length > 0 
+                            ? selectedTeacher.assignedClasses.join(", ") 
+                            : selectedTeacher.classesAssigned}
                       </span>
                     </div>
                     
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "salaryLabel")}</span>
-                      <span className="font-medium text-foreground">{selectedTeacher.salary.toLocaleString()}</span>
+                      <span className="font-medium text-foreground">{formatLocalizedNumber(selectedTeacher.salary, language)}</span>
                     </div>
                   </div>
 
                   {/* Attendance Summary Section */}
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="text-sm font-semibold mb-3">Attendance Summary</h4>
+                    <h4 className="text-sm font-semibold mb-3">{tr("teachers", "attendanceSummary")}</h4>
                     {loadingSummary ? (
-                      <div className="text-xs text-muted-foreground">Loading summary...</div>
+                      <div className="text-xs text-muted-foreground">{tr("teachers", "loadingSummary")}</div>
                     ) : teacherAttendanceSummary ? (
                       <div className="space-y-4">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm">
                           <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
-                            <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Total</div>
-                            <div className="font-bold text-lg text-foreground mt-1">{teacherAttendanceSummary.summary?.total || 0}</div>
+                            <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">{tr("teachers", "total")}</div>
+                            <div className="font-bold text-lg text-foreground mt-1">{formatLocalizedNumber(teacherAttendanceSummary.summary?.total || 0, language)}</div>
                           </div>
                           <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
-                            <div className="text-emerald-700 text-[10px] font-semibold uppercase tracking-wider">Present</div>
-                            <div className="font-bold text-lg text-emerald-700 mt-1">{teacherAttendanceSummary.summary?.present || 0}</div>
+                            <div className="text-emerald-700 text-[10px] font-semibold uppercase tracking-wider">{tr("teachers", "present")}</div>
+                            <div className="font-bold text-lg text-emerald-700 mt-1">{formatLocalizedNumber(teacherAttendanceSummary.summary?.present || 0, language)}</div>
                           </div>
                           <div className="bg-red-500/10 p-3 rounded-xl border border-red-500/20">
-                            <div className="text-red-700 text-[10px] font-semibold uppercase tracking-wider">Absent</div>
-                            <div className="font-bold text-lg text-red-700 mt-1">{teacherAttendanceSummary.summary?.absent || 0}</div>
+                            <div className="text-red-700 text-[10px] font-semibold uppercase tracking-wider">{tr("teachers", "absent")}</div>
+                            <div className="font-bold text-lg text-red-700 mt-1">{formatLocalizedNumber(teacherAttendanceSummary.summary?.absent || 0, language)}</div>
                           </div>
                           <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
-                            <div className="text-amber-700 text-[10px] font-semibold uppercase tracking-wider">Late</div>
-                            <div className="font-bold text-lg text-amber-700 mt-1">{teacherAttendanceSummary.summary?.late || 0}</div>
+                            <div className="text-amber-700 text-[10px] font-semibold uppercase tracking-wider">{tr("teachers", "late")}</div>
+                            <div className="font-bold text-lg text-amber-700 mt-1">{formatLocalizedNumber(teacherAttendanceSummary.summary?.late || 0, language)}</div>
                           </div>
                         </div>
                         
                         {teacherAttendanceSummary.records && teacherAttendanceSummary.records.length > 0 && (
                           <div className="mt-2">
-                            <div className="text-xs font-medium text-gray-500 mb-2">Recent Records</div>
+                            <div className="text-xs font-medium text-gray-500 mb-2">{tr("teachers", "recentRecords")}</div>
                             <div className="max-h-32 overflow-y-auto rounded border">
                               <Table>
                                 <TableBody>
                                   {teacherAttendanceSummary.records.slice(0, 5).map(record => (
                                     <TableRow key={record._id}>
-                                      <TableCell className="py-1 text-xs">{new Date(record.date).toLocaleDateString()}</TableCell>
-                                      <TableCell className="py-1 text-xs text-right">
+                                      <TableCell className="py-1 text-xs">{formatLocalizedDate(record.date, language)}</TableCell>
+                                      <TableCell className="py-1 text-xs text-end">
                                         <span className={`px-2 py-0.5 rounded-full ${record.status === 'Present' ? 'bg-green-100 text-green-700' : record.status === 'Absent' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                                           {record.status}
                                         </span>
@@ -464,7 +483,7 @@ export default function Teachers() {
                         )}
                       </div>
                     ) : (
-                      <div className="text-xs text-muted-foreground">No attendance records found.</div>
+                      <div className="text-xs text-muted-foreground">{tr("teachers", "noAttendanceRecords")}</div>
                     )}
                   </div>
                 </div>
@@ -474,13 +493,12 @@ export default function Teachers() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
 
         <div className="bg-card rounded-lg border shadow-sm">
           <div className="p-4 border-b flex items-center justify-between">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"/>
-              <Input placeholder={tr("teachers", "searchPlaceholder")} className="pl-9 rounded-full bg-muted/20 shadow-inner focus-visible:ring-primary/20" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/>
+              <Input placeholder={tr("teachers", "searchPlaceholder")} className="ps-9 rounded-full bg-muted/20 shadow-inner focus-visible:ring-primary/20" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/>
             </div>
           </div>
           
@@ -493,8 +511,8 @@ export default function Teachers() {
                   <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "primarySubject")}</TableHead>
                   <TableHead className="text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "classes")}</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "mobile")}</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "salaryLabel")}</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "attendance")}</TableHead>
+                  <TableHead className="text-end text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "salaryLabel")}</TableHead>
+                  <TableHead className="text-end text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "attendance")}</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -513,16 +531,16 @@ export default function Teachers() {
                       <TableCell className="text-center">{teacher.classesAssigned}</TableCell>
                       <TableCell>
                         <div className="flex items-center text-sm">
-                          <Phone className="h-3 w-3 mr-1 text-muted-foreground"/>
+                          <Phone className="h-3 w-3 me-1 text-muted-foreground"/>
                           {teacher.mobile}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-medium text-gray-900">
-                        {teacher.salary.toLocaleString()}
+                      <TableCell className="text-end font-medium text-gray-900">
+                        {formatLocalizedNumber(teacher.salary, language)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-end">
                         <span className={`font-medium ${teacher.attendancePercent >= 95 ? 'text-green-600' : 'text-amber-600'}`}>
-                          {teacher.attendancePercent}%
+                          {formatLocalizedPercent(teacher.attendancePercent, language)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -536,16 +554,16 @@ export default function Teachers() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>{tr("teachers", "actions")}</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => openViewModal(teacher)}>
-                              <FileText className="mr-2 h-4 w-4"/>
+                              <FileText className="me-2 h-4 w-4"/>
                               {tr("teachers", "viewProfile")}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openEditModal(teacher)}>
-                              <Edit className="mr-2 h-4 w-4"/>
+                              <Edit className="me-2 h-4 w-4"/>
                               {tr("teachers", "editDetails")}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(teacher._id || teacher.id)}>
-                              <Trash className="mr-2 h-4 w-4"/>
+                              <Trash className="me-2 h-4 w-4"/>
                               {tr("teachers", "deleteRecord")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -554,14 +572,18 @@ export default function Teachers() {
                     </TableRow>
                   ))) : !loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
-                      {tr("teachers", "noResults")}
+                    <TableCell colSpan={8} className="p-0">
+                      <EmptyState 
+                        title={tr("teachers", "noResults")}
+                        description={tr("teachers", "noTeachersDesc")}
+                        icon={Search}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} className="h-24 text-center">
-                      Loading...
+                      {tr("common", "loading")}
                     </TableCell>
                   </TableRow>
                 )}

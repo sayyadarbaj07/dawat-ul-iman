@@ -2,6 +2,7 @@ import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { dashCardClass } from "../dashboard/primitives";
 
 function Sparkline({ data }) {
   if (!data?.length) return null;
@@ -28,7 +29,7 @@ function Sparkline({ data }) {
       <polyline
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="2.5"
         strokeLinejoin="round"
         strokeLinecap="round"
         points={points}
@@ -43,6 +44,7 @@ export function StatCard({
   subtitle,
   icon,
   iconClassName,
+  accentClassName,
   trend,
   sparkline,
   className,
@@ -50,62 +52,69 @@ export function StatCard({
 }) {
   return (
     <motion.div
-      className="h-full min-w-0"
-      initial={{ opacity: 0, y: 10 }}
+      className="h-full"
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1], delay }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1], delay }}
     >
       <Card
-        className={cn(
-          "group h-full rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md",
-          className,
-        )}
+        className={cn("relative group", dashCardClass, className)}
       >
-        <CardContent className="flex h-full min-h-[140px] flex-col p-6 pt-7 sm:p-7 sm:pt-8">
-          <div className="flex items-start justify-between gap-4">
-            <p className="pt-1 text-[13px] font-medium uppercase tracking-wider text-muted-foreground">
-              {title}
-            </p>
+        <CardContent className="flex h-full flex-col p-4 sm:p-5 lg:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-1.5 shrink">
+              <p className="text-[11.5px] sm:text-[12px] lg:text-[13px] font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase leading-snug">
+                {title}
+              </p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <h3 className="text-[24px] min-[400px]:text-[26px] sm:text-[28px] lg:text-[32px] font-[750] leading-none tracking-[-0.02em] text-slate-900 dark:text-white tabular-nums whitespace-nowrap">
+                  {value}
+                </h3>
+              </div>
+            </div>
+            
             {icon && (
               <div
                 className={cn(
-                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 ease-out group-hover:scale-[1.08] shadow-sm",
+                  "flex h-[44px] w-[44px] sm:h-[48px] sm:w-[48px] lg:h-[52px] lg:w-[52px] shrink-0 items-center justify-center rounded-[14px] transition-transform duration-300 ease-out group-hover:scale-110 group-hover:rotate-3",
                   iconClassName || "bg-primary/10 text-primary",
                 )}
               >
                 {React.cloneElement(icon, {
-                  className: cn("h-[20px] w-[20px]", icon.props.className),
-                  strokeWidth: 2,
+                  className: cn("h-[20px] w-[20px] sm:h-[22px] sm:w-[22px] lg:h-[24px] lg:w-[24px]", icon.props.className),
+                  strokeWidth: 2.5,
                 })}
               </div>
             )}
           </div>
 
-          <div className="mt-4 flex min-w-0 flex-wrap items-baseline gap-2.5">
-            <h3 className="text-4xl font-bold leading-none tracking-tight text-foreground tabular-nums">
-              {value}
-            </h3>
-            {trend && (
-              <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
-                  trend.isPositive
-                    ? "bg-primary/10 text-primary"
-                    : "bg-destructive/10 text-destructive",
-                )}
-              >
-                {trend.value}
-              </span>
-            )}
+          <div className="mt-auto pt-4 flex flex-col justify-end">
+            <div className="flex items-center gap-2 flex-wrap">
+              {trend && (
+                <span
+                  className={cn(
+                    "rounded-full px-2.5 py-0.5 text-[11.5px] sm:text-[12px] font-bold tabular-nums shrink-0",
+                    trend.isPositive
+                      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400"
+                      : "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-400",
+                  )}
+                >
+                  {trend.value}
+                </span>
+              )}
+              {subtitle && (
+                <p className="text-[12px] sm:text-[12.5px] leading-relaxed text-slate-500 dark:text-slate-400 font-medium">
+                  {subtitle}
+                </p>
+              )}
+            </div>
+            {sparkline && <Sparkline data={sparkline} />}
           </div>
-
-          {subtitle ? (
-            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground font-medium">
-              {subtitle}
-            </p>
-          ) : null}
-          <Sparkline data={sparkline} />
         </CardContent>
+        {/* Accent Line */}
+        {accentClassName && (
+          <div className={cn("absolute bottom-0 left-0 right-0 h-[3px] rounded-t-full opacity-90", accentClassName)} />
+        )}
       </Card>
     </motion.div>
   );

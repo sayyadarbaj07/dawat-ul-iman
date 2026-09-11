@@ -11,6 +11,12 @@ export const examApi = {
       body: JSON.stringify(payload),
     });
   },
+  updateExam(id, payload) {
+    return request(`/exams/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
   removeExam(id) {
     return request(`/exams/${id}`, { method: "DELETE" });
   },

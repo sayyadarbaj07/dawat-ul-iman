@@ -12,3 +12,5 @@ export { eventApi } from "./event";
 export { reportApi } from "./report";
 export { activityLogApi } from "./activity";
 export { settingsApi } from "./settings";
+export { notificationApi } from "./notification";
+export { classApi } from "./classApi";

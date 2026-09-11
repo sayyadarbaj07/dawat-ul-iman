@@ -11,13 +11,19 @@ const studentSchema = new mongoose.Schema(
       },
     },
     name: { type: String, required: true, trim: true },
+    nameUrdu: { type: String, trim: true, default: "" },
     fatherName: { type: String, required: true, trim: true },
     motherName: { type: String, trim: true, default: "" },
     className: {
       type: String,
       required: true,
-      enum: ["diniyat", "arabic", "contemporary"],
+      enum: ["diniyat", "hifz", "alimiyat", "qirat", "contemporary", "arabic"],
       default: "diniyat",
+    },
+    classId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Class',
+      default: null
     },
     schoolClass: { type: String, trim: true, default: "" },
     studentClass: { type: String, trim: true, default: "" },
@@ -61,6 +67,7 @@ const studentSchema = new mongoose.Schema(
     feeHistory: [
       {
         academicYear: { type: String, required: true },
+        classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: false },
         className: { type: String, required: true },
         totalFee: { type: Number, required: true, default: 0 },
         date: { type: Date, default: Date.now },
@@ -75,9 +82,16 @@ const studentSchema = new mongoose.Schema(
 
 studentSchema.index({
   name: "text",
+  nameUrdu: "text",
   fatherName: "text",
   admissionNumber: "text",
   rollNumber: "text",
 });
+
+// NEW: Optimized index for heavy class-wise lookups (Exam generation, Directory, PDF reports)
+studentSchema.index({ className: 1, status: 1 });
+
+// NEW: Optimized index for classId lookup (Attendance page)
+studentSchema.index({ classId: 1, status: 1 });
 
 module.exports = mongoose.model("Student", studentSchema);

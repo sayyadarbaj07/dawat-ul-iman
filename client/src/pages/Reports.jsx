@@ -6,6 +6,7 @@ import { BackButton } from "@/components/ui/BackButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLanguage } from "@/context/LanguageContext";
+import { getLocalizedStudentName, formatLocalizedPercent, formatLocalizedNumber } from "@/utils/localizationUtils";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Users, 
@@ -25,52 +26,54 @@ import { ReportFilters } from "@/components/reports/ReportFilters";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { reportApi } from "@/lib/api/report";
 import { pdfApi } from "@/lib/api/pdf";
-import { teacherApi } from "@/lib/api";
+import { teacherApi, classApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 
-const REPORT_CATEGORIES = [
-  { id: "students", label: "Student Reports", icon: Users },
-  { id: "results", label: "Result Reports", icon: Award },
-  { id: "attendance", label: "Attendance Reports", icon: CalendarCheck },
-  { id: "finance", label: "Finance Reports", icon: Landmark },
-];
-
-const ALL_REPORTS = [
-  // Student Reports
-  { id: "student_performance", category: "students", title: "Student Performance", desc: "Detailed academic performance of a student.", icon: BookOpen, config: { showClass: true, showDateRange: true } },
-  { id: "student_marksheet", category: "students", title: "Student Marksheet", desc: "Official printable student marksheet.", icon: FileSpreadsheet, config: { showClass: true, showExamType: true } },
-  { id: "student_list", category: "students", title: "Student List", desc: "Complete directory of students.", icon: Users, config: { showClass: true } },
-  { id: "weak_students", category: "students", title: "Weak Students", desc: "Identify students requiring attention.", icon: TrendingDown, config: { showClass: true } },
-  { id: "student_attendance", category: "students", title: "Student Attendance", desc: "Attendance records for a specific student.", icon: CalendarCheck, config: { showClass: true, showStudent: true, showMonth: true, showYear: true, showDateRange: true } },
-  
-  // Result Reports
-  { id: "monthly_result", category: "results", title: "Monthly Result", desc: "Monthly exam results and ranks.", icon: FileSpreadsheet, config: { showClass: true, showDateRange: true } },
-  { id: "half_yearly_result", category: "results", title: "Half-Yearly Result", desc: "Half-Yearly exam results.", icon: Award, config: { showClass: true } },
-  { id: "annual_result", category: "results", title: "Annual Result", desc: "Generate annual class and student results.", icon: GraduationCap, config: { showClass: true } },
-  { id: "class_result", category: "results", title: "Class Result", desc: "Overall class performance summary.", icon: Users, config: { showClass: true, showExamType: true } },
-
-  // Attendance Reports
-  { id: "daily_attendance", category: "attendance", title: "Daily Attendance", desc: "Daily attendance logs for all classes.", icon: CalendarCheck, config: { showClass: true, showDateRange: true } },
-  { id: "weekly_attendance", category: "attendance", title: "Weekly Attendance", desc: "Weekly attendance summary.", icon: CalendarCheck, config: { showClass: true, showDateRange: true } },
-  { id: "monthly_attendance", category: "attendance", title: "Monthly Attendance", desc: "Monthly attendance aggregation.", icon: CalendarCheck, config: { showClass: true, showMonth: true, showYear: true, showDateRange: true } },
-  { id: "yearly_attendance", category: "attendance", title: "Yearly Attendance", desc: "Yearly attendance summary.", icon: CalendarCheck, config: { showDateRange: true } },
-
-  // Finance Reports
-  { id: "daily_finance", category: "finance", title: "Daily Finance", desc: "Daily income and expense tracking.", icon: Wallet, config: { showDateRange: true } },
-  { id: "weekly_finance", category: "finance", title: "Weekly Finance", desc: "Weekly financial summary.", icon: Landmark, config: { showDateRange: true } },
-  { id: "monthly_finance", category: "finance", title: "Monthly Finance", desc: "Monthly financial statement.", icon: Landmark, config: { showDateRange: true } },
-  { id: "yearly_finance", category: "finance", title: "Yearly Finance", desc: "Annual financial statement.", icon: Landmark, config: { showDateRange: true } },
-  { id: "income_report", category: "finance", title: "Income Report", desc: "Detailed breakdown of all income sources.", icon: TrendingDown, config: { showDateRange: true } }, // Trending up conceptually
-  { id: "expense_report", category: "finance", title: "Expense Report", desc: "Detailed breakdown of all expenses.", icon: Receipt, config: { showDateRange: true } },
-  { id: "donor_report", category: "finance", title: "Donor Report", desc: "Summary of donations by donors.", icon: HeartHandshake, config: { showDateRange: true } },
-  { id: "receipt_history", category: "finance", title: "Receipt History", desc: "Log of all generated financial receipts.", icon: Receipt, config: { showDateRange: true } },
-];
 
 export default function Reports() {
-  const { tr } = useLanguage();
+  const { tr, language } = useLanguage();
   const { toast } = useToast();
   const { user } = useAuth();
+
+  const REPORT_CATEGORIES = [
+    { id: "students", label: tr("reports", "catStudents"), icon: Users },
+    { id: "results", label: tr("reports", "catResults"), icon: Award },
+    { id: "attendance", label: tr("reports", "catAttendance"), icon: CalendarCheck },
+    { id: "finance", label: tr("reports", "catFinance"), icon: Landmark },
+  ];
+
+  const ALL_REPORTS = [
+    // Student Reports
+    { id: "student_performance", category: "students", title: tr("reports", "studentPerformance"), desc: tr("reports", "studentPerformanceDesc"), icon: BookOpen, config: { showClass: true, showStudent: true, showExamType: true } },
+    { id: "student_marksheet", category: "students", title: tr("reports", "studentMarksheet"), desc: tr("reports", "studentMarksheetDesc"), icon: FileSpreadsheet, config: { showClass: true, showStudent: true, showExamType: true } },
+    { id: "student_list", category: "students", title: tr("reports", "studentListReport"), desc: tr("reports", "studentListReportDesc"), icon: Users, config: { showClass: true } },
+    { id: "weak_students", category: "students", title: tr("reports", "weakStudentsReport"), desc: tr("reports", "weakStudentsReportDesc"), icon: TrendingDown, config: { showClass: true } },
+    { id: "student_attendance", category: "students", title: tr("reports", "studentAttendanceReport"), desc: tr("reports", "studentAttendanceReportDesc"), icon: CalendarCheck, config: { showClass: true, showStudent: true, showDateRange: true } },
+    // Result Reports
+    { id: "monthly_result", category: "results", title: tr("reports", "monthlyResult"), desc: tr("reports", "monthlyResultDesc"), icon: FileSpreadsheet, config: { showClass: true } },
+    { id: "half_yearly_result", category: "results", title: tr("reports", "halfYearlyResult"), desc: tr("reports", "halfYearlyResultDesc"), icon: Award, config: { showClass: true } },
+    { id: "annual_result", category: "results", title: tr("reports", "annualResult"), desc: tr("reports", "annualResultDesc"), icon: GraduationCap, config: { showClass: true } },
+    { id: "class_result", category: "results", title: tr("reports", "classResult"), desc: tr("reports", "classResultDesc"), icon: Users, config: { showClass: true, showExamType: true } },
+    { id: "class_marksheets", category: "results", title: "Class Marksheets", desc: "Generate marksheets for all students in a class", icon: BookOpen, config: { showClass: true, showExamType: true } },
+    { id: "yearly_result", category: "results", title: "Yearly Result", desc: "Generate yearly result for a specific student", icon: Award, config: { showClass: true, showStudent: true } },
+    { id: "academic_history", category: "results", title: "Academic History", desc: "Generate academic history for a specific student", icon: BookOpen, config: { showClass: true, showStudent: true } },
+    // Attendance Reports
+    { id: "daily_attendance", category: "attendance", title: tr("reports", "dailyAttendance"), desc: tr("reports", "dailyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showDateRange: true } },
+    { id: "weekly_attendance", category: "attendance", title: tr("reports", "weeklyAttendance"), desc: tr("reports", "weeklyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showDateRange: true } },
+    { id: "monthly_attendance", category: "attendance", title: tr("reports", "monthlyAttendance"), desc: tr("reports", "monthlyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showMonth: true, showYear: true } },
+    { id: "yearly_attendance", category: "attendance", title: tr("reports", "yearlyAttendance"), desc: tr("reports", "yearlyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showYear: true } },
+    // Finance Reports
+    { id: "daily_finance", category: "finance", title: tr("reports", "dailyFinance"), desc: tr("reports", "dailyFinanceDesc"), icon: Wallet, config: { showDateRange: true } },
+    { id: "weekly_finance", category: "finance", title: tr("reports", "weeklyFinance"), desc: tr("reports", "weeklyFinanceDesc"), icon: Landmark, config: { showDateRange: true } },
+    { id: "monthly_finance", category: "finance", title: tr("reports", "monthlyFinance"), desc: tr("reports", "monthlyFinanceDesc"), icon: Landmark, config: { showDateRange: true } },
+    { id: "yearly_finance", category: "finance", title: tr("reports", "yearlyFinance"), desc: tr("reports", "yearlyFinanceDesc"), icon: Landmark, config: { showDateRange: true } },
+    { id: "income_report", category: "finance", title: tr("reports", "incomeReport"), desc: tr("reports", "incomeReportDesc"), icon: TrendingDown, config: { showDateRange: true, showCategory: true } },
+    { id: "expense_report", category: "finance", title: tr("reports", "expenseReport"), desc: tr("reports", "expenseReportDesc"), icon: Receipt, config: { showDateRange: true, showCategory: true } },
+    { id: "donor_report", category: "finance", title: tr("reports", "donorReport"), desc: tr("reports", "donorReportDesc"), icon: HeartHandshake, config: { showDateRange: true } },
+    { id: "receipt_history", category: "finance", title: tr("reports", "receiptHistory"), desc: tr("reports", "receiptHistoryDesc"), icon: Receipt, config: { showDateRange: true } },
+  ];
+
   
   const [activeTab, setActiveTab] = useState("students");
   const [selectedReport, setSelectedReport] = useState(null);
@@ -86,26 +89,59 @@ export default function Reports() {
 
   const [assignedClasses, setAssignedClasses] = useState([]);
 
-  React.useEffect(() => {
+  const fetchClasses = async () => {
+    let ALL_DYNAMIC_CLASSES = [{ id: "all", name: tr("reports", "allClasses") }];
+    let classData = [];
+    try {
+      const res = await classApi.getClasses();
+      if (res.success && res.data) {
+        classData = res.data.filter(c => c.status === "active");
+        ALL_DYNAMIC_CLASSES = [
+          { id: "all", name: tr("reports", "allClasses") },
+          ...classData.map(c => ({ id: c._id, name: c.fullName }))
+        ];
+      }
+    } catch(e) {
+      console.error(e);
+    }
+
     if (user?.role === "teacher") {
         teacherApi.list().then(res => {
             const me = (res.data || []).find(t => (t.userId?._id === user.id) || (t.userId === user.id));
-            if (me && me.assignedClasses && me.assignedClasses.length > 0) {
-                setAssignedClasses(me.assignedClasses);
-                setFilters(prev => ({ ...prev, class: me.assignedClasses[0] }));
+            if (me) {
+                const myClassIds = me.assignedClassIds || [];
+                const myClassNames = me.assignedClasses || [];
+                
+                const teacherClasses = classData
+                   .filter(c => myClassIds.includes(c._id) || myClassNames.includes(c.fullName))
+                   .map(c => ({ id: c._id, name: c.fullName }));
+
+                if (teacherClasses.length > 0) {
+                    setAssignedClasses(teacherClasses);
+                    setFilters(prev => ({ ...prev, class: teacherClasses[0].id }));
+                } else {
+                    setAssignedClasses([]);
+                }
             }
         });
     } else {
-        setAssignedClasses(["all", "diniyat", "arabic", "contemporary"]);
+        setAssignedClasses(ALL_DYNAMIC_CLASSES);
     }
+  };
+
+  React.useEffect(() => {
+    fetchClasses();
   }, [user]);
 
   /** Builds a clean human-readable subtitle for the on-screen report layout header. */
   const buildSubtitle = (report, f) => {
     const parts = [];
     const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    if (report.config.showClass && f.class)
-      parts.push(`Class: ${f.class === "all" ? "All" : f.class.charAt(0).toUpperCase() + f.class.slice(1)}`);
+    if (report.config.showClass && f.class) {
+      const clsObj = assignedClasses.find(c => c.id === f.class);
+      const clsName = clsObj ? clsObj.name : f.class;
+      parts.push(`Class: ${clsName === "All Classes" ? "All" : clsName}`);
+    }
     if (report.config.showExamType && f.examType)
       parts.push(`Exam: ${f.examType.charAt(0).toUpperCase() + f.examType.slice(1)}`);
     if (report.config.showMonth && f.month)
@@ -137,9 +173,9 @@ export default function Reports() {
           a.click();
           a.remove();
           setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000);
-          toast({ title: "Success", description: "Attendance PDF downloaded successfully" });
+          toast({ title: tr("common", "success"), description: tr("reports", "download") });
       } catch (error) {
-          toast({ title: "Error", description: error.message, variant: "destructive" });
+          toast({ title: tr("common", "error"), description: error.message, variant: "destructive" });
       } finally {
           setIsLoading(false);
       }
@@ -151,50 +187,104 @@ export default function Reports() {
           try {
               const res = await reportApi.getWeakStudents(filters);
               setReportData(res.data);
-              toast({ title: "Success", description: "Report generated successfully." });
+              toast({ title: tr("common", "success"), description: tr("reports", "generate") });
           } catch (error) {
-              toast({ title: "Error", description: "Failed to generate report.", variant: "destructive" });
+              toast({ title: tr("common", "error"), description: tr("reports", "failed"), variant: "destructive" });
           } finally {
               setIsLoading(false);
           }
-      } else if (selectedReport?.id === "student_attendance") {
-          handleExport();
       } else {
-          toast({
-              title: "Notice",
-              description: "Report data generation will be implemented in Phase 3/4. The UI layout is ready.",
-          });
+          // For most PDF-based reports, "Generate" acts as "Export PDF" because there is no separate on-screen preview yet
+          handleExport();
       }
   };
 
-  const handleExport = () => {
+  const handleExport = (type = 'pdf', language = 'en') => {
+      if (type === 'excel') {
+          toast({ title: "Notice", description: "Excel export not supported." });
+          return;
+      }
+
+      const { class: classId, studentId, examId, examType, startDate, endDate, month, year, status, category } = filters;
+      const txType = filters.type;
+
+      // Validation for student reports
+      if (selectedReport?.config?.showStudent && !studentId) {
+          toast({ title: "Missing Filter", description: "Please select a Student.", variant: "destructive" });
+          return;
+      }
+
+      // Validation for exam reports
+      if (selectedReport?.config?.showExamType && !examType && !examId && selectedReport.id !== "monthly_result" && selectedReport.id !== "half_yearly_result" && selectedReport.id !== "annual_result") {
+          toast({ title: "Missing Filter", description: "Please select an Exam Type or Exam.", variant: "destructive" });
+          return;
+      }
+
+      // PDF Exports Mapping
       if (selectedReport?.id === "weak_students") {
-          downloadPdf(pdfApi.getWeakStudentsReport(filters), "Weak_Students_Report.pdf");
-      } else if (selectedReport?.id === "student_attendance") {
-          if (!filters.studentId) {
-             toast({ title: "Missing Filter", description: "Please select a Student from the dropdown.", variant: "destructive" });
-             return;
-          }
-          const { studentId, ...restFilters } = filters;
-          downloadPdf(pdfApi.getStudentAttendanceReport(studentId, restFilters), `Student_Attendance_${studentId}.pdf`);
-      } else if (
-          selectedReport?.id === "monthly_attendance" || 
-          selectedReport?.id === "daily_attendance" || 
-          selectedReport?.id === "weekly_attendance" || 
-          selectedReport?.id === "yearly_attendance"
-      ) {
-          downloadPdf(pdfApi.getClassAttendanceReport({ ...filters, className: filters.class }), "Class_Attendance_Report.pdf");
-      } else {
-          handleGenerate();
+          downloadPdf(pdfApi.getWeakStudentsReport({ ...filters, language }), `Weak_Students_Report_${language}.pdf`);
+      } 
+      else if (selectedReport?.id === "student_performance" || selectedReport?.id === "student_marksheet") {
+          downloadPdf(pdfApi.getStudentReportCard(studentId, examId || examType, language), `Marksheet_${studentId}_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "yearly_result") {
+          downloadPdf(pdfApi.getYearlyResult(studentId, language), `Yearly_Result_${studentId}_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "academic_history") {
+          downloadPdf(pdfApi.getAcademicHistory(studentId, language), `Academic_History_${studentId}_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "class_result") {
+          downloadPdf(pdfApi.getClassResult(classId, examId, examType, language), `Class_Result_${classId}_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "monthly_result") {
+          downloadPdf(pdfApi.getClassResult(classId, examId, "monthly", language), `Monthly_Result_${classId}_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "half_yearly_result") {
+          downloadPdf(pdfApi.getClassResult(classId, examId, "half-yearly", language), `Half_Yearly_Result_${classId}_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "annual_result") {
+          downloadPdf(pdfApi.getClassResult(classId, examId, "annual", language), `Annual_Result_${classId}_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "class_marksheets") {
+          downloadPdf(pdfApi.getClassMarksheets(classId, examId, examType, language), `Class_Marksheets_${classId}_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "student_attendance") {
+          downloadPdf(pdfApi.getStudentAttendanceReport(studentId, { ...filters, language }), `Student_Attendance_${studentId}_${language}.pdf`);
+      } 
+      else if (selectedReport?.id === "daily_attendance") {
+          // Send today's date if not set
+          const today = new Date().toISOString().split('T')[0];
+          downloadPdf(pdfApi.getClassAttendanceReport({ classId, startDate: startDate || today, endDate: endDate || today, language }), `Daily_Attendance_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "weekly_attendance") {
+          downloadPdf(pdfApi.getClassAttendanceReport({ classId, startDate, endDate, language }), `Weekly_Attendance_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "monthly_attendance") {
+          downloadPdf(pdfApi.getClassAttendanceReport({ classId, month, year, language }), `Monthly_Attendance_${language}.pdf`);
+      }
+      else if (selectedReport?.id === "yearly_attendance") {
+          downloadPdf(pdfApi.getClassAttendanceReport({ classId, year, language }), `Yearly_Attendance_${language}.pdf`);
+      }
+      else if (selectedReport?.category === "finance") {
+          // For specific finance reports that have fixed types:
+          let finalType = txType;
+          let finalCategory = category;
+          if (selectedReport.id === "income_report") finalType = "income";
+          if (selectedReport.id === "expense_report") finalType = "expense";
+          if (selectedReport.id === "donor_report") finalCategory = "Atiya"; // Using Atiya as donation category example
+
+          downloadPdf(pdfApi.getFinanceSummary({ ...filters, type: finalType, category: finalCategory, language }), `Finance_${selectedReport.id}_${language}.pdf`);
+      } 
+      else if (selectedReport?.id === "student_list") {
+          downloadPdf(pdfApi.getStudentListReport(classId, language), `Student_List_${classId || "All"}_${language}.pdf`);
+      }
+      else {
+          window.print();
       }
   };
 
   const handlePrint = () => {
-      if (selectedReport?.id === "student_attendance" || selectedReport?.id === "weak_students" || selectedReport?.category === "attendance") {
-          handleExport();
-      } else {
-          window.print();
-      }
+      handleExport();
   };
 
   const renderReportMenu = () => (
@@ -288,11 +378,11 @@ export default function Reports() {
                               {reportData.map((student, idx) => (
                                   <TableRow key={student._id} className="hover:bg-muted/40 transition-colors duration-200">
                                       <TableCell className="font-mono text-xs text-muted-foreground">{idx + 1}</TableCell>
-                                      <TableCell className="font-semibold text-sm">{student.name}</TableCell>
+                                      <TableCell className="font-semibold text-sm">{getLocalizedStudentName(student, language)}</TableCell>
                                       <TableCell className="capitalize text-sm">{student.className}</TableCell>
-                                      <TableCell className="font-bold text-red-600 text-sm">{student.averageMarks}%</TableCell>
-                                      <TableCell className="font-bold text-amber-600 text-sm">{student.attendancePercent}%</TableCell>
-                                      <TableCell className="text-sm">{student.failedSubjectsCount}</TableCell>
+                                      <TableCell className="font-bold text-red-600 text-sm">{formatLocalizedPercent(student.averageMarks, language)}</TableCell>
+                                      <TableCell className="font-bold text-amber-600 text-sm">{formatLocalizedPercent(student.attendancePercent, language)}</TableCell>
+                                      <TableCell className="text-sm">{formatLocalizedNumber(student.failedSubjectsCount, language)}</TableCell>
                                       <TableCell className="text-sm text-muted-foreground">{student.reasons.join(", ")}</TableCell>
                                   </TableRow>
                               ))}

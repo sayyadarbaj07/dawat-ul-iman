@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const pdfController = require("../controllers/pdfController");
-const { protect, authorize } = require("../middleware/authMiddleware");
+const { protect, authorize, checkClassAccess } = require("../middleware/authMiddleware");
 
 // All routes are protected
 router.use(protect);
@@ -16,7 +16,10 @@ router.route("/student/:id/academic-history")
   .get(authorize("admin", "teacher"), pdfController.generateAcademicHistoryPDF);
 
 router.route("/class/result")
-  .get(authorize("admin", "teacher"), pdfController.generateClassResultPDF);
+  .get(authorize("admin", "teacher"), checkClassAccess, pdfController.generateClassResultPDF);
+
+router.route("/class/marksheets")
+  .get(authorize("admin", "teacher"), checkClassAccess, pdfController.generateClassMarksheetsPDF);
 
 router.route("/finance/summary")
   .get(authorize("admin", "accountant"), pdfController.generateFinanceSummary);
@@ -24,11 +27,14 @@ router.route("/finance/summary")
 router.route("/finance/receipt/:id")
   .get(authorize("admin", "accountant"), pdfController.generateFeeReceiptPDF);
 router.route("/weak-students")
-  .get(authorize("admin", "teacher", "accountant"), pdfController.generateWeakStudentsReport);
+  .get(authorize("admin", "teacher", "accountant"), checkClassAccess, pdfController.generateWeakStudentsReport);
 
 router.route("/attendance/class")
-  .get(authorize("admin", "teacher"), pdfController.generateClassAttendancePDF);
+  .get(authorize("admin", "teacher"), checkClassAccess, pdfController.generateClassAttendancePDF);
 router.route("/attendance/student/:id")
   .get(authorize("admin", "teacher"), pdfController.generateStudentAttendancePDF);
+
+router.route("/student-list")
+  .get(authorize("admin", "teacher", "accountant"), checkClassAccess, pdfController.generateStudentListPDF);
 
 module.exports = router;

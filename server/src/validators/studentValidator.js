@@ -3,9 +3,12 @@ const { body, validationResult } = require("express-validator");
 const studentValidationRules = [
   body("name").trim().notEmpty().withMessage("Name is required"),
   body("fatherName").trim().notEmpty().withMessage("Father name is required"),
-  body("className").trim().notEmpty().withMessage("Class is required"),
   body("className")
-    .isIn(["diniyat", "arabic", "contemporary"])
+    .if(body("classId").not().exists())
+    .trim()
+    .notEmpty()
+    .withMessage("Class is required")
+    .isIn(["diniyat", "hifz", "alimiyat", "qirat", "contemporary", "arabic"])
     .withMessage("Invalid class value"),
   body("dateOfBirth")
     .optional({ nullable: true })

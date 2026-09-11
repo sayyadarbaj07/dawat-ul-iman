@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Menu, Search, Bell, Globe } from "lucide-react";
+import { Menu, Search, Bell, Globe, Info, CheckCircle2, AlertTriangle, AlertCircle, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/common/BrandLogo";
 import {
@@ -15,7 +15,8 @@ import { useLocation } from "wouter";
 import { formatHeaderDates } from "@/lib/utils";
 import { getNavItemByPath } from "./nav";
 import { CommandPalette } from "./CommandPalette";
-import { useUpcomingAlerts } from "@/hooks/useUpcomingAlerts";
+import { useNotifications } from "@/hooks/useNotifications";
+import { formatDistanceToNow } from "date-fns";
 
 export function Header({ onMenuClick }) {
   const { user } = useAuth();
@@ -24,9 +25,17 @@ export function Header({ onMenuClick }) {
   const currentNav = getNavItemByPath(location);
   const { islamic, gregorian } = formatHeaderDates(language);
   const [commandOpen, setCommandOpen] = useState(false);
-  const { alerts } = useUpcomingAlerts();
-  const allowed = user ? ROLE_PERMISSIONS[user.role] || [] : [];
-  const visibleAlerts = alerts.filter((item) => allowed.includes(item.href));
+  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, loading } = useNotifications();
+
+  const getIconForType = (type) => {
+    switch (type) {
+      case "success": return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+      case "warning": return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+      case "error": return <AlertCircle className="h-4 w-4 text-destructive" />;
+      case "alert": return <Bell className="h-4 w-4 text-primary" />;
+      default: return <Info className="h-4 w-4 text-blue-500" />;
+    }
+  };
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -138,38 +147,96 @@ export function Header({ onMenuClick }) {
               data-testid="button-notifications"
             >
               <Bell className="h-[20px] w-[20px]" />
-              {visibleAlerts.length > 0 && (
-                <span className="absolute end-1.5 top-1.5 h-2 w-2 rounded-full border border-card bg-destructive shadow-sm" />
+              {unreadCount > 0 && (
+                <span className="absolute end-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-card bg-destructive text-[9px] font-bold text-white shadow-sm">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
               )}
               <span className="sr-only">{t("notifications")}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80 rounded-xl shadow-lg border-border/40 p-1">
-            <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80 border-b border-border/40 mb-1">
-              {tr("dashboard", "upcomingThisWeek")}
-            </div>
-            {visibleAlerts.length === 0 ? (
-              <div className="px-3 py-4 text-sm font-medium text-muted-foreground text-center">
-                {tr("dashboard", "noNotifications")}
-              </div>
-            ) : (
-              visibleAlerts.map((item) => (
-                <DropdownMenuItem
-                  key={item.id}
-                  onClick={() => setLocation(item.href)}
-                  className="flex flex-col items-start gap-1 rounded-lg px-3 py-2 cursor-pointer transition-colors"
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/40 mb-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                {t("notifications")}
+              </span>
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={markAllAsRead}
+                  className="h-6 px-2 text-[11px] text-primary hover:text-primary/80"
                 >
-                  <span className="text-sm font-semibold">{item.title}</span>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {item.days === 0
-                      ? tr("dashboard", "today")
-                      : item.days === 1
-                        ? tr("dashboard", "tomorrow")
-                        : tr("dashboard", "daysLeft", { count: item.days })}
-                  </span>
-                </DropdownMenuItem>
-              ))
-            )}
+                  {tr("common", "markAllAsRead")}
+                </Button>
+              )}
+            </div>
+
+            <div className="max-h-[350px] overflow-y-auto overflow-x-hidden">
+              {loading && notifications.length === 0 ? (
+                <div className="px-3 py-6 text-sm font-medium text-muted-foreground text-center flex items-center justify-center">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent me-2" />
+                  {tr("common", "loading")}
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="px-3 py-6 text-sm font-medium text-muted-foreground text-center">
+                  {tr("dashboard", "noNotifications")}
+                </div>
+              ) : (
+                notifications.map((item) => (
+                  <div
+                    key={item._id}
+                    className={`group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors relative ${item.isRead ? "opacity-75 hover:bg-muted/30" : "bg-primary/5 hover:bg-primary/10"}`}
+                  >
+                    <div className="mt-0.5 shrink-0">
+                      {getIconForType(item.type)}
+                    </div>
+                    <div
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => {
+                        if (!item.isRead) markAsRead(item._id);
+                        if (item.link) setLocation(item.link);
+                      }}
+                    >
+                      <p className={`text-sm ${item.isRead ? "font-medium" : "font-bold text-foreground"} leading-tight`}>
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                        {item.message}
+                      </p>
+                      <p className="text-[10px] font-medium text-muted-foreground/70 mt-1.5">
+                        {language === "en" 
+                          ? formatDistanceToNow(new Date(item.createdAt), { addSuffix: true }) 
+                          : `${new Intl.DateTimeFormat("ur-PK", { day: "numeric", month: "short" }).format(new Date(item.createdAt))} · ${new Intl.DateTimeFormat("ur-PK", { hour: "numeric", minute: "numeric" }).format(new Date(item.createdAt))} ${tr("dashboard", "at")}`
+                        }
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {!item.isRead && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                          onClick={(e) => { e.stopPropagation(); markAsRead(item._id); }}
+                          title={tr("common", "markAsRead")}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => { e.stopPropagation(); deleteNotification(item._id); }}
+                        title={tr("common", "delete")}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 

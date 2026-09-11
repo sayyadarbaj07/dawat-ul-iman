@@ -6,7 +6,9 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Book, CheckCircle, Clock, Loader2, Plus, Trash2, Edit } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
-import { curriculumApi } from "@/lib/api/curriculum";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { curriculumApi, classApi } from "@/lib/api";
 
 export default function Curriculum() {
     const { tr } = useLanguage();
@@ -15,28 +17,32 @@ export default function Curriculum() {
     
     const [activeTab, setActiveTab] = useState("diniyat");
     const [curriculums, setCurriculums] = useState([]);
+    const [apiClasses, setApiClasses] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // Form states
     const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({ department: "diniyat", subject: "", book: "", progress: 0, status: "On Track" });
+    const [formData, setFormData] = useState({ classId: "", subject: "", book: "", progress: 0, status: "On Track" });
     const [isEditing, setIsEditing] = useState(null);
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        const fetchCurriculums = async () => {
+        const fetchData = async () => {
             try {
-                const response = await curriculumApi.list();
-                if (response.success) {
-                    setCurriculums(response.data);
-                }
+                const [currRes, classRes] = await Promise.all([
+                    curriculumApi.list(),
+                    classApi.getClasses()
+                ]);
+                
+                if (currRes.success) setCurriculums(currRes.data);
+                if (classRes.success) setApiClasses(classRes.data);
             } catch (error) {
-                console.error("Failed to fetch curriculums", error);
+                console.error("Failed to fetch data", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchCurriculums();
+        fetchData();
     }, []);
 
     const handleSubmit = async (e) => {
@@ -77,7 +83,7 @@ export default function Curriculum() {
 
     const handleEdit = (item) => {
         setFormData({
-            department: item.department,
+            classId: item.classId?._id || item.classId || "",
             subject: item.subject,
             book: item.book,
             progress: item.progress,
@@ -85,17 +91,26 @@ export default function Curriculum() {
         });
         setIsEditing(item._id);
         setShowForm(true);
-        setActiveTab(item.department);
+        setActiveTab(item.department || activeTab);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const resetForm = () => {
-        setFormData({ department: activeTab, subject: "", book: "", progress: 0, status: "On Track" });
+        setFormData({ classId: "", subject: "", book: "", progress: 0, status: "On Track" });
         setIsEditing(null);
         setShowForm(false);
     };
 
-    const departments = ["diniyat", "arabic", "contemporary"];
+    const departments = ["diniyat", "hifz", "alimiyat", "qirat", "contemporary"];
+    
+    // Group classes by department
+    const classesByDept = departments.reduce((acc, dept) => {
+        acc[dept] = apiClasses.filter(c => c.department === dept);
+        return acc;
+    }, {});
+
+    // Available classes for current active tab (for form)
+    const activeClasses = classesByDept[activeTab] || [];
 
     if (loading) {
         return (
@@ -107,57 +122,60 @@ export default function Curriculum() {
 
     return (
         <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <div className="flex justify-between items-center flex-wrap gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">{tr("curriculum", "pageTitle")}</h2>
-                    <p className="text-muted-foreground mt-1">{tr("curriculum", "pageSubtitle")}</p>
-                </div>
-                {isAdmin && !showForm && (
-                    <button 
-                        onClick={() => { resetForm(); setShowForm(true); }}
-                        className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors text-sm font-medium"
-                    >
-                        <Plus className="h-4 w-4" /> Add Subject
-                    </button>
-                )}
-            </div>
+            <PageHeader 
+                title={tr("curriculum", "pageTitle")}
+                description={tr("curriculum", "pageSubtitle")}
+                showBack={true}
+                backLabel={tr("common", "backToDashboard")}
+                actions={
+                    isAdmin && !showForm ? (
+                        <button 
+                            onClick={() => { resetForm(); setShowForm(true); }}
+                            className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors text-sm font-medium w-full sm:w-auto justify-center"
+                        >
+                            <Plus className="h-4 w-4" /> {tr("curriculum", "addSubject")}
+                        </button>
+                    ) : null
+                }
+            />
 
             {isAdmin && showForm && (
                 <Card className="bg-muted/30 border-dashed border-2">
                     <CardHeader className="pb-4">
-                        <CardTitle className="text-lg">{isEditing ? "Edit Subject" : "Add New Subject"}</CardTitle>
+                        <CardTitle className="text-lg">{isEditing ? tr("curriculum", "editSubject") : tr("curriculum", "addNewSubject")}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-sm font-medium">Department</label>
+                                    <label className="text-sm font-medium">{tr("curriculum", "class")}</label>
                                     <select 
-                                        value={formData.department} 
-                                        onChange={e => setFormData({...formData, department: e.target.value})}
+                                        value={formData.classId} 
+                                        onChange={e => setFormData({...formData, classId: e.target.value})}
                                         className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        required
+                                        required={!isEditing} 
                                     >
-                                        <option value="diniyat">Diniyat</option>
-                                        <option value="arabic">Arabic</option>
-                                        <option value="contemporary">Contemporary</option>
+                                        <option value="" disabled>{tr("curriculum", "selectClass")}</option>
+                                        {activeClasses.map(c => (
+                                            <option key={c._id} value={c._id}>{c.fullName}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-sm font-medium">Status</label>
+                                    <label className="text-sm font-medium">{tr("common", "status")}</label>
                                     <select 
                                         value={formData.status} 
                                         onChange={e => setFormData({...formData, status: e.target.value})}
                                         className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                         required
                                     >
-                                        <option value="On Track">On Track</option>
-                                        <option value="Delayed">Delayed</option>
-                                        <option value="Almost Complete">Almost Complete</option>
+                                        <option value="On Track">{tr("curriculum", "onTrack")}</option>
+                                        <option value="Delayed">{tr("curriculum", "delayed")}</option>
+                                        <option value="Almost Complete">{tr("curriculum", "almostComplete")}</option>
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-sm font-medium">Subject Name</label>
+                                    <label className="text-sm font-medium">{tr("curriculum", "subjectName")}</label>
                                     <input 
                                         type="text" 
                                         value={formData.subject} 
@@ -168,7 +186,7 @@ export default function Curriculum() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-sm font-medium">Book Name</label>
+                                    <label className="text-sm font-medium">{tr("curriculum", "bookName")}</label>
                                     <input 
                                         type="text" 
                                         value={formData.book} 
@@ -180,7 +198,7 @@ export default function Curriculum() {
                                 </div>
                                 <div className="space-y-1.5 md:col-span-2">
                                     <label className="text-sm font-medium flex justify-between">
-                                        <span>Progress</span>
+                                        <span>{tr("curriculum", "progress")}</span>
                                         <span className="text-primary">{formData.progress}%</span>
                                     </label>
                                     <input 
@@ -198,7 +216,7 @@ export default function Curriculum() {
                                     onClick={resetForm}
                                     className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
                                 >
-                                    Cancel
+                                    {tr("common", "cancel")}
                                 </button>
                                 <button 
                                     type="submit" 
@@ -206,7 +224,7 @@ export default function Curriculum() {
                                     className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2"
                                 >
                                     {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                                    {isEditing ? "Update Subject" : "Save Subject"}
+                                    {isEditing ? tr("curriculum", "updateSubject") : tr("curriculum", "saveSubject")}
                                 </button>
                             </div>
                         </form>
@@ -214,79 +232,133 @@ export default function Curriculum() {
                 </Card>
             )}
 
-            <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); if (showForm && !isEditing) setFormData({...formData, department: val}); }} className="w-full">
-                <TabsList className="grid w-full max-w-md grid-cols-3">
+            <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); if (showForm && !isEditing) setFormData({...formData, classId: ""}); }} className="w-full">
+                <TabsList className="grid w-full max-w-3xl grid-cols-5">
                     <TabsTrigger value="diniyat">{tr("curriculum", "diniyat")}</TabsTrigger>
-                    <TabsTrigger value="arabic">{tr("curriculum", "arabic")}</TabsTrigger>
+                    <TabsTrigger value="hifz">{tr("curriculum", "hifz")}</TabsTrigger>
+                    <TabsTrigger value="alimiyat">{tr("curriculum", "alimiyat")}</TabsTrigger>
+                    <TabsTrigger value="qirat">{tr("curriculum", "qirat")}</TabsTrigger>
                     <TabsTrigger value="contemporary">{tr("curriculum", "contemporary")}</TabsTrigger>
                 </TabsList>
 
                 {departments.map((dept) => {
-                    const subjects = curriculums.filter(c => c.department === dept);
+                    const deptCurriculums = curriculums.filter(c => c.department === dept);
+                    const deptClasses = classesByDept[dept] || [];
+                    
+                    // Legacy records have no classId
+                    const legacyCurriculums = deptCurriculums.filter(c => !c.classId);
+
                     return (
-                        <TabsContent key={dept} value={dept} className="mt-6">
-                            {subjects.length === 0 ? (
-                                <div className="text-center py-12 border-2 border-dashed rounded-lg bg-muted/10">
-                                    <Book className="mx-auto h-8 w-8 text-muted-foreground/50 mb-3" />
-                                    <h3 className="text-lg font-medium">No subjects found</h3>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                        {isAdmin ? "Click 'Add Subject' to create one for this department." : "There is currently no curriculum data for this department."}
-                                    </p>
-                                </div>
+                        <TabsContent key={dept} value={dept} className="mt-6 space-y-8">
+                            {deptCurriculums.length === 0 ? (
+                                <EmptyState 
+                                  title="No Subjects Found"
+                                  description={isAdmin ? "Click 'Add Subject' to create one for this department." : "There is currently no curriculum data for this department."}
+                                  icon={Book}
+                                />
                             ) : (
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    {subjects.map((subject) => (
-                                        <Card key={subject._id} className="group hover:border-primary/20 transition-colors">
-                                            <CardHeader className="pb-2">
-                                                <div className="flex justify-between items-start gap-4">
-                                                    <div className="min-w-0 flex-1">
-                                                        <CardTitle className="text-lg truncate flex items-center gap-2">
-                                                            {subject.subject}
-                                                        </CardTitle>
-                                                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1 truncate">
-                                                            <Book className="h-4 w-4 shrink-0"/> {subject.book}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex flex-col items-end gap-2 shrink-0">
-                                                        <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1
-                                                            ${subject.status === 'On Track' ? 'bg-green-100 text-green-700' :
-                                                            subject.status === 'Delayed' ? 'bg-amber-100 text-amber-700' :
-                                                            'bg-blue-100 text-blue-700'}`}>
-                                                            {subject.status === 'On Track' ? <CheckCircle className="h-3 w-3"/> : <Clock className="h-3 w-3"/>}
-                                                            {subject.status}
-                                                        </div>
-                                                        {isAdmin && (
-                                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button 
-                                                                    onClick={() => handleEdit(subject)} 
-                                                                    className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
-                                                                    title="Edit"
-                                                                >
-                                                                    <Edit className="h-3.5 w-3.5" />
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => handleDelete(subject._id)} 
-                                                                    className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                                                                    title="Delete"
-                                                                >
-                                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                <>
+                                    {/* Grouped by specific class */}
+                                    {deptClasses.map(cls => {
+                                        const classSubjects = deptCurriculums.filter(c => c.classId && (c.classId._id === cls._id || c.classId === cls._id));
+                                        if (classSubjects.length === 0) return null;
+
+                                        return (
+                                            <div key={cls._id} className="space-y-3">
+                                                <h3 className="text-xl font-bold border-b pb-2">{cls.fullName}</h3>
+                                                <div className="grid gap-4 md:grid-cols-2">
+                                                    {classSubjects.map((subject) => (
+                                                        <SubjectCard 
+                                                            key={subject._id} 
+                                                            subject={subject} 
+                                                            isAdmin={isAdmin} 
+                                                            handleEdit={handleEdit} 
+                                                            handleDelete={handleDelete} 
+                                                            tr={tr} 
+                                                        />
+                                                    ))}
                                                 </div>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <ProgressBar value={subject.progress} label={tr("curriculum", "syllabusCompleted")} colorClass={subject.progress > 75 ? "bg-green-500" : subject.progress > 40 ? "bg-primary" : "bg-amber-500"}/>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {/* Legacy / Unassigned bucket */}
+                                    {legacyCurriculums.length > 0 && (
+                                        <div className="space-y-3 mt-8 p-4 bg-muted/20 border rounded-lg">
+                                            <h3 className="text-lg font-bold text-amber-600 flex items-center gap-2">
+                                                Legacy / Unassigned
+                                                <span className="text-xs bg-amber-100 px-2 py-1 rounded-full font-normal">Needs Manual Assignment</span>
+                                            </h3>
+                                            <div className="grid gap-4 md:grid-cols-2">
+                                                {legacyCurriculums.map((subject) => (
+                                                    <SubjectCard 
+                                                        key={subject._id} 
+                                                        subject={subject} 
+                                                        isAdmin={isAdmin} 
+                                                        handleEdit={handleEdit} 
+                                                        handleDelete={handleDelete} 
+                                                        tr={tr} 
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </TabsContent>
                     );
                 })}
             </Tabs>
         </motion.div>
+    );
+}
+
+function SubjectCard({ subject, isAdmin, handleEdit, handleDelete, tr }) {
+    return (
+        <Card className="group hover:border-primary/20 transition-colors">
+            <CardHeader className="pb-2">
+                <div className="flex justify-between items-start gap-4">
+                    <div className="min-w-0 flex-1">
+                        <CardTitle className="text-lg truncate flex items-center gap-2">
+                            {subject.subject}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1 truncate">
+                            <Book className="h-4 w-4 shrink-0"/> {subject.book}
+                        </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                        <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1
+                            ${subject.status === 'On Track' ? 'bg-green-100 text-green-700' :
+                            subject.status === 'Delayed' ? 'bg-amber-100 text-amber-700' :
+                            'bg-blue-100 text-blue-700'}`}>
+                            {subject.status === 'On Track' ? <CheckCircle className="h-3 w-3"/> : <Clock className="h-3 w-3"/>}
+                            {subject.status}
+                        </div>
+                        {isAdmin && (
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEdit(subject); }} 
+                                    className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
+                                    title="Edit"
+                                >
+                                    <Edit className="h-3.5 w-3.5" />
+                                </button>
+                                <button 
+                                    onClick={() => handleDelete(subject._id)} 
+                                    className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                                    title="Delete"
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <ProgressBar value={subject.progress} label={tr("curriculum", "syllabusCompleted")} colorClass={subject.progress > 75 ? "bg-green-500" : subject.progress > 40 ? "bg-primary" : "bg-amber-500"}/>
+            </CardContent>
+        </Card>
     );
 }

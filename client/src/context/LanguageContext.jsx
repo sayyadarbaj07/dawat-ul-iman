@@ -10,9 +10,11 @@ const LanguageContext = createContext();
 export function LanguageProvider({ children }) {
   const [language, setLanguage] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("app-language") || "en";
+      const stored = localStorage.getItem("app-language");
+      if (stored === "en") return "en";
+      return "ur"; // Default to ur if "ur", invalid, or not present
     }
-    return "en";
+    return "ur";
   });
 
   useEffect(() => {

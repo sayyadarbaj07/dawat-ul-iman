@@ -17,8 +17,5 @@ router.route("/:id/void")
 router.route("/summary")
   .get(authorize("admin", "accountant", "viewer"), financeController.getFinanceSummary);
 
-router.route("/student/:id/fees")
-  .get(authorize("admin", "accountant", "teacher"), financeController.getStudentFeeRecords)
-  .post(authorize("admin", "accountant"), financeController.setStudentFee);
 
 module.exports = router;

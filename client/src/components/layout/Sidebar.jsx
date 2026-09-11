@@ -161,7 +161,7 @@ export function Sidebar({ isOpen, setIsOpen, isMobile }) {
                   className="w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent"
                   size="sm"
                 >
-                  <KeyRound className="mr-2 h-4 w-4" />
+                  <KeyRound className="me-2 h-4 w-4" />
                   {tr("common", "changePassword")}
                 </Button>
               </DialogTrigger>
@@ -222,7 +222,7 @@ export function Sidebar({ isOpen, setIsOpen, isMobile }) {
               size="sm"
               onClick={handleLogout}
             >
-              <LogOut className="mr-2 h-4 w-4" />
+              <LogOut className="me-2 h-4 w-4" />
               {t("logout")}
             </Button>
           </div>

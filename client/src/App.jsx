@@ -30,6 +30,10 @@ import UsersManagement from "@/pages/UsersManagement";
 import SystemLogs from "@/pages/SystemLogs";
 import ForceChangePassword from "@/pages/ForceChangePassword";
 import InstituteSettings from "@/pages/InstituteSettings";
+import Classes from "@/pages/Classes";
+import ClassAttendanceOverview from "@/pages/ClassAttendanceOverview";
+import ClassAttendanceDetail from "@/pages/ClassAttendanceDetail";
+import DataResolution from "@/pages/DataResolution";
 
 import NotFound from "@/pages/not-found";
 const queryClient = new QueryClient();
@@ -88,6 +92,10 @@ function Router() {
             <Route path="/users" component={UsersManagement} />
             <Route path="/audit" component={SystemLogs} />
             <Route path="/settings" component={InstituteSettings} />
+            <Route path="/classes" component={Classes} />
+            <Route path="/class-attendance" component={ClassAttendanceOverview} />
+            <Route path="/class-attendance/:classId" component={ClassAttendanceDetail} />
+            <Route path="/data-resolution" component={DataResolution} />
             <Route component={NotFound} />
           </Switch>
         </Layout>

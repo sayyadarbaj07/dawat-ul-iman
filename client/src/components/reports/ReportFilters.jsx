@@ -2,6 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 import { 
     Select,
     SelectContent,
@@ -23,7 +30,7 @@ export function ReportFilters({
   showPrint = true,
   showExport = true,
   generateLabel = "Generate Report",
-  availableClasses = ["all", "diniyat", "arabic", "contemporary"]
+  availableClasses = ["all"]
 }) {
   const CLASS_LABELS = {
     all: "All Classes",
@@ -36,6 +43,8 @@ export function ReportFilters({
         const newFilters = { ...prev, [key]: value };
         if (key === "class") {
             newFilters.studentId = ""; // Clear student when class changes
+            newFilters.examId = "";
+            newFilters.examType = "";
         }
         return newFilters;
     });
@@ -43,19 +52,34 @@ export function ReportFilters({
 
   const [students, setStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [exams, setExams] = useState([]);
+  const [loadingExams, setLoadingExams] = useState(false);
 
   useEffect(() => {
-    if (config.showStudent && filters.class && filters.class !== "all") {
-        setStudents([]);  // clear stale list immediately
-        setLoadingStudents(true);
-        studentApi.list({ className: filters.class, limit: 1000 })
-            .then(res => setStudents(res.data || []))
-            .catch(err => console.error("Failed to load students", err))
-            .finally(() => setLoadingStudents(false));
+    if ((config.showStudent || config.showExamType) && filters.class && filters.class !== "all") {
+        if (config.showStudent) {
+            setStudents([]);  // clear stale list immediately
+            setLoadingStudents(true);
+            studentApi.list({ classId: filters.class, limit: 1000 })
+                .then(res => setStudents(res.data?.data || res.data || []))
+                .catch(err => console.error("Failed to load students", err))
+                .finally(() => setLoadingStudents(false));
+        }
+        if (config.showExamType) {
+            setExams([]);
+            setLoadingExams(true);
+            import("@/lib/api/exam").then(({ examApi }) => {
+                examApi.listExams({ classId: filters.class })
+                    .then(res => setExams(res.data || res || []))
+                    .catch(err => console.error("Failed to load exams", err))
+                    .finally(() => setLoadingExams(false));
+            });
+        }
     } else {
         setStudents([]);
+        setExams([]);
     }
-  }, [filters.class, config.showStudent]);
+  }, [filters.class, config.showStudent, config.showExamType]);
 
   const handleDatePreset = (preset) => {
       const today = new Date();
@@ -96,8 +120,8 @@ export function ReportFilters({
                     </SelectTrigger>
                     <SelectContent>
                         {availableClasses.map(cls => (
-                            <SelectItem key={cls} value={cls}>
-                                {CLASS_LABELS[cls] ?? cls}
+                            <SelectItem key={cls.id || cls} value={cls.id || cls}>
+                                {cls.name || CLASS_LABELS[cls] || cls}
                             </SelectItem>
                         ))}
                     </SelectContent>
@@ -116,6 +140,36 @@ export function ReportFilters({
                         <SelectItem value="monthly">Monthly</SelectItem>
                         <SelectItem value="half-yearly">Half-Yearly</SelectItem>
                         <SelectItem value="annual">Annual</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        )}
+
+        {config.showExamType && (
+            <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-500">Exam</Label>
+                <Select 
+                    value={filters.examId || ""} 
+                    onValueChange={(val) => handleChange("examId", val)}
+                    disabled={!filters.class || filters.class === "all" || loadingExams}
+                >
+                    <SelectTrigger>
+                        <SelectValue placeholder={
+                            loadingExams
+                                ? "Loading exams…"
+                                : (!filters.class || filters.class === "all")
+                                    ? "Select a class first"
+                                    : exams.length === 0
+                                        ? "No exams in class"
+                                        : "Select Specific Exam"
+                        } />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {(Array.isArray(exams) ? exams : []).map(e => (
+                            <SelectItem key={e._id} value={e._id}>
+                                {e.name || e.examType || "Unknown Exam"}
+                            </SelectItem>
+                        ))}
                     </SelectContent>
                 </Select>
             </div>
@@ -173,7 +227,7 @@ export function ReportFilters({
                         } />
                     </SelectTrigger>
                     <SelectContent>
-                        {students.map(s => (
+                        {(Array.isArray(students) ? students : []).map(s => (
                             <SelectItem key={s._id} value={s._id}>
                                 {s.name}{s.rollNumber ? ` — Roll ${s.rollNumber}` : ""}
                             </SelectItem>
@@ -209,6 +263,55 @@ export function ReportFilters({
                 </div>
             </>
         )}
+
+        {config.showType && (
+            <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-500">Transaction Type</Label>
+                <Select value={filters.type || "all"} onValueChange={(val) => handleChange("type", val)}>
+                    <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="income">Income</SelectItem>
+                        <SelectItem value="expense">Expense</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        )}
+
+        {config.showCategory && (
+            <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-500">Category</Label>
+                <Select value={filters.category || "all"} onValueChange={(val) => handleChange("category", val)}>
+                    <SelectTrigger><SelectValue placeholder="Select Category" /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        <SelectItem value="Fees">Fees</SelectItem>
+                        <SelectItem value="Salary">Salary</SelectItem>
+                        <SelectItem value="Maintenance">Maintenance</SelectItem>
+                        <SelectItem value="Atiya">Atiya</SelectItem>
+                        <SelectItem value="Kafalat">Kafalat</SelectItem>
+                        <SelectItem value="Zakat">Zakat</SelectItem>
+                        <SelectItem value="Sadqa">Sadqa</SelectItem>
+                        <SelectItem value="Isale Sawab">Isale Sawab</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        )}
+
+        {config.showStatus && (
+            <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-gray-500">Status</Label>
+                <Select value={filters.status || "active"} onValueChange={(val) => handleChange("status", val)}>
+                    <SelectTrigger><SelectValue placeholder="Select Status" /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="graduated">Graduated</SelectItem>
+                        <SelectItem value="left">Left</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        )}
       </div>
 
       <div className="flex justify-between items-center mt-6 pt-4 border-t">
@@ -232,9 +335,17 @@ export function ReportFilters({
                 </Button>
             )}
             {showExport && (
-                <Button variant="outline" onClick={onExport} disabled={loading} className="gap-2">
-                    <Download className="w-4 h-4" /> Export
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" disabled={loading} className="gap-2">
+                            <Download className="w-4 h-4" /> Export
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onExport('en')}>English PDF</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onExport('ur')}>Urdu PDF (اردو)</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             )}
           </div>
       </div>

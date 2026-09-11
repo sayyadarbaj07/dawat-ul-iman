@@ -1,5 +1,8 @@
 const Transaction = require("../models/transactionModel");
 const Student = require("../models/studentModel");
+const Class = require("../models/classModel");
+const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
+const ActivityNotificationService = require("../services/activityNotificationService");
 
 const sendSuccess = (res, statusCode, message, data = null) => {
   const payload = { success: true, message };
@@ -15,7 +18,7 @@ const sendError = (res, statusCode, message, error = null) => {
 
 exports.getAllTransactions = async (req, res) => {
   try {
-    const { startDate, endDate, type, category, academicYear, referenceId, status, paymentMode } = req.query;
+    const { startDate, endDate, type, category, academicYear, referenceId, status, paymentMode, page = 1, limit = 50 } = req.query;
     
     let filter = {};
     if (startDate && endDate) {
@@ -29,20 +32,36 @@ exports.getAllTransactions = async (req, res) => {
         filter.date = { $lte: new Date(endDate) };
     }
     
-    if (type) filter.type = type;
+    if (type && type !== "all") filter.type = type;
     if (category) filter.category = category;
     if (academicYear) filter.academicYear = academicYear;
     if (referenceId) filter.referenceId = referenceId;
     if (status) filter.status = status;
     if (paymentMode) filter.paymentMode = paymentMode;
 
+    const parsedPage = parseInt(page, 10);
+    const parsedLimit = Math.min(parseInt(limit, 10), 500); // cap limit at 500
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const total = await Transaction.countDocuments(filter);
+    
     const transactions = await Transaction.find(filter)
       .populate("recordedBy", "name initials username role")
       .populate("referenceId", "name rollNumber studentClass className")
       .sort({ date: -1 })
+      .skip(skip)
+      .limit(parsedLimit)
       .lean();
       
-    return sendSuccess(res, 200, "Transactions fetched successfully", transactions);
+    return sendSuccess(res, 200, "Transactions fetched successfully", {
+      data: transactions,
+      meta: {
+        total,
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(total / parsedLimit)
+      }
+    });
   } catch (error) {
     return sendError(res, 500, "Failed to fetch transactions", error);
   }
@@ -69,7 +88,37 @@ exports.createTransaction = async (req, res) => {
         delete payload.referenceId;
     }
 
+    
+    // Dual-write class info if this is a student fee transaction
+    if (payload.category === 'Fees' && payload.referenceId) {
+      const student = await Student.findById(payload.referenceId).populate('classId');
+      if (student) {
+        if (student.classId) {
+          payload.classId = student.classId._id;
+          // Do not set payload.className here to avoid dual-write conflicts
+        } else if (student.className || student.studentClass) {
+          payload.className = student.className || student.studentClass;
+        }
+      }
+    }
+
     const transaction = await Transaction.create(payload);
+
+    ActivityNotificationService.dispatchActivityEvent({
+      user: req.user,
+      action: "TRANSACTION_CREATED",
+      description: `Created ${payload.type} transaction: ${payload.amount} for ${payload.title || payload.category}`,
+      moduleName: "Finance",
+      notification: {
+        title: "New Transaction Created",
+        message: `A new ${payload.type} transaction of ${payload.amount} has been recorded.`,
+        type: "success",
+        link: `/finance`,
+        relatedEntity: { entityId: transaction._id, entityModel: "Transaction" }
+      },
+      notifyAdmins: true
+    });
+
     return sendSuccess(res, 201, "Transaction created successfully", transaction);
   } catch (error) {
     console.error("Transaction Error:", error);
@@ -92,6 +141,21 @@ exports.voidTransaction = async (req, res) => {
       { new: true }
     );
 
+    ActivityNotificationService.dispatchActivityEvent({
+      user: req.user,
+      action: "TRANSACTION_VOIDED",
+      description: `Voided transaction: ${transaction.title || transaction.category} (${transaction.amount})`,
+      moduleName: "Finance",
+      notification: {
+        title: "Transaction Voided",
+        message: `A transaction of ${transaction.amount} has been voided.`,
+        type: "warning",
+        link: `/finance`,
+        relatedEntity: { entityId: transaction._id, entityModel: "Transaction" }
+      },
+      notifyAdmins: true
+    });
+
     return sendSuccess(res, 200, "Transaction voided successfully", updatedTransaction);
   } catch (error) {
     console.error("Void Error:", error);
@@ -103,29 +167,39 @@ exports.getFinanceSummary = async (req, res) => {
   try {
     const { startDate, endDate, academicYear } = req.query;
     
-    let filter = { status: "Completed" }; // only active txns
+    let matchStage = { status: "Completed" };
     if (startDate && endDate) {
-        filter.date = {
+        matchStage.date = {
             $gte: new Date(startDate),
             $lte: new Date(endDate)
         };
     }
-    if (academicYear) filter.academicYear = academicYear;
+    if (academicYear) matchStage.academicYear = academicYear;
 
-    const transactions = await Transaction.find(filter).lean();
-    
+    const summaryData = await Transaction.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: "$category",
+          totalAmount: { $sum: "$amount" },
+          type: { $first: "$type" }
+        }
+      }
+    ]);
+
     let totalIncome = 0;
     let totalExpense = 0;
     let categorySummary = {};
 
-    transactions.forEach(tx => {
-      if (tx.type === "income") totalIncome += tx.amount;
-      if (tx.type === "expense") totalExpense += tx.amount;
+    summaryData.forEach(item => {
+      const cat = item._id;
+      const amt = item.totalAmount;
+      const type = item.type;
+
+      if (type === "income") totalIncome += amt;
+      if (type === "expense") totalExpense += amt;
       
-      if (!categorySummary[tx.category]) {
-          categorySummary[tx.category] = { amount: 0, type: tx.type };
-      }
-      categorySummary[tx.category].amount += tx.amount;
+      categorySummary[cat] = { amount: amt, type };
     });
 
     const currentBalance = totalIncome - totalExpense;
@@ -139,95 +213,4 @@ exports.getFinanceSummary = async (req, res) => {
   } catch (error) {
     return sendError(res, 500, "Failed to fetch finance summary", error);
   }
-};
-
-exports.getStudentFeeRecords = async (req, res) => {
-    try {
-        const studentId = req.params.id;
-        const student = await Student.findById(studentId).lean();
-        
-        if (!student) {
-            return sendError(res, 404, "Student not found");
-        }
-
-        const feeHistory = student.feeHistory || [];
-        const feeTransactions = await Transaction.find({ 
-            referenceId: studentId, 
-            type: "income", 
-            category: "Fees",
-            status: "Completed"
-        }).lean();
-
-        // Calculate paid and pending per academic year
-        const result = feeHistory.map(record => {
-            const payments = feeTransactions.filter(tx => tx.academicYear === record.academicYear);
-            const paid = payments.reduce((acc, tx) => acc + tx.amount, 0);
-            return {
-                ...record,
-                paid,
-                pending: record.totalFee - paid,
-                payments
-            };
-        });
-
-        // Also find any orphan payments that don't have a feeHistory record yet
-        const yearsWithHistory = new Set(feeHistory.map(r => r.academicYear));
-        const orphanPayments = feeTransactions.filter(tx => !yearsWithHistory.has(tx.academicYear));
-        if (orphanPayments.length > 0) {
-            const orphanByYear = {};
-            orphanPayments.forEach(tx => {
-                if (!orphanByYear[tx.academicYear]) orphanByYear[tx.academicYear] = [];
-                orphanByYear[tx.academicYear].push(tx);
-            });
-            Object.keys(orphanByYear).forEach(year => {
-                const payments = orphanByYear[year];
-                const paid = payments.reduce((acc, tx) => acc + tx.amount, 0);
-                result.push({
-                    academicYear: year,
-                    className: payments[0].className || "Unknown",
-                    totalFee: 0,
-                    paid,
-                    pending: 0 - paid,
-                    payments
-                });
-            });
-        }
-
-        return sendSuccess(res, 200, "Student fee records fetched", result);
-    } catch (error) {
-        return sendError(res, 500, "Failed to fetch student fee records", error);
-    }
-};
-
-exports.setStudentFee = async (req, res) => {
-    try {
-        const { academicYear, className, totalFee } = req.body;
-        const studentId = req.params.id;
-
-        const student = await Student.findById(studentId);
-        if (!student) return sendError(res, 404, "Student not found");
-
-        if (!student.feeHistory) student.feeHistory = [];
-        
-        const existingRecordIndex = student.feeHistory.findIndex(f => f.academicYear === academicYear);
-        if (existingRecordIndex >= 0) {
-            student.feeHistory[existingRecordIndex].totalFee = totalFee;
-            student.feeHistory[existingRecordIndex].className = className;
-            student.feeHistory[existingRecordIndex].updatedBy = req.user._id;
-            student.feeHistory[existingRecordIndex].date = new Date();
-        } else {
-            student.feeHistory.push({
-                academicYear,
-                className,
-                totalFee,
-                updatedBy: req.user._id,
-                date: new Date()
-            });
-        }
-
-        await student.save();
-        return sendSuccess(res, 200, "Student fee set successfully", student.feeHistory);
-    } catch (error) {
-        return sendError(res, 500, "Failed to set student fee", error);
-    }
 };

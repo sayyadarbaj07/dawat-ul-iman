@@ -24,15 +24,7 @@ export const financeApi = {
   voidTransaction(id) {
     return request(`/finance/${id}/void`, { method: "PUT" });
   },
-  getStudentFeeRecords(studentId) {
-    return request(`/finance/student/${studentId}/fees`);
-  },
-  setStudentFee(studentId, payload) {
-    return request(`/finance/student/${studentId}/fees`, {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-  },
+
   async downloadPdf(url, filename) {
     const token = localStorage.getItem("dawat_token");
     const response = await fetch(`${API_BASE}${url}`, {

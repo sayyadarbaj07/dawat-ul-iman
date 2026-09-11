@@ -20,6 +20,10 @@ const teacherSchema = new mongoose.Schema(
     assignedClasses: [{
       type: String,
     }],
+    assignedClassIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Class'
+    }],
     mobile: {
       type: String,
       required: true,

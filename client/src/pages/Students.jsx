@@ -10,9 +10,10 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BackButton } from "@/components/ui/BackButton";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
-import { studentApi, attendanceApi, examApi, financeApi } from "@/lib/api";
+import { BackButton } from "@/components/ui/BackButton";
+import { studentApi, attendanceApi, examApi } from "@/lib/api";
 import {
   Search,
   Plus,
@@ -20,6 +21,8 @@ import {
   Edit,
   Trash,
   FileText,
+  User,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -40,25 +43,39 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
-import { CLASS_TREE } from "@/lib/classTree";
+import { formatLocalizedNumber, formatLocalizedDate, formatLocalizedPercent, getLocalizedStudentName } from "@/utils/localizationUtils";
 
 export default function Students() {
-  const { tr } = useLanguage();
+  const { tr, language } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     fullName: "",
+    nameUrdu: "",
     fatherName: "",
     rollNumber: "",
     schoolClass: "",
-    className: "diniyat", // keeping legacy field for backward compatibility
-    studentClassCategory: "Shob-e-Deeniyat",
-    studentClassSub: "Awwal",
+    classId: "",
+    className: "", // keeping legacy field for backward compatibility
+    studentClassCategory: "",
+    studentClassSub: "",
     residential: true,
     dateOfBirth: "",
     photo: null,
+    photoPreview: null,
+    motherName: "",
+    gender: "",
+    contactNumber: "",
+    email: "",
+    address: "",
+    guardianName: "",
+    guardianContact: "",
+    guardianRelation: "",
+    admissionNumber: "",
+    admissionDate: "",
+    section: "",
   });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -67,28 +84,43 @@ export default function Students() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [studentAcademicHistory, setStudentAcademicHistory] = useState([]);
   const [loadingAcademicHistory, setLoadingAcademicHistory] = useState(false);
-  const [studentFinanceRecords, setStudentFinanceRecords] = useState([]);
-  const [loadingFinanceRecords, setLoadingFinanceRecords] = useState(false);
+
   const [isExportingStudentPDF, setIsExportingStudentPDF] = useState(null);
   const [editFormData, setEditFormData] = useState({
     name: "",
+    nameUrdu: "",
     fatherName: "",
     rollNumber: "",
     schoolClass: "",
-    className: "diniyat",
-    studentClassCategory: "Shob-e-Deeniyat",
-    studentClassSub: "Awwal",
+    classId: "",
+    className: "",
+    studentClassCategory: "",
+    studentClassSub: "",
     residential: true,
     dateOfBirth: "",
     photo: null,
+    photoPreview: null,
+    removePhoto: false,
+    motherName: "",
+    gender: "",
+    contactNumber: "",
+    email: "",
+    address: "",
+    guardianName: "",
+    guardianContact: "",
+    guardianRelation: "",
+    admissionNumber: "",
+    admissionDate: "",
+    section: "",
   });
 
   const [isPromoteModalOpen, setIsPromoteModalOpen] = useState(false);
   const [promoteFormData, setPromoteFormData] = useState({
     academicYear: new Date().getFullYear() + "-" + (new Date().getFullYear() + 1),
-    className: "diniyat",
-    studentClassCategory: "Shob-e-Deeniyat",
-    studentClassSub: "Awwal",
+    classId: "",
+    className: "",
+    studentClassCategory: "",
+    studentClassSub: "",
     schoolClass: "",
     notes: ""
   });
@@ -100,7 +132,7 @@ export default function Students() {
       if (isBackground) setIsSearching(true);
       else setLoading(true);
       const res = await studentApi.list({ search: term });
-      setStudents(res.data || []);
+      setStudents(res.data?.data || []);
     } catch (error) {
       setStudents([]);
     } finally {
@@ -109,8 +141,20 @@ export default function Students() {
     }
   };
 
+  const [apiClasses, setApiClasses] = useState([]);
+
   useEffect(() => {
     loadStudents("", false);
+    const fetchClasses = async () => {
+      try {
+        const { classApi } = await import("@/lib/api/classApi");
+        const res = await classApi.getClasses();
+        setApiClasses(res.data?.filter(c => c.status === "active") || []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchClasses();
   }, []);
 
   useEffect(() => {
@@ -121,16 +165,45 @@ export default function Students() {
     return () => clearTimeout(timeout);
   }, [searchTerm]);
 
+  const handlePhotoSelection = (e, setFormDataCallback) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate size (20MB)
+    const MAX_SIZE_MB = 20;
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      alert(`Please select an image smaller than ${MAX_SIZE_MB}MB.`);
+      e.target.value = null; // Clear input
+      return;
+    }
+
+    // Validate type
+    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      alert("Only JPG, PNG, and WebP images are supported.");
+      e.target.value = null;
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setFormDataCallback(file, previewUrl);
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
       const payload = new FormData();
       payload.append("name", formData.fullName);
+      if (formData.nameUrdu) payload.append("nameUrdu", formData.nameUrdu);
       payload.append("fatherName", formData.fatherName);
       payload.append("rollNumber", formData.rollNumber);
       payload.append("schoolClass", formData.schoolClass);
-      payload.append("className", formData.className);
-      payload.append("studentClass", `${formData.studentClassCategory} - ${formData.studentClassSub}`);
+      if (formData.classId) {
+        payload.append("classId", formData.classId);
+      } else {
+        payload.append("className", formData.className);
+        payload.append("studentClass", `${formData.studentClassCategory} - ${formData.studentClassSub}`);
+      }
       payload.append("residential", formData.residential === "true" || formData.residential === true);
       
       if (formData.dateOfBirth) {
@@ -139,6 +212,17 @@ export default function Students() {
       if (formData.photo) {
         payload.append("photo", formData.photo);
       }
+      if (formData.motherName) payload.append("motherName", formData.motherName);
+      if (formData.gender) payload.append("gender", formData.gender);
+      if (formData.contactNumber) payload.append("contactNumber", formData.contactNumber);
+      if (formData.email) payload.append("email", formData.email);
+      if (formData.address) payload.append("address", formData.address);
+      if (formData.guardianName) payload.append("guardianName", formData.guardianName);
+      if (formData.guardianContact) payload.append("guardianContact", formData.guardianContact);
+      if (formData.guardianRelation) payload.append("guardianRelation", formData.guardianRelation);
+      if (formData.admissionNumber) payload.append("admissionNumber", formData.admissionNumber);
+      if (formData.admissionDate) payload.append("admissionDate", formData.admissionDate);
+      if (formData.section) payload.append("section", formData.section);
 
       await studentApi.createWithFile(payload);
       setIsAddModalOpen(false);
@@ -147,12 +231,25 @@ export default function Students() {
         fatherName: "",
         rollNumber: "",
         schoolClass: "",
-        className: "diniyat",
-        studentClassCategory: "Shob-e-Deeniyat",
-        studentClassSub: "Awwal",
+        classId: "",
+        className: "",
+        studentClassCategory: "",
+        studentClassSub: "",
         residential: true,
         dateOfBirth: "",
         photo: null,
+        photoPreview: null,
+        motherName: "",
+        gender: "",
+        contactNumber: "",
+        email: "",
+        address: "",
+        guardianName: "",
+        guardianContact: "",
+        guardianRelation: "",
+        admissionNumber: "",
+        admissionDate: "",
+        section: "",
       });
       loadStudents(searchTerm);
     } catch (error) {
@@ -180,14 +277,30 @@ export default function Students() {
     
     setEditFormData({
       name: student.fullName || student.name || "",
+      nameUrdu: student.nameUrdu || "",
       fatherName: student.fatherName || "",
       rollNumber: student.rollNumber || "",
       schoolClass: student.schoolClass || "",
-      className: student.className || "diniyat",
-      studentClassCategory: parsedCategory,
-      studentClassSub: parsedSub,
+      classId: student.classId || "",
+      className: student.className || "",
+      studentClassCategory: parsedCategory || "",
+      studentClassSub: parsedSub || "",
       residential: student.residential ?? true,
       dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth).toISOString().split('T')[0] : "",
+      photo: null,
+      photoPreview: student.photo ? `http://localhost:5000${student.photo}` : null,
+      removePhoto: false,
+      motherName: student.motherName || "",
+      gender: student.gender || "",
+      contactNumber: student.contactNumber || "",
+      email: student.email || "",
+      address: student.address || "",
+      guardianName: student.guardianName || "",
+      guardianContact: student.guardianContact || "",
+      guardianRelation: student.guardianRelation || "",
+      admissionNumber: student.admissionNumber || "",
+      admissionDate: student.admissionDate ? new Date(student.admissionDate).toISOString().split('T')[0] : "",
+      section: student.section || "",
     });
     setIsEditModalOpen(true);
   };
@@ -197,11 +310,16 @@ export default function Students() {
     try {
       const payload = new FormData();
       payload.append("name", editFormData.name);
+      if (editFormData.nameUrdu) payload.append("nameUrdu", editFormData.nameUrdu);
       payload.append("fatherName", editFormData.fatherName);
       payload.append("rollNumber", editFormData.rollNumber);
       payload.append("schoolClass", editFormData.schoolClass);
-      payload.append("className", editFormData.className);
-      payload.append("studentClass", `${editFormData.studentClassCategory} - ${editFormData.studentClassSub}`);
+      if (editFormData.classId) {
+        payload.append("classId", editFormData.classId);
+      } else {
+        payload.append("className", editFormData.className);
+        payload.append("studentClass", `${editFormData.studentClassCategory} - ${editFormData.studentClassSub}`);
+      }
       payload.append("residential", editFormData.residential === "true" || editFormData.residential === true);
       
       if (editFormData.dateOfBirth) {
@@ -210,6 +328,20 @@ export default function Students() {
       if (editFormData.photo) {
         payload.append("photo", editFormData.photo);
       }
+      if (editFormData.removePhoto) {
+        payload.append("removePhoto", "true");
+      }
+      if (editFormData.motherName) payload.append("motherName", editFormData.motherName);
+      if (editFormData.gender) payload.append("gender", editFormData.gender);
+      if (editFormData.contactNumber) payload.append("contactNumber", editFormData.contactNumber);
+      if (editFormData.email) payload.append("email", editFormData.email);
+      if (editFormData.address) payload.append("address", editFormData.address);
+      if (editFormData.guardianName) payload.append("guardianName", editFormData.guardianName);
+      if (editFormData.guardianContact) payload.append("guardianContact", editFormData.guardianContact);
+      if (editFormData.guardianRelation) payload.append("guardianRelation", editFormData.guardianRelation);
+      if (editFormData.admissionNumber) payload.append("admissionNumber", editFormData.admissionNumber);
+      if (editFormData.admissionDate) payload.append("admissionDate", editFormData.admissionDate);
+      if (editFormData.section) payload.append("section", editFormData.section);
 
       const id = selectedStudent._id || selectedStudent.id || selectedStudent.studentId;
       await studentApi.updateWithFile(id, payload);
@@ -224,8 +356,8 @@ export default function Students() {
     setSelectedStudent(student);
     setPromoteFormData({
       ...promoteFormData,
-      studentClassCategory: "Shob-e-Deeniyat",
-      studentClassSub: "Awwal",
+      studentClassCategory: "",
+      studentClassSub: "",
       schoolClass: "",
       notes: ""
     });
@@ -236,7 +368,7 @@ export default function Students() {
     event.preventDefault();
     try {
       const payload = {
-        toClass: `${promoteFormData.studentClassCategory} - ${promoteFormData.studentClassSub}`,
+        classId: promoteFormData.classId,
         schoolClass: promoteFormData.schoolClass,
         academicYear: promoteFormData.academicYear,
         notes: promoteFormData.notes
@@ -284,32 +416,20 @@ export default function Students() {
     }
   };
 
-  const loadStudentFinanceRecords = async (studentId) => {
-    try {
-      setLoadingFinanceRecords(true);
-      const res = await financeApi.getStudentFeeRecords(studentId);
-      setStudentFinanceRecords(res.data);
-    } catch(err) {
-      console.error(err);
-      setStudentFinanceRecords(null);
-    } finally {
-      setLoadingFinanceRecords(false);
-    }
-  };
+
 
   const handleViewProfile = (student) => {
     openViewModal(student);
     const id = student._id || student.id || student.studentId;
     if (id) {
       loadStudentAcademicHistory(id);
-      loadStudentFinanceRecords(id);
     }
   };
 
-  const exportStudentHistoricalPDF = async (studentId, examId) => {
+  const exportStudentHistoricalPDF = async (studentId, examId, language = "en") => {
     setIsExportingStudentPDF(examId);
     try {
-      await examApi.downloadPdf(`/pdf/student/${studentId}/report-card?examId=${examId}`, `Report_Card_${studentId}.pdf`);
+      await examApi.downloadPdf(`/pdf/student/${studentId}/report-card?examId=${examId}&language=${language}`, `Report_Card_${studentId}_${language}.pdf`);
     } catch(e) {
       console.error(e);
       alert(e.message === "403 Forbidden" ? "Unauthorized to export PDF" : "Failed to export PDF");
@@ -318,10 +438,10 @@ export default function Students() {
     }
   };
 
-  const exportFullAcademicHistory = async (studentId) => {
+  const exportFullAcademicHistory = async (studentId, language = "en") => {
     setIsExportingStudentPDF('full_history');
     try {
-      await examApi.downloadPdf(`/pdf/student/${studentId}/academic-history`, `Academic_History_${studentId}.pdf`);
+      await examApi.downloadPdf(`/pdf/student/${studentId}/academic-history?language=${language}`, `Academic_History_${studentId}_${language}.pdf`);
     } catch(e) {
       console.error(e);
       alert(e.message === "403 Forbidden" ? "Unauthorized to export PDF" : "Failed to export full academic history");
@@ -330,10 +450,10 @@ export default function Students() {
     }
   };
 
-  const exportYearlyResult = async (studentId, academicYear) => {
+  const exportYearlyResult = async (studentId, academicYear, language = "en") => {
     setIsExportingStudentPDF(`yearly_${academicYear}`);
     try {
-      await examApi.downloadPdf(`/pdf/student/${studentId}/yearly-result?academicYear=${academicYear}`, `Yearly_Result_${studentId}_${academicYear}.pdf`);
+      await examApi.downloadPdf(`/pdf/student/${studentId}/yearly-result?academicYear=${academicYear}&language=${language}`, `Yearly_Result_${studentId}_${academicYear}_${language}.pdf`);
     } catch(e) {
       console.error(e);
       alert(e.message === "403 Forbidden" ? "Unauthorized to export PDF" : "Failed to export yearly result. Ensure exams exist for this year.");
@@ -350,159 +470,169 @@ export default function Students() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            {tr("students", "pageTitle")}
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            {tr("students", "pageSubtitle")}
-          </p>
-        </div>
+      <PageHeader 
+        title={tr("students", "pageTitle")}
+        description={tr("students", "pageSubtitle")}
+        showBack={true}
+        backLabel={tr("common", "backToDashboard")}
+        actions={
+          <Button onClick={() => setIsAddModalOpen(true)} className="shrink-0 w-full sm:w-auto">
+            <Plus className="me-2 h-4 w-4" /> {tr("students", "addStudent")}
+          </Button>
+        }
+      />
 
-        <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-          <DialogTrigger asChild>
-            <Button className="shrink-0">
-              <Plus className="mr-2 h-4 w-4" /> {tr("students", "addStudent")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>{tr("students", "addStudent")}</DialogTitle>
               <DialogDescription>
                 {tr("students", "addStudentDescription")}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">{tr("students", "fullName")}</Label>
-                  <Input
-                    id="name"
-                    placeholder="Muhammad Ali"
-                    value={formData.fullName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, fullName: e.target.value })
-                    }
-                  />
+            <form onSubmit={handleSubmit} className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto px-1">
+              
+              {/* SECTION 1: PERSONAL INFORMATION */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold border-b pb-2">{tr("students", "personalInfo")}</h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="photo">{tr("students", "fullName")}</Label>
+                    <div className="flex items-center gap-4">
+                      <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border flex items-center justify-center shrink-0">
+                        {formData.photoPreview ? (
+                          <img src={formData.photoPreview} alt="Preview" className="h-full w-full object-cover" />
+                        ) : (
+                          <User className="h-8 w-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <Input
+                          id="photo"
+                          type="file"
+                          accept="image/jpeg, image/jpg, image/png, image/webp"
+                          onChange={(e) => handlePhotoSelection(e, (file, url) => setFormData({ ...formData, photo: file, photoPreview: url }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="father">{tr("students", "fatherName")}</Label>
-                  <Input
-                    id="father"
-                    placeholder="Ahmed Ali"
-                    value={formData.fatherName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, fatherName: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="department">Department</Label>
-                  <select
-                    id="department"
-                    value={formData.studentClassCategory}
-                    onChange={(e) => {
-                      const category = e.target.value;
-                      setFormData({ 
-                        ...formData, 
-                        studentClassCategory: category,
-                        studentClassSub: CLASS_TREE[category][0]
-                      });
-                    }}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {Object.keys(CLASS_TREE).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="subClass">Class / Grade</Label>
-                  <select
-                    id="subClass"
-                    value={formData.studentClassSub}
-                    onChange={(e) =>
-                      setFormData({ ...formData, studentClassSub: e.target.value })
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {CLASS_TREE[formData.studentClassCategory]?.map(sub => (
-                      <option key={sub} value={sub}>{sub}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="schoolClass">School Class (Optional)</Label>
-                  <Input
-                    id="schoolClass"
-                    placeholder="e.g. 5th Grade, Matric"
-                    value={formData.schoolClass}
-                    onChange={(e) =>
-                      setFormData({ ...formData, schoolClass: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="residential">
-                    {tr("students", "status")}
-                  </Label>
-                  <select
-                    id="residential"
-                    value={String(formData.residential)}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        residential: e.target.value === "true",
-                      })
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="true">
-                      {tr("students", "residential")}
-                    </option>
-                    <option value="false">
-                      {tr("students", "dayScholar")}
-                    </option>
-                  </select>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">{tr("students", "fullName")}</Label>
+                    <Input dir="auto" id="name" placeholder="Muhammad Ali" value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="dob">{tr("students", "dateOfBirth")}</Label>
+                    <Input dir="ltr" id="dob" type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="gender">{tr("students", "gender")}</Label>
+                    <select id="gender" value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                      <option value="">Select Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="contactNumber">{tr("students", "mobileNumber")}</Label>
+                    <Input dir="ltr" id="contactNumber" placeholder="9876543210" value={formData.contactNumber} onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">{tr("students", "email")}</Label>
+                    <Input dir="ltr" id="email" type="email" placeholder="test@example.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="residential">{tr("students", "status")}</Label>
+                    <select id="residential" value={String(formData.residential)} onChange={(e) => setFormData({ ...formData, residential: e.target.value === "true" })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+                      <option value="true">{tr("students", "residential")}</option>
+                      <option value="false">{tr("students", "dayScholar")}</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2 sm:col-span-2">
+                    <Label htmlFor="address">{tr("students", "address")}</Label>
+                    <Input dir="auto" id="address" placeholder="123 Street Name" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="rollNumber">Roll Number</Label>
-                  <Input
-                    id="rollNumber"
-                    placeholder="1, 2, 3..."
-                    value={formData.rollNumber}
-                    onChange={(e) =>
-                      setFormData({ ...formData, rollNumber: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="dob">{tr("students", "dateOfBirth")}</Label>
-                  <Input
-                    id="dob"
-                    type="date"
-                    value={formData.dateOfBirth}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dateOfBirth: e.target.value })
-                    }
-                  />
+
+              {/* SECTION 2: PARENT / GUARDIAN */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold border-b pb-2">{tr("students", "parentInfo")}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="father">{tr("students", "fatherName")}</Label>
+                    <Input dir="auto" id="father" placeholder="Ahmed Ali" value={formData.fatherName} onChange={(e) => setFormData({ ...formData, fatherName: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="motherName">{tr("students", "motherName")}</Label>
+                    <Input dir="auto" id="motherName" placeholder="Aisha" value={formData.motherName} onChange={(e) => setFormData({ ...formData, motherName: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="guardianName">{tr("students", "guardianName")}</Label>
+                    <Input dir="auto" id="guardianName" placeholder="Uncle Name" value={formData.guardianName} onChange={(e) => setFormData({ ...formData, guardianName: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="guardianRelation">{tr("students", "guardian")}</Label>
+                    <Input dir="auto" id="guardianRelation" placeholder="Uncle" value={formData.guardianRelation} onChange={(e) => setFormData({ ...formData, guardianRelation: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2 sm:col-span-2">
+                    <Label htmlFor="guardianContact">{tr("students", "guardianContact")}</Label>
+                    <Input dir="ltr" id="guardianContact" placeholder="9876543210" value={formData.guardianContact} onChange={(e) => setFormData({ ...formData, guardianContact: e.target.value })} />
+                  </div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                >
-                  {tr("students", "cancel")}
-                </Button>
+
+              {/* SECTION 3: ADMISSION / ACADEMIC DETAILS */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold border-b pb-2">{tr("students", "academicInfo")}</h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="classId">Class (Assigned via API)</Label>
+                    <select id="classId" value={formData.classId} onChange={(e) => setFormData({ ...formData, classId: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                      <option value="">{tr("common", "selectClass")}</option>
+                      {apiClasses.map(cls => (
+                        <option key={cls._id} value={cls._id}>{cls.fullName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {!formData.classId && (
+                    <div className="text-xs text-muted-foreground italic px-1">
+                      Warning: Legacy default classes will be assigned if no class is selected.
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="rollNumber">{tr("students", "admissionNumber")}</Label>
+                    <Input dir="ltr" id="rollNumber" placeholder="1, 2, 3..." value={formData.rollNumber} onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="admissionNumber">{tr("students", "admissionNumber")}</Label>
+                    <Input dir="ltr" id="admissionNumber" placeholder="ADM-001" value={formData.admissionNumber} onChange={(e) => setFormData({ ...formData, admissionNumber: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="admissionDate">{tr("students", "admissionDate")}</Label>
+                    <Input dir="ltr" id="admissionDate" type="date" value={formData.admissionDate} onChange={(e) => setFormData({ ...formData, admissionDate: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="section">{tr("students", "section")}</Label>
+                    <Input dir="auto" id="section" placeholder="A, B, C..." value={formData.section} onChange={(e) => setFormData({ ...formData, section: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2 sm:col-span-2">
+                    <Label htmlFor="schoolClass">School Class (Optional)</Label>
+                    <Input dir="auto" id="schoolClass" placeholder="e.g. 5th Grade, Matric" value={formData.schoolClass} onChange={(e) => setFormData({ ...formData, schoolClass: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="pt-4 border-t mt-4">
+                <Button variant="outline" type="button" onClick={() => setIsAddModalOpen(false)}>{tr("students", "cancel")}</Button>
                 <Button type="submit">{tr("students", "saveStudent")}</Button>
               </DialogFooter>
             </form>
@@ -515,134 +645,156 @@ export default function Students() {
             <DialogHeader>
               <DialogTitle>{tr("students", "editDetails")}</DialogTitle>
               <DialogDescription>
-                Update the student's information below.
+                {tr("students", "editStudentDescription")}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleEditSubmit} className="grid gap-4 py-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-name">{tr("students", "fullName")}</Label>
-                  <Input
-                    id="edit-name"
-                    value={editFormData.name}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, name: e.target.value })
-                    }
-                  />
+            <form onSubmit={handleEditSubmit} className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto px-1">
+              
+              {/* SECTION 1: PERSONAL INFORMATION */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold border-b pb-2">{tr("students", "personalInfo")}</h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Student Photo</Label>
+                    <div className="flex items-center gap-4">
+                      <div className="group relative h-16 w-16 rounded-full overflow-hidden bg-muted border flex items-center justify-center shrink-0">
+                        {editFormData.photoPreview ? (
+                          <>
+                            <img src={editFormData.photoPreview} alt="Preview" className="h-full w-full object-cover" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer" onClick={() => setEditFormData({ ...editFormData, photoPreview: null, photo: null, removePhoto: true })}>
+                              <X className="h-6 w-6 text-white" />
+                            </div>
+                          </>
+                        ) : (
+                          <User className="h-8 w-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label htmlFor="edit-photo" className="text-xs text-muted-foreground font-normal">
+                          {editFormData.photoPreview ? "Change Photo" : "Upload Photo"}
+                        </Label>
+                        <Input
+                          id="edit-photo"
+                          type="file"
+                          accept="image/jpeg, image/jpg, image/png, image/webp"
+                          onChange={(e) => handlePhotoSelection(e, (file, url) => setEditFormData({ ...editFormData, photo: file, photoPreview: url, removePhoto: false }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-father">{tr("students", "fatherName")}</Label>
-                  <Input
-                    id="edit-father"
-                    value={editFormData.fatherName}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, fatherName: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-department">Department</Label>
-                  <select
-                    id="edit-department"
-                    value={editFormData.studentClassCategory}
-                    onChange={(e) => {
-                      const category = e.target.value;
-                      setEditFormData({ 
-                        ...editFormData, 
-                        studentClassCategory: category,
-                        studentClassSub: CLASS_TREE[category][0]
-                      });
-                    }}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {Object.keys(CLASS_TREE).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-subClass">Class / Grade</Label>
-                  <select
-                    id="edit-subClass"
-                    value={editFormData.studentClassSub}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, studentClassSub: e.target.value })
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {CLASS_TREE[editFormData.studentClassCategory]?.map(sub => (
-                      <option key={sub} value={sub}>{sub}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-schoolClass">School Class (Optional)</Label>
-                  <Input
-                    id="edit-schoolClass"
-                    placeholder="e.g. 5th Grade, Matric"
-                    value={editFormData.schoolClass}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, schoolClass: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-residential">
-                    {tr("students", "status")}
-                  </Label>
-                  <select
-                    id="edit-residential"
-                    value={String(editFormData.residential)}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        residential: e.target.value === "true",
-                      })
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <option value="true">{tr("students", "residential")}</option>
-                    <option value="false">{tr("students", "dayScholar")}</option>
-                  </select>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-name">{tr("students", "fullName")}</Label>
+                    <Input dir="auto" id="edit-name" value={editFormData.name} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-dob">{tr("students", "dateOfBirth")}</Label>
+                    <Input dir="ltr" id="edit-dob" type="date" value={editFormData.dateOfBirth} onChange={(e) => setEditFormData({ ...editFormData, dateOfBirth: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-gender">{tr("students", "gender")}</Label>
+                    <select id="edit-gender" value={editFormData.gender} onChange={(e) => setEditFormData({ ...editFormData, gender: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                      <option value="">Select Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-contactNumber">{tr("students", "mobileNumber")}</Label>
+                    <Input dir="ltr" id="edit-contactNumber" value={editFormData.contactNumber} onChange={(e) => setEditFormData({ ...editFormData, contactNumber: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-email">{tr("students", "email")}</Label>
+                    <Input dir="ltr" id="edit-email" type="email" value={editFormData.email} onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-residential">{tr("students", "status")}</Label>
+                    <select id="edit-residential" value={String(editFormData.residential)} onChange={(e) => setEditFormData({ ...editFormData, residential: e.target.value === "true" })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+                      <option value="true">{tr("students", "residential")}</option>
+                      <option value="false">{tr("students", "dayScholar")}</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2 sm:col-span-2">
+                    <Label htmlFor="edit-address">{tr("students", "address")}</Label>
+                    <Input dir="auto" id="edit-address" value={editFormData.address} onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })} />
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-rollNumber">Roll Number</Label>
-                  <Input
-                    id="edit-rollNumber"
-                    placeholder="1, 2, 3..."
-                    value={editFormData.rollNumber}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, rollNumber: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-dob">{tr("students", "dateOfBirth")}</Label>
-                  <Input
-                    id="edit-dob"
-                    type="date"
-                    value={editFormData.dateOfBirth}
-                    onChange={(e) =>
-                      setEditFormData({ ...editFormData, dateOfBirth: e.target.value })
-                    }
-                  />
+
+              {/* SECTION 2: PARENT / GUARDIAN */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold border-b pb-2">{tr("students", "parentInfo")}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-father">{tr("students", "fatherName")}</Label>
+                    <Input dir="auto" id="edit-father" value={editFormData.fatherName} onChange={(e) => setEditFormData({ ...editFormData, fatherName: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-motherName">{tr("students", "motherName")}</Label>
+                    <Input dir="auto" id="edit-motherName" value={editFormData.motherName} onChange={(e) => setEditFormData({ ...editFormData, motherName: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-guardianName">{tr("students", "guardianName")}</Label>
+                    <Input dir="auto" id="edit-guardianName" value={editFormData.guardianName} onChange={(e) => setEditFormData({ ...editFormData, guardianName: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-guardianRelation">{tr("students", "guardian")}</Label>
+                    <Input dir="auto" id="edit-guardianRelation" value={editFormData.guardianRelation} onChange={(e) => setEditFormData({ ...editFormData, guardianRelation: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2 sm:col-span-2">
+                    <Label htmlFor="edit-guardianContact">{tr("students", "guardianContact")}</Label>
+                    <Input dir="ltr" id="edit-guardianContact" value={editFormData.guardianContact} onChange={(e) => setEditFormData({ ...editFormData, guardianContact: e.target.value })} />
+                  </div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                >
-                  {tr("students", "cancel")}
-                </Button>
-                <Button type="submit">Save Changes</Button>
+
+              {/* SECTION 3: ADMISSION / ACADEMIC DETAILS */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold border-b pb-2">{tr("students", "academicInfo")}</h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-classId">Class (Assigned via API)</Label>
+                    <select id="edit-classId" value={editFormData.classId} onChange={(e) => setEditFormData({ ...editFormData, classId: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                      <option value="">{tr("common", "selectClass")}</option>
+                      {apiClasses.map(cls => (
+                        <option key={cls._id} value={cls._id}>{cls.fullName}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-rollNumber">Roll Number</Label>
+                    <Input dir="ltr" id="edit-rollNumber" value={editFormData.rollNumber} onChange={(e) => setEditFormData({ ...editFormData, rollNumber: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-admissionNumber">Admission Number</Label>
+                    <Input dir="ltr" id="edit-admissionNumber" value={editFormData.admissionNumber} onChange={(e) => setEditFormData({ ...editFormData, admissionNumber: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-admissionDate">Admission Date</Label>
+                    <Input dir="ltr" id="edit-admissionDate" type="date" value={editFormData.admissionDate} onChange={(e) => setEditFormData({ ...editFormData, admissionDate: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-section">Section</Label>
+                    <Input dir="auto" id="edit-section" value={editFormData.section} onChange={(e) => setEditFormData({ ...editFormData, section: e.target.value })} />
+                  </div>
+                  <div className="grid gap-2 sm:col-span-2">
+                    <Label htmlFor="edit-schoolClass">School Class (Optional)</Label>
+                    <Input dir="auto" id="edit-schoolClass" value={editFormData.schoolClass} onChange={(e) => setEditFormData({ ...editFormData, schoolClass: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="pt-4 border-t mt-4">
+                <Button variant="outline" type="button" onClick={() => setIsEditModalOpen(false)}>{tr("students", "cancel")}</Button>
+                <Button type="submit">{tr("students", "saveChanges")}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -667,39 +819,19 @@ export default function Students() {
                   required
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="promote-department">New Department</Label>
+                  <Label htmlFor="promote-classId">New Class (Assigned via API)</Label>
                   <select
-                    id="promote-department"
-                    value={promoteFormData.studentClassCategory}
-                    onChange={(e) => {
-                      const category = e.target.value;
-                      setPromoteFormData({ 
-                        ...promoteFormData, 
-                        studentClassCategory: category,
-                        studentClassSub: CLASS_TREE[category][0]
-                      });
-                    }}
+                    id="promote-classId"
+                    value={promoteFormData.classId}
+                    onChange={(e) => setPromoteFormData({ ...promoteFormData, classId: e.target.value })}
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    required
                   >
-                    {Object.keys(CLASS_TREE).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="promote-subClass">New Class / Grade</Label>
-                  <select
-                    id="promote-subClass"
-                    value={promoteFormData.studentClassSub}
-                    onChange={(e) =>
-                      setPromoteFormData({ ...promoteFormData, studentClassSub: e.target.value })
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {CLASS_TREE[promoteFormData.studentClassCategory]?.map(sub => (
-                      <option key={sub} value={sub}>{sub}</option>
+                    <option value="">Select a Class...</option>
+                    {apiClasses.map(cls => (
+                      <option key={cls._id} value={cls._id}>{cls.fullName}</option>
                     ))}
                   </select>
                 </div>
@@ -723,7 +855,7 @@ export default function Students() {
                 />
               </div>
               <DialogFooter>
-                <Button variant="outline" type="button" onClick={() => setIsPromoteModalOpen(false)}>Cancel</Button>
+                <Button variant="outline" type="button" onClick={() => setIsPromoteModalOpen(false)}>{tr("common", "cancel")}</Button>
                 <Button type="submit">Promote Student</Button>
               </DialogFooter>
             </form>
@@ -732,281 +864,279 @@ export default function Students() {
 
         {/* View Modal */}
         <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>{tr("students", "viewProfile")}</DialogTitle>
-              <DialogDescription>
-                Detailed information for {selectedStudent?.fullName || selectedStudent?.name}
-              </DialogDescription>
-            </DialogHeader>
+          <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-background">
             {selectedStudent && (
-              <div className="grid gap-4 py-4 max-h-[80vh] overflow-y-auto">
-                {selectedStudent.photo && (
-                  <div className="flex justify-center mb-4">
-                    <img src={`http://localhost:5000${selectedStudent.photo}`} alt={selectedStudent.fullName || selectedStudent.name} className="h-24 w-24 rounded-full object-cover border" />
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/20 p-4 rounded-xl border border-border/50">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Roll Number</span>
-                    <span className="font-medium text-foreground">{selectedStudent.rollNumber || "—"}</span>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">System ID</span>
-                    <span className="font-medium text-foreground text-xs font-mono">{selectedStudent.studentId || selectedStudent.id}</span>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "fullName")}</span>
-                    <span className="font-medium text-foreground">{selectedStudent.fullName || selectedStudent.name}</span>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "fatherName")}</span>
-                    <span className="font-medium text-foreground">{selectedStudent.fatherName}</span>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "departmentClass")}</span>
-                    <span className="font-medium text-foreground capitalize">{selectedStudent.studentClass || selectedStudent.className}</span>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">School Class</span>
-                    <span className="font-medium text-foreground">{selectedStudent.schoolClass || "—"}</span>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "status")}</span>
-                    <span className="font-medium text-foreground">{selectedStudent.residential ? tr("students", "residential") : tr("students", "dayScholar")}</span>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "admission")}</span>
-                    <span className="font-medium text-foreground">{selectedStudent.admissionDate ? new Date(selectedStudent.admissionDate).toLocaleDateString() : "—"}</span>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("students", "dateOfBirth")}</span>
-                    <span className="font-medium text-foreground">{selectedStudent.dateOfBirth ? new Date(selectedStudent.dateOfBirth).toLocaleDateString() : "—"}</span>
-                  </div>
-                </div>
-
-                {/* Promotion History Section */}
-                {selectedStudent.promotionHistory && selectedStudent.promotionHistory.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
-                    <h4 className="text-sm font-semibold mb-3">Promotion History</h4>
-                    <div className="max-h-40 overflow-y-auto rounded border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs font-medium">Date</TableHead>
-                            <TableHead className="text-xs font-medium">Year</TableHead>
-                            <TableHead className="text-xs font-medium">From</TableHead>
-                            <TableHead className="text-xs font-medium">To</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedStudent.promotionHistory.map((hist, i) => (
-                            <TableRow key={i}>
-                              <TableCell className="py-2 text-xs">{new Date(hist.date).toLocaleDateString()}</TableCell>
-                              <TableCell className="py-2 text-xs">{hist.academicYear}</TableCell>
-                              <TableCell className="py-2 text-xs text-muted-foreground">{hist.fromClass}</TableCell>
-                              <TableCell className="py-2 text-xs font-medium">{hist.toClass}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Attendance Summary Section */}
-                <div className="mt-4 pt-4 border-t">
-                  <h4 className="text-sm font-semibold mb-3">Attendance Summary</h4>
-                  {loadingSummary ? (
-                    <div className="text-xs text-muted-foreground">Loading summary...</div>
-                  ) : studentAttendanceSummary ? (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm">
-                        <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
-                          <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Total</div>
-                          <div className="font-bold text-lg text-foreground mt-1">{studentAttendanceSummary.summary?.total || 0}</div>
-                        </div>
-                        <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
-                          <div className="text-emerald-700 text-[10px] font-semibold uppercase tracking-wider">Present</div>
-                          <div className="font-bold text-lg text-emerald-700 mt-1">{studentAttendanceSummary.summary?.present || 0}</div>
-                        </div>
-                        <div className="bg-red-500/10 p-3 rounded-xl border border-red-500/20">
-                          <div className="text-red-700 text-[10px] font-semibold uppercase tracking-wider">Absent</div>
-                          <div className="font-bold text-lg text-red-700 mt-1">{studentAttendanceSummary.summary?.absent || 0}</div>
-                        </div>
-                        <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
-                          <div className="text-amber-700 text-[10px] font-semibold uppercase tracking-wider">Late</div>
-                          <div className="font-bold text-lg text-amber-700 mt-1">{studentAttendanceSummary.summary?.late || 0}</div>
-                        </div>
-                      </div>
-                      
-                      {studentAttendanceSummary.records && studentAttendanceSummary.records.length > 0 && (
-                        <div className="mt-2">
-                          <div className="text-xs font-medium text-gray-500 mb-2">Recent Records</div>
-                          <div className="max-h-32 overflow-y-auto rounded border">
-                            <Table>
-                              <TableBody>
-                                {studentAttendanceSummary.records.slice(0, 5).map(record => (
-                                  <TableRow key={record._id}>
-                                    <TableCell className="py-1 text-xs">{new Date(record.date).toLocaleDateString()}</TableCell>
-                                    <TableCell className="py-1 text-xs text-right">
-                                      <span className={`px-2 py-0.5 rounded-full ${record.status === 'Present' ? 'bg-green-100 text-green-700' : record.status === 'Absent' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                                        {record.status}
-                                      </span>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </div>
+              <div className="flex flex-col h-full max-h-[90vh]">
+                {/* Header Profile Section */}
+                <div className="relative px-6 pt-10 pb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-b flex flex-col md:flex-row items-center md:items-start gap-6 shrink-0">
+                  <div className="relative">
+                    <div className="h-28 w-28 md:h-32 md:w-32 rounded-full overflow-hidden border-4 border-background shadow-md bg-muted flex items-center justify-center shrink-0">
+                      {selectedStudent.photo ? (
+                        <img 
+                          src={`http://localhost:5000${selectedStudent.photo}`} 
+                          alt={selectedStudent.fullName || selectedStudent.name} 
+                          className="h-full w-full object-cover" 
+                          onError={(e) => { e.target.src = ""; e.target.className = "hidden"; }}
+                        />
+                      ) : (
+                        <span className="text-4xl font-semibold text-muted-foreground uppercase">
+                          {(selectedStudent.fullName || selectedStudent.name || "S").charAt(0)}
+                        </span>
                       )}
                     </div>
-                  ) : (
-                    <div className="text-xs text-muted-foreground">No attendance records found.</div>
-                  )}
+                  </div>
+                  <div className="flex-1 text-center md:text-start pt-2">
+                    <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-2">
+                      <h2 className="text-2xl md:text-3xl font-bold text-foreground">
+                        {getLocalizedStudentName(selectedStudent, language)}
+                      </h2>
+                      <div className="flex items-center justify-center gap-2">
+                        <Badge variant={selectedStudent.status === 'active' ? 'default' : 'secondary'} className="rounded-full px-3 shadow-sm">
+                          {selectedStudent.status === 'active' ? 'Active' : 'Inactive'}
+                        </Badge>
+                        <Badge variant="outline" className="rounded-full px-3 shadow-sm bg-background">
+                          {selectedStudent.residential ? "Residential" : "Day Scholar"}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap justify-center md:justify-start gap-x-6 gap-y-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <span className="text-foreground/70">ID:</span>
+                        <span className="font-mono text-foreground">{selectedStudent.studentId || selectedStudent.id}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <span className="text-foreground/70">Class:</span>
+                        <span className="capitalize text-foreground">{selectedStudent.studentClass || selectedStudent.className}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <span className="text-foreground/70">Section:</span>
+                        <span className="text-foreground">{selectedStudent.section || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Finance Summary Section */}
-                <div className="mt-4 pt-4 border-t">
-                  <h4 className="text-sm font-semibold mb-3">Finance & Fees</h4>
-                  {loadingFinanceRecords ? (
-                    <div className="text-xs text-muted-foreground">Loading finance records...</div>
-                  ) : studentFinanceRecords && studentFinanceRecords.length > 0 ? (
-                    <div className="space-y-4">
-                      <div className="max-h-40 overflow-y-auto rounded border">
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-muted/10">
+                  
+                  {/* Grid 1: Personal & Parent Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Personal Information */}
+                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
+                      <h3 className="font-semibold text-lg border-b pb-2">{tr("students", "personalInfo")}</h3>
+                      <div className="grid grid-cols-2 gap-y-4 gap-x-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{tr("students", "dateOfBirth")}</p>
+                          <p className="font-medium text-foreground">{formatLocalizedDate(selectedStudent.dateOfBirth, language)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{tr("students", "gender")}</p>
+                          <p className="font-medium text-foreground capitalize">{selectedStudent.gender || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{tr("students", "contact")}</p>
+                          <p className="font-medium text-foreground">{selectedStudent.contactNumber || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{tr("students", "email")}</p>
+                          <p className="font-medium text-foreground truncate" title={selectedStudent.email}>{selectedStudent.email || "—"}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{tr("students", "address")}</p>
+                          <p className="font-medium text-foreground">{selectedStudent.address || "—"}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Parent/Guardian Info */}
+                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
+                      <h3 className="font-semibold text-lg border-b pb-2">{tr("students", "parentInfo")}</h3>
+                      <div className="grid grid-cols-2 gap-y-4 gap-x-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Father</p>
+                          <p className="font-medium text-foreground">{selectedStudent.fatherName || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Mother</p>
+                          <p className="font-medium text-foreground">{selectedStudent.motherName || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Guardian</p>
+                          <p className="font-medium text-foreground">{selectedStudent.guardianName || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Relation</p>
+                          <p className="font-medium text-foreground">{selectedStudent.guardianRelation || "—"}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Guardian Contact</p>
+                          <p className="font-medium text-foreground">{selectedStudent.guardianContact || "—"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Grid 2: Academic & Attendance */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Academic Information */}
+                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
+                      <h3 className="font-semibold text-lg border-b pb-2">Academic Details</h3>
+                      <div className="grid grid-cols-2 gap-y-4 gap-x-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Roll Number</p>
+                          <p className="font-medium text-foreground">{selectedStudent.rollNumber || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Admission No</p>
+                          <p className="font-medium text-foreground">{selectedStudent.admissionNumber || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">School Class</p>
+                          <p className="font-medium text-foreground">{selectedStudent.schoolClass || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Admission Date</p>
+                          <p className="font-medium text-foreground">{formatLocalizedDate(selectedStudent.admissionDate, language)}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Attendance Summary */}
+                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
+                      <h3 className="font-semibold text-lg border-b pb-2">{tr("students", "attendance")}</h3>
+                      {loadingSummary ? (
+                        <div className="text-sm text-muted-foreground p-4 text-center">{tr("common", "loading")}</div>
+                      ) : studentAttendanceSummary ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                          <div className="bg-muted/50 p-3 rounded-xl border border-border/50">
+                            <div className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">Total</div>
+                            <div className="font-bold text-xl text-foreground mt-1">{formatLocalizedNumber(studentAttendanceSummary.summary?.total || 0, language)}</div>
+                          </div>
+                          <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
+                            <div className="text-emerald-700 text-[10px] font-bold uppercase tracking-wider">{tr("attendance", "present")}</div>
+                            <div className="font-bold text-xl text-emerald-700 mt-1">{formatLocalizedNumber(studentAttendanceSummary.summary?.present || 0, language)}</div>
+                          </div>
+                          <div className="bg-red-500/10 p-3 rounded-xl border border-red-500/20">
+                            <div className="text-red-700 text-[10px] font-bold uppercase tracking-wider">{tr("attendance", "absent")}</div>
+                            <div className="font-bold text-xl text-red-700 mt-1">{formatLocalizedNumber(studentAttendanceSummary.summary?.absent || 0, language)}</div>
+                          </div>
+                          <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
+                            <div className="text-amber-700 text-[10px] font-bold uppercase tracking-wider">{tr("attendance", "late")}</div>
+                            <div className="font-bold text-xl text-amber-700 mt-1">{formatLocalizedNumber(studentAttendanceSummary.summary?.late || 0, language)}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground p-4 text-center">{tr("attendance", "noRecordsFound")}</div>
+                      )}
+                    </div>
+                  </div>
+
+
+
+                  {/* Exam & Result Performance */}
+                  <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
+                    <div className="flex justify-between items-center border-b pb-2">
+                      <h3 className="font-semibold text-lg">Academic Performance</h3>
+                    </div>
+                    {loadingAcademicHistory ? (
+                      <div className="text-sm text-muted-foreground text-center p-4">Loading performance...</div>
+                    ) : studentAcademicHistory && studentAcademicHistory.length > 0 ? (
+                      <div className="overflow-x-auto">
                         <Table>
-                          <TableHeader className="bg-muted/30">
+                          <TableHeader className="bg-muted/40">
                             <TableRow>
-                              <TableHead className="text-xs font-medium">Year</TableHead>
-                              <TableHead className="text-xs font-medium">Class</TableHead>
-                              <TableHead className="text-xs font-medium text-right">Total Fee</TableHead>
-                              <TableHead className="text-xs font-medium text-right">Paid</TableHead>
-                              <TableHead className="text-xs font-medium text-right">Pending</TableHead>
+                              <TableHead className="font-semibold">Year</TableHead>
+                              <TableHead className="font-semibold">Class</TableHead>
+                              <TableHead className="font-semibold">Exam</TableHead>
+                              <TableHead className="text-end font-semibold">Score</TableHead>
+                              <TableHead className="text-center font-semibold">Grade</TableHead>
+                              <TableHead className="font-semibold text-center">Result</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {studentFinanceRecords.map((record, i) => (
+                            {studentAcademicHistory.map((hist, i) => (
                               <TableRow key={i}>
-                                <TableCell className="py-2 text-xs">{record.academicYear}</TableCell>
-                                <TableCell className="py-2 text-xs">{record.className}</TableCell>
-                                <TableCell className="py-2 text-xs text-right font-medium">Rs {record.totalFee.toLocaleString()}</TableCell>
-                                <TableCell className="py-2 text-xs text-right text-green-600">Rs {record.paid.toLocaleString()}</TableCell>
-                                <TableCell className="py-2 text-xs text-right text-red-600">Rs {record.pending.toLocaleString()}</TableCell>
+                                <TableCell className="font-medium text-sm">{hist.academicYear}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{hist.className}</TableCell>
+                                <TableCell className="text-sm">
+                                  <span className="font-medium text-foreground">{hist.examName || hist.examType}</span>
+                                </TableCell>
+                                <TableCell className="text-end font-semibold text-sm">{formatLocalizedPercent(hist.percentage, language)}</TableCell>
+                                <TableCell className="text-center font-bold text-sm">{hist.grade}</TableCell>
+                                <TableCell className="text-center text-sm">
+                                  <Badge variant={hist.status === 'Pass' ? 'soft-success' : 'destructive'} className="shadow-none">
+                                    {hist.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground p-6 text-center bg-muted/20 rounded-xl">No academic history found for this student.</div>
+                    )}
+                  </div>
+
+                  {/* Promotion History */}
+                  {selectedStudent.promotionHistory && selectedStudent.promotionHistory.length > 0 && (
+                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
+                      <h3 className="font-semibold text-lg border-b pb-2">Promotion History</h3>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader className="bg-muted/40">
+                            <TableRow>
+                              <TableHead className="font-semibold">Date</TableHead>
+                              <TableHead className="font-semibold">Year</TableHead>
+                              <TableHead className="font-semibold">From Class</TableHead>
+                              <TableHead className="font-semibold">To Class</TableHead>
+                              <TableHead className="font-semibold">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {selectedStudent.promotionHistory.map((hist, i) => (
+                              <TableRow key={i}>
+                                <TableCell className="text-sm">{formatLocalizedDate(hist.date, language)}</TableCell>
+                                <TableCell className="font-medium text-sm">{hist.academicYear}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{hist.fromClass}</TableCell>
+                                <TableCell className="text-sm font-medium">{hist.toClass}</TableCell>
+                                <TableCell className="text-sm">
+                                  <Badge variant="outline">{hist.status}</Badge>
+                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
                       </div>
                     </div>
-                  ) : (
-                    <div className="text-xs text-muted-foreground">No fee records found for this student.</div>
                   )}
-                </div>
-
-                {/* Academic History Section */}
-                <div className="mt-4 pt-4 border-t">
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="text-sm font-semibold">Academic History</h4>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-8 text-xs"
-                      onClick={() => exportFullAcademicHistory(selectedStudent._id || selectedStudent.id || selectedStudent.studentId)}
-                      disabled={isExportingStudentPDF === 'full_history'}
-                    >
-                      {isExportingStudentPDF === 'full_history' ? "Downloading..." : "Export Full History PDF"}
-                    </Button>
-                  </div>
-                  {loadingAcademicHistory ? (
-                    <div className="text-xs text-muted-foreground">Loading academic history...</div>
-                  ) : studentAcademicHistory && studentAcademicHistory.length > 0 ? (
-                    <div className="max-h-48 overflow-y-auto rounded border">
-                      <Table>
-                        <TableHeader className="bg-muted/30">
-                          <TableRow>
-                            <TableHead className="text-xs font-medium">Year</TableHead>
-                            <TableHead className="text-xs font-medium">Class</TableHead>
-                            <TableHead className="text-xs font-medium">Exam</TableHead>
-                            <TableHead className="text-xs font-medium">%</TableHead>
-                            <TableHead className="text-xs font-medium">Grade</TableHead>
-                            <TableHead className="text-xs font-medium">Result</TableHead>
-                            <TableHead className="text-right text-xs font-medium">Action</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {studentAcademicHistory.map((hist, i) => (
-                            <TableRow key={i}>
-                              <TableCell className="py-2 text-xs font-medium">
-                                {hist.academicYear}
-                                <div className="mt-1">
-                                  <Button 
-                                    variant="link" 
-                                    size="sm" 
-                                    className="h-4 p-0 text-[10px]"
-                                    onClick={() => exportYearlyResult(selectedStudent._id || selectedStudent.id || selectedStudent.studentId, hist.academicYear)}
-                                    disabled={isExportingStudentPDF === `yearly_${hist.academicYear}`}
-                                  >
-                                    Yearly PDF
-                                  </Button>
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-2 text-xs">{hist.className}</TableCell>
-                              <TableCell className="py-2 text-xs">
-                                <div>{hist.examName}</div>
-                                <div className="text-[10px] text-muted-foreground">{hist.examType}</div>
-                              </TableCell>
-                              <TableCell className="py-2 text-xs font-semibold">{hist.percentage}%</TableCell>
-                              <TableCell className="py-2 text-xs font-bold">{hist.grade}</TableCell>
-                              <TableCell className="py-2 text-xs">
-                                <span className={hist.status === 'Pass' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-                                  {hist.status}
-                                </span>
-                              </TableCell>
-                              <TableCell className="py-2 text-right">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-7 text-xs px-2"
-                                  onClick={() => exportStudentHistoricalPDF(selectedStudent._id || selectedStudent.id || selectedStudent.studentId, hist.examId)}
-                                  disabled={isExportingStudentPDF === hist.examId}
-                                >
-                                  {isExportingStudentPDF === hist.examId ? "Wait..." : "PDF"}
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                  
+                  {/* Notes */}
+                  {selectedStudent.notes && (
+                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-2">
+                      <h3 className="font-semibold text-lg border-b pb-2">Notes</h3>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedStudent.notes}</p>
                     </div>
-                  ) : (
-                    <div className="text-xs text-muted-foreground">No academic history found.</div>
                   )}
+
+                </div>
+                
+                {/* Footer Action */}
+                <div className="px-6 py-4 bg-background border-t flex justify-end shrink-0">
+                  <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close Profile</Button>
                 </div>
               </div>
             )}
-            <DialogFooter className="sm:justify-start">
-              <BackButton onClick={() => setIsViewModalOpen(false)} />
-            </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
 
-      <div className="bg-card rounded-lg border shadow-sm">
+        <div className="bg-card rounded-lg border shadow-sm">
         <div className="p-4 border-b flex items-center justify-between">
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder={tr("students", "searchPlaceholder")}
-              className="pl-9 rounded-full bg-muted/20 shadow-inner focus-visible:ring-primary/20"
+              className="ps-9 rounded-full bg-muted/20 shadow-inner focus-visible:ring-primary/20"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -1026,7 +1156,7 @@ export default function Students() {
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">School Class</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "status")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "admission")}</TableHead>
-                <TableHead className="text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="text-end text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {tr("students", "attendance")}
                 </TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -1043,7 +1173,7 @@ export default function Students() {
                       {student.rollNumber || "—"}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground text-sm">
-                      {student.fullName || student.name}
+                      {getLocalizedStudentName(student, language)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{student.fatherName}</TableCell>
                     <TableCell>
@@ -1066,15 +1196,13 @@ export default function Students() {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {student.admissionDate
-                        ? new Date(student.admissionDate).toLocaleDateString()
-                        : "—"}
+                      {formatLocalizedDate(student.admissionDate, language)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       <span
                         className={`font-medium ${student.attendancePercent >= 90 ? "text-green-600" : student.attendancePercent >= 80 ? "text-amber-600" : "text-red-600"}`}
                       >
-                        {student.attendancePercent ?? 0}%
+                        {formatLocalizedPercent(student.attendancePercent ?? 0, language)}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -1092,16 +1220,16 @@ export default function Students() {
                             {tr("students", "actions")}
                           </DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => openViewModal(student)}>
-                            <FileText className="mr-2 h-4 w-4" />
+                            <FileText className="me-2 h-4 w-4" />
                             {tr("students", "viewProfile")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openEditModal(student)}>
-                            <Edit className="mr-2 h-4 w-4" />
+                            <Edit className="me-2 h-4 w-4" />
                             {tr("students", "editDetails")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => openPromoteModal(student)}>
-                            <Plus className="mr-2 h-4 w-4" />
+                            <Plus className="me-2 h-4 w-4" />
                             Promote
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
@@ -1111,7 +1239,7 @@ export default function Students() {
                               handleDelete(student._id || student.id)
                             }
                           >
-                            <Trash className="mr-2 h-4 w-4" />
+                            <Trash className="me-2 h-4 w-4" />
                             {tr("students", "deleteRecord")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>

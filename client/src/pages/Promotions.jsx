@@ -33,25 +33,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { studentApi, settingsApi } from "@/lib/api";
+import { studentApi, settingsApi, classApi } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
+import { getLocalizedStudentName } from "@/utils/localizationUtils";
 import { useToast } from "@/hooks/use-toast";
 
-const SHOB_CLASSES = {
-  "Shob-e-Deeniyat": [
-    "Awwal", "Duwwam", "Suwwam", "Chaharum", "Panjum", "Shashum",
-  ],
-  "Shob-e-Hifz": [
-    "Darja Awwal", "Darja Duwwam", "Darja Suwwam", "Darja Chaharum",
-  ],
-  "Shob-e-Aalimiyat": [
-    "Awwal", "Duwwam", "Suwwam", "Chaharum", "Panjum", "Shashum", "Haftum", "Dora-e-Hadees",
-  ],
-  "Shob-e-Qirat": ["Hafs", "Saba", "Ashra"],
-};
-
 export default function Promotions() {
-  const { t, tr } = useLanguage();
+  const { t, tr, language } = useLanguage();
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
@@ -60,6 +48,7 @@ export default function Promotions() {
   const [selectedStudents, setSelectedStudents] = useState([]);
   
   const [academicYears, setAcademicYears] = useState(["2025-26", "2026-27"]);
+  const [apiClasses, setApiClasses] = useState([]);
   
   const [sourceFilter, setSourceFilter] = useState({
     academicYear: "",
@@ -78,16 +67,40 @@ export default function Promotions() {
 
   useEffect(() => {
     fetchAcademicYears();
+    fetchClasses();
   }, []);
+
+  const fetchClasses = async () => {
+    try {
+      const res = await classApi.getClasses();
+      if (res.success) {
+        setApiClasses(res.data?.filter(c => c.status === "active") || []);
+      }
+    } catch(e) {
+      console.error(e);
+    }
+  };
+
+  // Helper to group classes by department for the dropdowns
+  const groupedClasses = apiClasses.reduce((acc, cls) => {
+    // For legacy compatibility, we might need to map canonical department to legacy names if needed
+    // The user said: "If a legacy module still expects className, keep its existing API contract for this phase and only make the UI selection canonical."
+    // Let's use the DB's department and name exactly.
+    if (!acc[cls.department]) acc[cls.department] = [];
+    acc[cls.department].push(cls.name);
+    return acc;
+  }, {});
 
   const fetchAcademicYears = async () => {
     try {
-      const res = await settingsApi.getAcademicYears();
-      if (res.data && res.data.length > 0) {
-        setAcademicYears(res.data.map(ay => ay.year));
-        const active = res.data.find(ay => ay.isActive);
-        if (active) {
-          setSourceFilter(prev => ({ ...prev, academicYear: active.year }));
+      const res = await settingsApi.getSettings();
+      if (res.success && res.data) {
+        const activeYear = res.data.academicYear || "2025-26";
+        setSourceFilter(prev => ({ ...prev, academicYear: activeYear }));
+        
+        // Ensure the active year is in our list
+        if (!academicYears.includes(activeYear)) {
+          setAcademicYears(prev => [...prev, activeYear].sort());
         }
       }
     } catch (error) {
@@ -111,9 +124,14 @@ export default function Promotions() {
     
     try {
       const classFullName = `${sourceFilter.department} - ${sourceFilter.className}`;
-      const res = await studentApi.list({ className: classFullName, status: "active" });
-      if (res.data) {
-        setStudents(res.data);
+      // Find classId
+      const sourceClassObj = apiClasses.find(c => c.department === sourceFilter.department && c.name === sourceFilter.className);
+      const classId = sourceClassObj ? sourceClassObj._id : "";
+      
+      // Use classId for primary lookup, keeping className for legacy fallback
+      const res = await studentApi.list({ classId, className: classFullName, status: "active", limit: 500 });
+      if (res.success) {
+        setStudents(res.data?.data || res.data || []);
       }
     } catch (error) {
       console.error(error);
@@ -263,7 +281,7 @@ export default function Promotions() {
                   <SelectValue placeholder="Select Department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.keys(SHOB_CLASSES).map((dept) => (
+                  {Object.keys(groupedClasses).map((dept) => (
                     <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                   ))}
                 </SelectContent>
@@ -280,7 +298,7 @@ export default function Promotions() {
                   <SelectValue placeholder="Select Class" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sourceFilter.department && SHOB_CLASSES[sourceFilter.department]?.map((cls) => (
+                  {sourceFilter.department && groupedClasses[sourceFilter.department]?.map((cls) => (
                     <SelectItem key={cls} value={cls}>{cls}</SelectItem>
                   ))}
                 </SelectContent>
@@ -328,7 +346,7 @@ export default function Promotions() {
                   <SelectValue placeholder="Select Department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.keys(SHOB_CLASSES).map((dept) => (
+                  {Object.keys(groupedClasses).map((dept) => (
                     <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                   ))}
                 </SelectContent>
@@ -345,7 +363,7 @@ export default function Promotions() {
                   <SelectValue placeholder="Select Class" />
                 </SelectTrigger>
                 <SelectContent>
-                  {targetFilter.department && SHOB_CLASSES[targetFilter.department]?.map((cls) => (
+                  {targetFilter.department && groupedClasses[targetFilter.department]?.map((cls) => (
                     <SelectItem key={cls} value={cls}>{cls}</SelectItem>
                   ))}
                 </SelectContent>
@@ -418,7 +436,7 @@ export default function Promotions() {
                         />
                       </TableCell>
                       <TableCell className="font-medium">{student.rollNumber}</TableCell>
-                      <TableCell>{student.name}</TableCell>
+                      <TableCell>{getLocalizedStudentName(student, language)}</TableCell>
                       <TableCell className="text-muted-foreground">{student.fatherName}</TableCell>
                       <TableCell>
                         <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">

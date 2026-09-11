@@ -32,12 +32,26 @@ exports.getTeacherById = async (req, res) => {
   }
 };
 
+const Class = require("../models/classModel");
+
 exports.createTeacher = async (req, res) => {
   try {
     const { username, password, isActive, ...teacherData } = req.body;
 
     if (!username || !password) {
       return sendError(res, 400, "Username and password are required for teacher accounts");
+    }
+
+    // Validate assignedClassIds if provided
+    if (teacherData.assignedClassIds && Array.isArray(teacherData.assignedClassIds)) {
+      for (const cid of teacherData.assignedClassIds) {
+        const cls = await Class.findById(cid);
+        if (!cls || cls.status !== "active") {
+          return sendError(res, 400, `Invalid or inactive class ID provided: ${cid}`);
+        }
+      }
+      // Ensure we don't accidentally write empty/invalid legacy data from frontend payloads
+      delete teacherData.assignedClasses;
     }
 
     // Check if username exists
@@ -80,6 +94,21 @@ exports.createTeacher = async (req, res) => {
 exports.updateTeacher = async (req, res) => {
   try {
     const payload = { ...req.body };
+    
+    // Validate assignedClassIds if provided
+    if (payload.assignedClassIds && Array.isArray(payload.assignedClassIds)) {
+      for (const cid of payload.assignedClassIds) {
+        const cls = await Class.findById(cid);
+        if (!cls || cls.status !== "active") {
+          return sendError(res, 400, `Invalid or inactive class ID provided: ${cid}`);
+        }
+      }
+      // If we are updating with canonical IDs, DO NOT overwrite legacy assignedClasses with new arrays.
+      // But we shouldn't explicitly clear it either (to preserve backward compatibility as per rule 5), 
+      // however we MUST ensure the payload doesn't contain an empty array for assignedClasses that would overwrite it.
+      delete payload.assignedClasses;
+    }
+
     if (req.file) {
       payload.photo = `/uploads/profiles/${req.file.filename}`;
     }
