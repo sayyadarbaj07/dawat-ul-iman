@@ -7,6 +7,11 @@ const {
 } = require("../validators/studentValidator");
 const upload = require("../middleware/uploadMiddleware");
 
+const { protect, authorize } = require("../middleware/authMiddleware");
+
+// All student endpoints require authentication
+router.use(protect);
+
 router.post(
   "/",
   upload.single("photo"),
@@ -23,17 +28,15 @@ router.put(
   handleValidationErrors,
   studentController.updateStudent,
 );
-const { protect, authorize } = require("../middleware/authMiddleware");
+
 
 router.post(
   "/:id/promote",
-  protect,
   authorize("admin"),
   studentController.promoteStudent
 );
 router.post(
   "/bulk-promote",
-  protect,
   authorize("admin"),
   studentController.bulkPromoteStudents
 );

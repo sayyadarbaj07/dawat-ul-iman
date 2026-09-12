@@ -11,6 +11,9 @@ router.route("/")
   .get(teacherController.getAllTeachers)
   .post(authorize("admin"), upload.single("photo"), teacherController.createTeacher);
 
+router.route("/me")
+  .get(teacherController.getCurrentTeacher);
+
 router.route("/:id")
   .get(teacherController.getTeacherById)
   .put(authorize("admin"), upload.single("photo"), teacherController.updateTeacher)

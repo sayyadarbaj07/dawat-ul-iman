@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { BackButton } from "@/components/ui/BackButton";
-import { studentApi, attendanceApi, examApi } from "@/lib/api";
+import { studentApi, attendanceApi, examApi, pdfApi } from "@/lib/api";
 import {
   Search,
   Plus,
@@ -457,6 +457,18 @@ export default function Students() {
     } catch(e) {
       console.error(e);
       alert(e.message === "403 Forbidden" ? "Unauthorized to export PDF" : "Failed to export yearly result. Ensure exams exist for this year.");
+    } finally {
+      setIsExportingStudentPDF(null);
+    }
+  };
+
+  const exportIdCard = async (studentId, language = "en") => {
+    setIsExportingStudentPDF('id_card');
+    try {
+      await pdfApi.downloadPdf(pdfApi.getStudentIdCard(studentId, language), `ID_Card_${studentId}_${language}.pdf`);
+    } catch(e) {
+      console.error(e);
+      alert(e.message === "403 Forbidden" ? "Unauthorized to export ID Card" : "Failed to generate ID Card");
     } finally {
       setIsExportingStudentPDF(null);
     }
@@ -1122,7 +1134,25 @@ export default function Students() {
                 </div>
                 
                 {/* Footer Action */}
-                <div className="px-6 py-4 bg-background border-t flex justify-end shrink-0">
+                <div className="px-6 py-4 bg-background border-t flex justify-between shrink-0 items-center">
+                  <Button 
+                    variant="default"
+                    className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => exportIdCard(selectedStudent._id, language)}
+                    disabled={isExportingStudentPDF === 'id_card'}
+                  >
+                    {isExportingStudentPDF === 'id_card' ? (
+                      <>
+                        <span className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>
+                        {tr("common", "generating") || "Generating..."}
+                      </>
+                    ) : (
+                      <>
+                        <User className="w-4 h-4" />
+                        {tr("students", "generateIdCard") || "Generate ID Card"}
+                      </>
+                    )}
+                  </Button>
                   <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close Profile</Button>
                 </div>
               </div>

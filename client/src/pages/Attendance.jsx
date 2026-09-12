@@ -84,11 +84,10 @@ export default function Attendance() {
 
       // 2. Resolve Teachers & RBAC
       if (user?.role === "teacher") {
-        const teacherRes = await teacherApi.list().catch(() => ({ data: [] }));
-        const allTeachers = teacherRes.data?.data || teacherRes.data || [];
-        setTeachers(allTeachers);
+        const teacherRes = await teacherApi.getMe().catch(() => ({ data: null }));
+        const me = teacherRes.data?.data || teacherRes.data || null;
+        setTeachers(me ? [me] : []);
         
-        const me = allTeachers.find(t => (t.userId?._id === user.id) || (t.userId === user.id));
         if (me) {
           let teacherClasses = [];
           if (me.assignedClassIds && me.assignedClassIds.length > 0) {

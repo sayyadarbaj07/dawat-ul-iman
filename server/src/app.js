@@ -24,7 +24,18 @@ const settingsRoutes = require("./routes/settingsRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const classRoutes = require("./routes/classRoutes");
 const dataResolutionRoutes = require("./routes/dataResolutionRoutes");
+const achievementRoutes = require("./routes/achievementRoutes");
 const path = require("path");
+
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.error(err.name, err.message, err.stack);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('UNHANDLED REJECTION! 💥 Shutting down...');
+  console.error(err.name, err.message, err.stack);
+});
 
 dotenv.config();
 
@@ -103,6 +114,7 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/classes", classRoutes);
 app.use("/api/data-resolution", dataResolutionRoutes);
+app.use("/api/achievements", achievementRoutes);
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 

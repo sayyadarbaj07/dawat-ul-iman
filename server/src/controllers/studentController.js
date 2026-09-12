@@ -17,6 +17,16 @@ const sendError = (res, statusCode, message, error = null) => {
 
 exports.createStudent = async (req, res) => {
   try {
+    if (req.user && req.user.role === "teacher") {
+      if (!req.body.classId) {
+        return sendError(res, 403, "Forbidden: Teachers must explicitly specify a valid classId when creating students.");
+      }
+      const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
+      const hasAccess = await verifyTeacherClassAccess(req.user, req.body.classId, null);
+      if (!hasAccess) {
+        return sendError(res, 403, "Forbidden: You are not authorized to add students to this class.");
+      }
+    }
     const payload = { ...req.body };
     if (req.file) {
       payload.photo = `/uploads/profiles/${req.file.filename}`;
@@ -48,7 +58,28 @@ exports.createStudent = async (req, res) => {
 
 exports.getAllStudents = async (req, res) => {
   try {
-    const students = await studentService.getAllStudents(req.query);
+    const query = { ...req.query };
+
+    if (req.user && req.user.role === "teacher") {
+      const Teacher = require("../models/teacherModel");
+      const teacher = await Teacher.findOne({ userId: req.user._id }).lean();
+      
+      const assignedIds = (teacher && teacher.assignedClassIds) ? teacher.assignedClassIds.map(id => id.toString()) : [];
+      
+      if (assignedIds.length === 0) {
+        return sendSuccess(res, 200, "Students fetched successfully", { data: [], meta: { total: 0, page: 1, limit: query.limit || 50, totalPages: 0 } });
+      }
+
+      if (query.classId) {
+        if (!assignedIds.includes(query.classId.toString())) {
+          return sendError(res, 403, "Forbidden: You are not authorized to access students of this class.");
+        }
+      } else {
+        query.classId = { $in: assignedIds };
+      }
+    }
+
+    const students = await studentService.getAllStudents(query);
     return sendSuccess(res, 200, "Students fetched successfully", students);
   } catch (error) {
     return sendError(res, 500, "Failed to fetch students", error);
@@ -59,6 +90,15 @@ exports.getStudentById = async (req, res) => {
   try {
     const student = await studentService.getStudentById(req.params.id);
     if (!student) return sendError(res, 404, "Student not found");
+
+    if (req.user && req.user.role === "teacher") {
+      const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
+      const hasAccess = await verifyTeacherClassAccess(req.user, student.classId, student.className || student.studentClass);
+      if (!hasAccess) {
+        return sendError(res, 403, "Forbidden: You are not authorized to access this student.");
+      }
+    }
+
     return sendSuccess(res, 200, "Student fetched successfully", student);
   } catch (error) {
     return sendError(res, 500, "Failed to fetch student", error);
@@ -70,6 +110,21 @@ exports.updateStudent = async (req, res) => {
     const payload = { ...req.body };
     const existingStudent = await studentService.getStudentById(req.params.id);
     if (!existingStudent) return sendError(res, 404, "Student not found");
+
+    if (req.user && req.user.role === "teacher") {
+      const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
+      const hasAccess = await verifyTeacherClassAccess(req.user, existingStudent.classId, existingStudent.className || existingStudent.studentClass);
+      if (!hasAccess) {
+        return sendError(res, 403, "Forbidden: You are not authorized to update this student.");
+      }
+
+      if (req.body.classId && req.body.classId.toString() !== (existingStudent.classId ? existingStudent.classId.toString() : "")) {
+         const hasTargetAccess = await verifyTeacherClassAccess(req.user, req.body.classId, null);
+         if (!hasTargetAccess) {
+            return sendError(res, 403, "Forbidden: You are not authorized to move student to this class.");
+         }
+      }
+    }
 
     if (req.body.removePhoto === "true") {
       payload.photo = "";
@@ -111,6 +166,14 @@ exports.deleteStudent = async (req, res) => {
   try {
     const existingStudent = await studentService.getStudentById(req.params.id);
     if (!existingStudent) return sendError(res, 404, "Student not found");
+
+    if (req.user && req.user.role === "teacher") {
+      const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
+      const hasAccess = await verifyTeacherClassAccess(req.user, existingStudent.classId, existingStudent.className || existingStudent.studentClass);
+      if (!hasAccess) {
+        return sendError(res, 403, "Forbidden: You are not authorized to delete this student.");
+      }
+    }
 
     const student = await studentService.deleteStudent(req.params.id);
     

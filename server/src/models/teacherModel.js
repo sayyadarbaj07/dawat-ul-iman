@@ -24,6 +24,10 @@ const teacherSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Class'
     }],
+    teachingAssignments: [{
+      classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
+      subjectId: { type: String, required: true, trim: true }
+    }],
     mobile: {
       type: String,
       required: true,

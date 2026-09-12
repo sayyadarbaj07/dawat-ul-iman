@@ -20,13 +20,21 @@ const sendError = (res, statusCode, message, error = null) => {
 // @access  Private
 const getEvents = async (req, res) => {
   try {
-    const { page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 50, type, upcoming } = req.query;
     const parsedPage = Math.max(1, parseInt(page, 10));
     const parsedLimit = Math.min(parseInt(limit, 10), 500);
     const skip = (parsedPage - 1) * parsedLimit;
+    
+    const filter = {};
+    if (type) {
+      filter.type = type;
+    }
+    if (upcoming === "true") {
+      filter.date = { $gte: new Date(new Date().setHours(0,0,0,0)) };
+    }
 
-    const total = await Event.countDocuments();
-    const events = await Event.find()
+    const total = await Event.countDocuments(filter);
+    const events = await Event.find(filter)
       .sort({ date: 1 })
       .skip(skip)
       .limit(parsedLimit)

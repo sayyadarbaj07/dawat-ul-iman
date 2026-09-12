@@ -14,3 +14,4 @@ export { activityLogApi } from "./activity";
 export { settingsApi } from "./settings";
 export { notificationApi } from "./notification";
 export { classApi } from "./classApi";
+export { achievementApi } from "./achievement";

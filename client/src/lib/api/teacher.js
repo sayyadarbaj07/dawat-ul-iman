@@ -4,6 +4,9 @@ export const teacherApi = {
   list() {
     return request("/teachers");
   },
+  getMe() {
+    return request("/teachers/me");
+  },
   create(payload) {
     return request("/teachers", {
       method: "POST",

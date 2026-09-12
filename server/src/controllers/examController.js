@@ -28,7 +28,7 @@ exports.getAllExams = async (req, res) => {
     if (req.user && req.user.role === "teacher") {
       const Teacher = require("../models/teacherModel");
       const teacher = await Teacher.findOne({ userId: req.user._id });
-      if (teacher && (teacher.assignedClasses.length > 0 || teacher.assignedClassIds.length > 0)) {
+      if (teacher && ((teacher.assignedClasses && teacher.assignedClasses.length > 0) || (teacher.assignedClassIds && teacher.assignedClassIds.length > 0))) {
         if (filter.class) {
           // If a specific class was requested, ensure it's in their assigned list
           const hasAccess = await verifyTeacherClassAccess(req.user, req.query.classId, filter.class);

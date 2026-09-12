@@ -15,10 +15,26 @@ const sendError = (res, statusCode, message, error = null) => {
 
 exports.getAllTeachers = async (req, res) => {
   try {
+    if (req.user && req.user.role === "teacher") {
+       return sendError(res, 403, "Teachers are not allowed to fetch all teachers");
+    }
     const teachers = await Teacher.find().populate("userId", "username").sort({ createdAt: -1 });
     return sendSuccess(res, 200, "Teachers fetched successfully", teachers);
   } catch (error) {
     return sendError(res, 500, "Failed to fetch teachers", error);
+  }
+};
+
+exports.getCurrentTeacher = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== "teacher") {
+      return sendError(res, 403, "Only teachers can access this endpoint");
+    }
+    const teacher = await Teacher.findOne({ userId: req.user._id }).populate("userId", "username");
+    if (!teacher) return sendError(res, 404, "Teacher profile not found");
+    return sendSuccess(res, 200, "Teacher profile fetched successfully", teacher);
+  } catch (error) {
+    return sendError(res, 500, "Failed to fetch teacher profile", error);
   }
 };
 
@@ -42,15 +58,49 @@ exports.createTeacher = async (req, res) => {
       return sendError(res, 400, "Username and password are required for teacher accounts");
     }
 
-    // Validate assignedClassIds if provided
-    if (teacherData.assignedClassIds && Array.isArray(teacherData.assignedClassIds)) {
+    // Process teachingAssignments if provided
+    if (teacherData.teachingAssignments !== undefined) {
+      if (typeof teacherData.teachingAssignments === 'string') {
+        try {
+          teacherData.teachingAssignments = JSON.parse(teacherData.teachingAssignments);
+        } catch(e) {}
+      }
+      if (Array.isArray(teacherData.teachingAssignments)) {
+        const uniqueCombos = new Map();
+        const classIdSet = new Set();
+        for (const assignment of teacherData.teachingAssignments) {
+          if (!assignment.classId || !assignment.subjectId) continue;
+          
+          const subject = String(assignment.subjectId).trim();
+          if (!subject) continue;
+          
+          const mongoose = require("mongoose");
+          if (!mongoose.Types.ObjectId.isValid(assignment.classId)) {
+            return sendError(res, 400, `Invalid class ID format: ${assignment.classId}`);
+          }
+          const cls = await Class.findById(assignment.classId);
+          if (!cls || cls.status !== "active") {
+            return sendError(res, 400, `Invalid or inactive class ID provided: ${assignment.classId}`);
+          }
+          
+          const key = `${assignment.classId.toString()}_${subject.toLowerCase()}`;
+          if (!uniqueCombos.has(key)) {
+            uniqueCombos.set(key, { classId: assignment.classId, subjectId: subject });
+            classIdSet.add(assignment.classId.toString());
+          }
+        }
+        teacherData.teachingAssignments = Array.from(uniqueCombos.values());
+        teacherData.assignedClassIds = Array.from(classIdSet);
+        delete teacherData.assignedClasses;
+      }
+    } else if (teacherData.assignedClassIds && Array.isArray(teacherData.assignedClassIds)) {
+      // Legacy validation
       for (const cid of teacherData.assignedClassIds) {
         const cls = await Class.findById(cid);
         if (!cls || cls.status !== "active") {
           return sendError(res, 400, `Invalid or inactive class ID provided: ${cid}`);
         }
       }
-      // Ensure we don't accidentally write empty/invalid legacy data from frontend payloads
       delete teacherData.assignedClasses;
     }
 
@@ -95,17 +145,45 @@ exports.updateTeacher = async (req, res) => {
   try {
     const payload = { ...req.body };
     
-    // Validate assignedClassIds if provided
-    if (payload.assignedClassIds && Array.isArray(payload.assignedClassIds)) {
+    // Process teachingAssignments if provided
+    if (payload.teachingAssignments !== undefined) {
+      if (typeof payload.teachingAssignments === 'string') {
+        try {
+          payload.teachingAssignments = JSON.parse(payload.teachingAssignments);
+        } catch(e) {}
+      }
+      if (Array.isArray(payload.teachingAssignments)) {
+        const uniqueCombos = new Map();
+        const classIdSet = new Set();
+        for (const assignment of payload.teachingAssignments) {
+          if (!assignment.classId || !assignment.subjectId) continue;
+          
+          const subject = String(assignment.subjectId).trim();
+          if (!subject) continue;
+          
+          const cls = await Class.findById(assignment.classId);
+          if (!cls || cls.status !== "active") {
+            return sendError(res, 400, `Invalid or inactive class ID provided: ${assignment.classId}`);
+          }
+          
+          const key = `${assignment.classId.toString()}_${subject.toLowerCase()}`;
+          if (!uniqueCombos.has(key)) {
+            uniqueCombos.set(key, { classId: assignment.classId, subjectId: subject });
+            classIdSet.add(assignment.classId.toString());
+          }
+        }
+        payload.teachingAssignments = Array.from(uniqueCombos.values());
+        payload.assignedClassIds = Array.from(classIdSet);
+        delete payload.assignedClasses;
+      }
+    } else if (payload.assignedClassIds && Array.isArray(payload.assignedClassIds)) {
+      // Legacy validation
       for (const cid of payload.assignedClassIds) {
         const cls = await Class.findById(cid);
         if (!cls || cls.status !== "active") {
           return sendError(res, 400, `Invalid or inactive class ID provided: ${cid}`);
         }
       }
-      // If we are updating with canonical IDs, DO NOT overwrite legacy assignedClasses with new arrays.
-      // But we shouldn't explicitly clear it either (to preserve backward compatibility as per rule 5), 
-      // however we MUST ensure the payload doesn't contain an empty array for assignedClasses that would overwrite it.
       delete payload.assignedClasses;
     }
 

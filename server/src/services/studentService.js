@@ -1,6 +1,7 @@
 const Student = require("../models/studentModel");
 
 const Class = require("../models/classModel");
+const ClassRollCounter = require("../models/classRollCounterModel");
 
 class StudentService {
   async createStudent(payload) {
@@ -14,9 +15,67 @@ class StudentService {
       // Do not dual-write className/studentClass when canonical classId is provided
       payload.className = undefined;
       payload.studentClass = undefined;
+      
+      try {
+        const nextRoll = await this._getNextRollNumber(payload.classId);
+        payload.rollNumber = nextRoll.toString();
+      } catch (err) {
+        throw new Error("Failed to assign roll number: " + err.message);
+      }
     }
     const student = await Student.create(payload);
     return student;
+  }
+
+  async _getNextRollNumber(classId) {
+    // 1. Try normal atomic increment first
+    let counter = await ClassRollCounter.findOneAndUpdate(
+      { classId },
+      { $inc: { lastRollNumber: 1 } },
+      { new: true }
+    );
+
+    if (counter) {
+      return counter.lastRollNumber;
+    }
+
+    // 2. Counter doesn't exist. Find max roll from existing students safely
+    const students = await Student.find({ classId }).select("rollNumber").lean();
+    let maxRoll = 0;
+    for (const student of students) {
+      if (student.rollNumber) {
+        const str = student.rollNumber.trim();
+        if (/^\d+$/.test(str)) { // strictly digits
+          const parsed = parseInt(str, 10);
+          if (parsed > maxRoll) {
+            maxRoll = parsed;
+          }
+        }
+      }
+    }
+
+    const nextRoll = maxRoll + 1;
+
+    // 3. Try to create the counter atomically
+    try {
+      counter = await ClassRollCounter.create({
+        classId,
+        lastRollNumber: nextRoll
+      });
+      return counter.lastRollNumber;
+    } catch (error) {
+      // If E11000 duplicate key error, another request initialized it a millisecond ago!
+      if (error.code === 11000) {
+        // Just retry the atomic increment
+        counter = await ClassRollCounter.findOneAndUpdate(
+          { classId },
+          { $inc: { lastRollNumber: 1 } },
+          { new: true }
+        );
+        if (counter) return counter.lastRollNumber;
+      }
+      throw error;
+    }
   }
 
   async getAllStudents(query = {}) {

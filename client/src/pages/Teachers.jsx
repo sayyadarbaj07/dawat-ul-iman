@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatLocalizedNumber, formatLocalizedDate, formatLocalizedPercent } from "@/utils/localizationUtils";
-import { teacherApi, attendanceApi, classApi } from "@/lib/api";
+import { teacherApi, attendanceApi, classApi, curriculumApi, pdfApi } from "@/lib/api";
 
 export default function Teachers() {
     const { tr, language } = useLanguage();
@@ -35,6 +35,7 @@ export default function Teachers() {
       salary: "",
       classesAssigned: "",
       assignedClassIds: [],
+      teachingAssignments: [],
       username: "",
       password: "",
       confirmPassword: "",
@@ -102,6 +103,7 @@ export default function Teachers() {
         payload.append("mobile", formData.mobile);
         payload.append("salary", Number(formData.salary));
         payload.append("classesAssigned", Number(formData.classesAssigned));
+        payload.append("teachingAssignments", JSON.stringify(formData.teachingAssignments));
         formData.assignedClassIds.forEach(c => payload.append("assignedClassIds[]", c));
         payload.append("username", formData.username);
         payload.append("password", formData.password);
@@ -148,6 +150,7 @@ export default function Teachers() {
         salary: teacher.salary || "",
         classesAssigned: teacher.classesAssigned || "",
         assignedClassIds: teacher.assignedClassIds || [],
+        teachingAssignments: teacher.teachingAssignments || [],
       });
       setIsEditModalOpen(true);
     };
@@ -161,6 +164,7 @@ export default function Teachers() {
         payload.append("mobile", editFormData.mobile);
         payload.append("salary", Number(editFormData.salary));
         payload.append("classesAssigned", Number(editFormData.classesAssigned));
+        payload.append("teachingAssignments", JSON.stringify(editFormData.teachingAssignments));
         editFormData.assignedClassIds.forEach(c => payload.append("assignedClassIds[]", c));
         if (editFormData.photo) {
           payload.append("photo", editFormData.photo);
@@ -488,8 +492,16 @@ export default function Teachers() {
                   </div>
                 </div>
               )}
-              <DialogFooter className="sm:justify-start">
+              <DialogFooter className="sm:justify-start flex flex-row items-center gap-2">
                 <BackButton onClick={() => setIsViewModalOpen(false)} />
+                <Button 
+                  type="button" 
+                  variant="default"
+                  onClick={() => pdfApi.downloadPdf(pdfApi.getTeacherIdCard(selectedTeacher._id || selectedTeacher.id, language), `Teacher_ID_Card_${(selectedTeacher._id || selectedTeacher.id)}.pdf`)}
+                >
+                  <FileText className="me-2 h-4 w-4"/>
+                  {tr("teachers", "generateIdCard") || "Generate ID Card"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

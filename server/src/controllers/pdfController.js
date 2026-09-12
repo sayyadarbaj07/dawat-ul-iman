@@ -133,6 +133,161 @@ const generatePDF = (res, title, generateContent, filters = null, options = {}) 
   doc.end();
 };
 
+exports.generateStudentIdCard = async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id).populate('classId');
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    if (req.user.role === 'teacher') {
+      const targetClassId = student.classId ? (student.classId._id || student.classId) : null;
+      const isAuthorized = await verifyTeacherClassAccess(req.user, targetClassId);
+      if (!isAuthorized) {
+        return res.status(403).json({ message: "Unauthorized to access this student's ID card" });
+      }
+    }
+
+    const doc = new PDFDocument({
+      size: [243, 153],
+      margin: 0
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="ID_Card_${student.studentId || student._id}.pdf"`);
+    doc.pipe(res);
+
+    const language = resolvePdfLanguage(req.query.language);
+    const isUrdu = language === "ur";
+    const fontRegular = isUrdu ? "UrduFont" : PDF_FONT_PATHS.english;
+    const fontBold = isUrdu ? "UrduFont" : PDF_FONT_PATHS.englishBold;
+
+    if (isUrdu && fs.existsSync(PDF_FONT_PATHS.urdu)) {
+      doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
+    } else if (isUrdu) {
+      doc.registerFont("UrduFont", "Helvetica");
+    }
+
+    // Border
+    doc.rect(2, 2, 239, 149).strokeColor('#047857').lineWidth(1.5).stroke();
+
+    // Top Header Banner
+    doc.rect(2, 2, 239, 36).fill('#047857');
+    
+    // Logo
+    const logoPath = path.join(__dirname, "../../../client/public/logo1.jpeg");
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 8, 6, { height: 26 });
+    }
+
+    // Header Text
+    doc.fillColor('white');
+    if (isUrdu) {
+      doc.font(fontBold).fontSize(13);
+      urduPdfHelper.drawTextRTL(doc, "جامعہ دعوتِ ایمان", 230, 8, { font: fontBold, fontSize: 13, color: 'white' });
+      doc.font(fontRegular).fontSize(8);
+      urduPdfHelper.drawTextRTL(doc, "شناختی کارڈ", 230, 24, { font: fontRegular, fontSize: 8, color: 'white' });
+    } else {
+      doc.font(fontBold).fontSize(11).text("JAMIA DAWAT-UL-EIMAN", 42, 9, { width: 195, align: 'center' });
+      doc.font(fontRegular).fontSize(8).text("Student Identity Card", 42, 22, { width: 195, align: 'center' });
+    }
+
+    // Photo Box
+    const photoX = 12;
+    const photoY = 48;
+    const photoWidth = 60;
+    const photoHeight = 75;
+    
+    // Draw photo border
+    doc.rect(photoX, photoY, photoWidth, photoHeight).lineWidth(1).strokeColor('#ccc').stroke();
+
+    if (student.photo) {
+      let photoFsPath = student.photo;
+      // Handle relative paths stored in DB (e.g. /uploads/...)
+      if (student.photo.startsWith('/uploads')) {
+        photoFsPath = path.join(__dirname, "../../", student.photo);
+      } else if (!path.isAbsolute(student.photo)) {
+        photoFsPath = path.join(__dirname, "../../public", student.photo);
+      }
+      
+      if (fs.existsSync(photoFsPath)) {
+        doc.image(photoFsPath, photoX, photoY, { width: photoWidth, height: photoHeight });
+      } else {
+        drawPlaceholderPhoto();
+      }
+    } else {
+      drawPlaceholderPhoto();
+    }
+
+    function drawPlaceholderPhoto() {
+      doc.font(PDF_FONT_PATHS.englishBold).fontSize(28).fillColor('#aaa').text(
+        (student.fullName || student.name || "S").charAt(0).toUpperCase(),
+        photoX, photoY + 22,
+        { width: photoWidth, align: 'center' }
+      );
+    }
+
+    // Student Details
+    doc.fillColor('black');
+    const labelX = 82;
+    let currentY = 48;
+    const yStep = 15;
+
+    const nameStr = isUrdu && student.nameUrdu ? student.nameUrdu : (student.fullName || student.name);
+    const classNameStr = student.classId?.fullName || student.className || "N/A";
+    const rollNoStr = student.rollNumber;
+    const admNoStr = student.admissionNumber;
+
+    if (isUrdu) {
+      doc.fontSize(11).font(fontBold);
+      urduPdfHelper.drawTextRTL(doc, nameStr, 230, currentY);
+      currentY += 18;
+      
+      doc.fontSize(9).font(fontRegular);
+      urduPdfHelper.drawTextRTL(doc, `${classNameStr} :کلاس`, 230, currentY);
+      currentY += yStep;
+      
+      if (rollNoStr) {
+        urduPdfHelper.drawTextRTL(doc, `${rollNoStr} :رول نمبر`, 230, currentY);
+        currentY += yStep;
+      }
+      
+      if (admNoStr) {
+        urduPdfHelper.drawTextRTL(doc, `${admNoStr} :داخلہ نمبر`, 230, currentY);
+      }
+    } else {
+      doc.fontSize(12).font(fontBold).text(nameStr, labelX, currentY, { width: 150 });
+      currentY += 18;
+      
+      doc.fontSize(9).font(fontRegular);
+      doc.text("Class:", labelX, currentY);
+      doc.font(fontBold).text(classNameStr, labelX + 35, currentY, { width: 110 });
+      currentY += yStep;
+
+      if (rollNoStr) {
+        doc.font(fontRegular).text("Roll No:", labelX, currentY);
+        doc.font(fontBold).text(rollNoStr, labelX + 45, currentY);
+        currentY += yStep;
+      }
+      
+      if (admNoStr) {
+        doc.font(fontRegular).text("Adm No:", labelX, currentY);
+        doc.font(fontBold).text(admNoStr, labelX + 45, currentY);
+      }
+    }
+
+    // Bottom Accent
+    doc.rect(2, 138, 239, 13).fill('#047857');
+    doc.fillColor('white').font(PDF_FONT_PATHS.english).fontSize(6).text("Issued by Jamia Dawat-ul-Eiman Administration", 0, 142, { align: 'center', width: 243 });
+
+    doc.end();
+
+  } catch (error) {
+    console.error("ID Card generation failed:", error);
+    res.status(500).json({ message: "Failed to generate ID card" });
+  }
+};
+
 exports.generateStudentReportCard = async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
@@ -2061,6 +2216,198 @@ exports.generateStudentListPDF = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ message: "Error generating Student List PDF", error: error.message });
+  }
+};
+
+
+exports.generateTeacherIdCard = async (req, res) => {
+  try {
+    const mongoose = require("mongoose");
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid teacher ID format" });
+    }
+
+    const teacher = await Teacher.findById(req.params.id).populate('teachingAssignments.classId assignedClassIds');
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher not found" });
+    }
+
+    if (req.user.role === 'teacher' && req.user._id.toString() !== teacher.userId.toString()) {
+      return res.status(403).json({ message: "Unauthorized to access this teacher's ID card" });
+    }
+
+    const doc = new PDFDocument({
+      size: [243, 153],
+      margin: 0
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Teacher_ID_Card_${teacher._id}.pdf"`);
+    doc.pipe(res);
+
+    const language = resolvePdfLanguage(req.query.language);
+    const isUrdu = language === "ur";
+    const fontRegular = isUrdu ? "UrduFont" : PDF_FONT_PATHS.english;
+    const fontBold = isUrdu ? "UrduFont" : PDF_FONT_PATHS.englishBold;
+
+    if (isUrdu && fs.existsSync(PDF_FONT_PATHS.urdu)) {
+      doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
+    } else if (isUrdu) {
+      doc.registerFont("UrduFont", "Helvetica");
+    }
+
+    // Border
+    doc.rect(2, 2, 239, 149).strokeColor('#047857').lineWidth(1.5).stroke();
+
+    // Top Header Banner
+    doc.rect(2, 2, 239, 36).fill('#047857');
+    
+    // Logo
+    const logoPath = path.join(__dirname, "../../../client/public/logo1.jpeg");
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 8, 6, { height: 26 });
+    }
+
+    // Header Text
+    doc.fillColor('white');
+    if (isUrdu) {
+      doc.font(fontBold).fontSize(13);
+      urduPdfHelper.drawTextRTL(doc, "جامعہ دعوتِ ایمان", 230, 8, { font: fontBold, fontSize: 13, color: 'white' });
+      doc.font(fontRegular).fontSize(8);
+      urduPdfHelper.drawTextRTL(doc, "استاد شناختی کارڈ", 230, 24, { font: fontRegular, fontSize: 8, color: 'white' });
+    } else {
+      doc.font(fontBold).fontSize(11).text("JAMIA DAWAT-UL-EIMAN", 42, 9, { width: 195, align: 'center' });
+      doc.font(fontRegular).fontSize(8).text("Teacher Identity Card", 42, 22, { width: 195, align: 'center' });
+    }
+
+    // Photo Box
+    const photoX = 12;
+    const photoY = 48;
+    const photoWidth = 60;
+    const photoHeight = 75;
+    
+    // Draw photo border
+    doc.rect(photoX, photoY, photoWidth, photoHeight).lineWidth(1).strokeColor('#ccc').stroke();
+
+    if (teacher.photo) {
+      let photoFsPath = teacher.photo;
+      if (teacher.photo.startsWith('/uploads')) {
+        photoFsPath = path.join(__dirname, "../../", teacher.photo);
+      } else if (!path.isAbsolute(teacher.photo)) {
+        photoFsPath = path.join(__dirname, "../../public", teacher.photo);
+      }
+      
+      if (fs.existsSync(photoFsPath)) {
+        doc.image(photoFsPath, photoX, photoY, { width: photoWidth, height: photoHeight });
+      } else {
+        drawPlaceholderPhoto();
+      }
+    } else {
+      drawPlaceholderPhoto();
+    }
+
+    function drawPlaceholderPhoto() {
+      doc.font(PDF_FONT_PATHS.englishBold).fontSize(28).fillColor('#aaa').text(
+        (teacher.name || "T").charAt(0).toUpperCase(),
+        photoX, photoY + 22,
+        { width: photoWidth, align: 'center' }
+      );
+    }
+
+    // Teacher Details
+    doc.fillColor('black');
+    const labelX = 82;
+    let currentY = 48;
+
+    const nameStr = teacher.name;
+
+    if (isUrdu) {
+      doc.fontSize(11).font(fontBold);
+      urduPdfHelper.drawTextRTL(doc, nameStr, 230, currentY);
+      currentY += 15;
+    } else {
+      doc.fontSize(12).font(fontBold).text(nameStr, labelX, currentY, { width: 150 });
+      currentY += 16;
+    }
+
+    // Teaching Assignments
+    let assignmentsGroups = {};
+    if (teacher.teachingAssignments && teacher.teachingAssignments.length > 0) {
+      teacher.teachingAssignments.forEach(a => {
+        if (a.classId) {
+          const cName = a.classId.fullName || a.classId.name || "Unknown Class";
+          if (!assignmentsGroups[cName]) assignmentsGroups[cName] = [];
+          assignmentsGroups[cName].push(a.subjectId);
+        }
+      });
+    } else if (teacher.assignedClassIds && teacher.assignedClassIds.length > 0) {
+      teacher.assignedClassIds.forEach(c => {
+        if (c) {
+          const cName = c.fullName || c.name || "Unknown Class";
+          assignmentsGroups[cName] = [];
+        }
+      });
+    }
+
+    const classesList = Object.keys(assignmentsGroups);
+    if (classesList.length > 0) {
+      if (isUrdu) {
+        doc.fontSize(9).font(fontRegular).fillColor('#666');
+        urduPdfHelper.drawTextRTL(doc, "مضامین:", 230, currentY);
+        currentY += 12;
+        doc.fillColor('black');
+        
+        // Overflow control: display max 4 lines
+        let renderedLines = 0;
+        for (let i = 0; i < classesList.length; i++) {
+          if (renderedLines >= 4) {
+             urduPdfHelper.drawTextRTL(doc, "...", 230, currentY);
+             break;
+          }
+          const cName = classesList[i];
+          const subs = assignmentsGroups[cName];
+          let lineStr = cName;
+          if (subs && subs.length > 0) {
+            lineStr += " — " + subs.join("، ");
+          }
+          doc.fontSize(8);
+          urduPdfHelper.drawTextRTL(doc, lineStr, 230, currentY);
+          currentY += 11;
+          renderedLines++;
+        }
+      } else {
+        doc.fontSize(8).font(fontBold).fillColor('#666').text("Assignments:", labelX, currentY);
+        currentY += 10;
+        doc.fillColor('black').font(fontRegular);
+        
+        let renderedLines = 0;
+        for (let i = 0; i < classesList.length; i++) {
+          if (renderedLines >= 4) {
+             doc.text("...", labelX, currentY);
+             break;
+          }
+          const cName = classesList[i];
+          const subs = assignmentsGroups[cName];
+          let lineStr = cName;
+          if (subs && subs.length > 0) {
+            lineStr += " — " + subs.join(", ");
+          }
+          doc.text(lineStr, labelX, currentY, { width: 155, height: 11, lineBreak: false, ellipsis: true });
+          currentY += 11;
+          renderedLines++;
+        }
+      }
+    }
+
+    // Bottom Accent
+    doc.rect(2, 138, 239, 13).fill('#047857');
+    doc.fillColor('white').font(PDF_FONT_PATHS.english).fontSize(6).text("Issued by Jamia Dawat-ul-Eiman Administration", 0, 142, { align: 'center', width: 243 });
+
+    doc.end();
+
+  } catch (error) {
+    console.error("Teacher ID Card generation failed:", error);
+    res.status(500).json({ message: "Failed to generate ID card" });
   }
 };
 

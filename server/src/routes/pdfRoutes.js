@@ -9,6 +9,12 @@ router.use(protect);
 router.route("/student/:id/report-card")
   .get(authorize("admin", "teacher"), pdfController.generateStudentReportCard);
 
+router.route("/student/:id/id-card")
+  .get(authorize("admin", "teacher"), pdfController.generateStudentIdCard);
+
+router.route("/teacher/:id/id-card")
+  .get(authorize("admin", "teacher"), pdfController.generateTeacherIdCard);
+
 router.route("/student/:id/yearly-result")
   .get(authorize("admin", "teacher"), pdfController.generateYearlyResultPDF);
 
@@ -36,5 +42,7 @@ router.route("/attendance/student/:id")
 
 router.route("/student-list")
   .get(authorize("admin", "teacher", "accountant"), checkClassAccess, pdfController.generateStudentListPDF);
+
+// ...
 
 module.exports = router;
