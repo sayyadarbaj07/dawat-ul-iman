@@ -102,10 +102,11 @@ export function useDashboardData(user) {
       const today = localISODate();
 
       try {
-        const [studentRes, teacherRes, reportRes] = await Promise.allSettled([
+        const [studentRes, teacherRes, reportRes, meRes] = await Promise.allSettled([
           studentApi.list(),
-          teacherApi.list(),
+          role === "admin" ? teacherApi.list() : Promise.reject(new Error("Unauthorized")),
           reportApi.getSummary(),
+          role === "teacher" ? teacherApi.getMe() : Promise.resolve(null),
         ]);
 
         if (cancelled) return;
@@ -120,10 +121,9 @@ export function useDashboardData(user) {
         if (role === "admin") {
           shouldFetchAttendance = true;
         } else if (role === "teacher") {
-          const me = teachers.find((t) => t.userId?._id === user?.id || t.userId === user?.id);
+          const me = meRes?.status === "fulfilled" && meRes.value ? meRes.value.data : null;
           const hasClassIds = me && me.assignedClassIds && me.assignedClassIds.length > 0;
-          const hasLegacyClasses = me && me.assignedClasses && me.assignedClasses.length > 0;
-          if (hasClassIds || hasLegacyClasses) {
+          if (hasClassIds) {
             shouldFetchAttendance = true;
           }
         }

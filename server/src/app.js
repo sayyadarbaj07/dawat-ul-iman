@@ -54,7 +54,8 @@ app.use(compression());
 const allowedOrigins = [
   process.env.CLIENT_URL || "http://localhost:5173",
   "http://localhost:3000",
-  "https://dawat-ul-iman-git-main-arbajs-projects-fc7dac77.vercel.app"
+  "https://dawat-ul-iman-git-main-arbajs-projects-fc7dac77.vercel.app",
+  "https://dawat-ul-iman.vercel.app"
 ];
 
 app.use(cors({ 

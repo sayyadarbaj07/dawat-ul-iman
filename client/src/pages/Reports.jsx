@@ -106,14 +106,13 @@ export default function Reports() {
     }
 
     if (user?.role === "teacher") {
-        teacherApi.list().then(res => {
-            const me = (res.data || []).find(t => (t.userId?._id === user.id) || (t.userId === user.id));
+        teacherApi.getMe().then(res => {
+            const me = res.data;
             if (me) {
                 const myClassIds = me.assignedClassIds || [];
-                const myClassNames = me.assignedClasses || [];
                 
                 const teacherClasses = classData
-                   .filter(c => myClassIds.includes(c._id) || myClassNames.includes(c.fullName))
+                   .filter(c => myClassIds.includes(c._id))
                    .map(c => ({ id: c._id, name: c.fullName }));
 
                 if (teacherClasses.length > 0) {
@@ -122,7 +121,12 @@ export default function Reports() {
                 } else {
                     setAssignedClasses([]);
                 }
+            } else {
+                setAssignedClasses([]);
             }
+        }).catch(err => {
+            console.error(err);
+            setAssignedClasses([]);
         });
     } else {
         setAssignedClasses(ALL_DYNAMIC_CLASSES);
