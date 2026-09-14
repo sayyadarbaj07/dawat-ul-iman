@@ -15,6 +15,7 @@ import {
   ScrollText,
   UserCog,
   Database,
+  Briefcase,
 } from "lucide-react";
 
 export const NAV_GROUPS = [
@@ -42,6 +43,9 @@ export const NAV_ITEMS = [
   { href: "/audit", key: "auditLogs", icon: ScrollText, group: "admin" },
   { href: "/classes", key: "classes", icon: BookOpen, group: "admin" },
   { href: "/class-attendance", key: "classAttendanceOverview", icon: CalendarCheck, group: "admin" },
+  { href: "/employees", key: "employees", icon: Briefcase, group: "admin" },
+  { href: "/employee-attendance", key: "employeeAttendance", icon: CalendarCheck, group: "admin" },
+  { href: "/payroll", key: "payroll", icon: FileSpreadsheet, group: "admin" },
   { href: "/settings", key: "settings", icon: Settings, group: "admin" },
 ];
 

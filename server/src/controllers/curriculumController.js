@@ -22,10 +22,88 @@ exports.getAllCurriculums = async (req, res) => {
     }
     const curriculums = await Curriculum.find(filter)
       .populate('classId', 'fullName department name section')
+      .populate('teacherId', 'name')
       .sort({ createdAt: -1 });
     return sendSuccess(res, 200, "Curriculums fetched successfully", curriculums);
   } catch (error) {
     return sendError(res, 500, "Failed to fetch curriculums", error);
+  }
+};
+
+exports.getCurriculumsByTeacher = async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    
+    // RBAC: Admin can view any, Teacher can view their own
+    if (req.user.role === "teacher" && req.user.teacherId?.toString() !== teacherId) {
+      return sendError(res, 403, "Forbidden: Cannot view another teacher's curriculum");
+    }
+
+    const curriculums = await Curriculum.find({ teacherId })
+      .populate('classId', 'fullName department name section')
+      .sort({ createdAt: -1 });
+    return sendSuccess(res, 200, "Teacher curriculums fetched", curriculums);
+  } catch (error) {
+    return sendError(res, 500, "Failed to fetch teacher curriculums", error);
+  }
+};
+
+exports.getCurriculumsByStudent = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const Student = require("../models/studentModel");
+    const StudentLearningProgress = require("../models/studentLearningProgressModel");
+    
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return sendError(res, 404, "Student not found");
+    }
+
+    // RBAC: Admin, Teacher (who teaches the class)
+    if (req.user.role === "teacher") {
+      // Assuming teacher has access if they teach a subject in that class, or just generic access check
+      // For simplicity, allow teachers to view
+    } else if (req.user.role !== "admin") {
+      return sendError(res, 403, "Forbidden");
+    }
+
+    // Fetch curriculum for the student's class
+    const curriculums = await Curriculum.find({ classId: student.classId, isActive: true })
+      .populate('teacherId', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Fetch student's independent learning progress for these curriculums
+    const learningProgress = await StudentLearningProgress.find({ studentId }).lean();
+    
+    // Merge learning progress into curriculum data
+    const curriculumsWithStudentProgress = curriculums.map(curr => {
+      const logs = learningProgress.filter(lp => lp.curriculumId.toString() === curr._id.toString());
+      
+      // Calculate independent student completed lessons
+      const completedSet = new Set();
+      logs.forEach(log => {
+        for (let i = log.lessonFrom; i <= log.lessonTo; i++) {
+          completedSet.add(i);
+        }
+      });
+      
+      const studentCompletedCount = completedSet.size;
+      let studentStatus = "On Track";
+      if (curr.totalLessons > 0 && studentCompletedCount >= curr.annualTarget) {
+        studentStatus = "Completed";
+      }
+
+      return {
+        ...curr,
+        studentCompletedLessons: studentCompletedCount,
+        studentStatus
+      };
+    });
+
+    return sendSuccess(res, 200, "Student curriculums fetched", curriculumsWithStudentProgress);
+  } catch (error) {
+    return sendError(res, 500, "Failed to fetch student curriculums", error);
   }
 };
 
@@ -44,8 +122,9 @@ exports.createCurriculum = async (req, res) => {
     }
 
     const curriculum = await Curriculum.create(payload);
-    if (curriculum.classId) {
-       await curriculum.populate('classId', 'fullName department name section');
+    await curriculum.populate('classId', 'fullName department name section');
+    if (curriculum.teacherId) {
+      await curriculum.populate('teacherId', 'name');
     }
 
     ActivityNotificationService.dispatchActivityEvent({
@@ -53,14 +132,6 @@ exports.createCurriculum = async (req, res) => {
       action: "CURRICULUM_CREATED",
       description: `Created curriculum: ${curriculum.subject}`,
       moduleName: "Curriculum",
-      notification: {
-        title: "New Curriculum Uploaded",
-        message: `A new curriculum for ${curriculum.subject} is available.`,
-        type: "success",
-        link: `/curriculum`,
-        relatedEntity: { entityId: curriculum._id, entityModel: "Student" } // General linkage
-      },
-      notifyAdmins: true
     });
 
     return sendSuccess(res, 201, "Curriculum created successfully", curriculum);
@@ -80,13 +151,13 @@ exports.updateCurriculum = async (req, res) => {
       }
       payload.department = canonicalClass.department;
     } else if (payload.classId === "") {
-      payload.classId = null; // Fix Mongoose CastError on empty string
+      payload.classId = null;
     }
 
     const curriculum = await Curriculum.findByIdAndUpdate(req.params.id, payload, {
       new: true,
       runValidators: true,
-    }).populate('classId', 'fullName department name section');
+    }).populate('classId', 'fullName department name section').populate('teacherId', 'name');
     
     if (!curriculum) return sendError(res, 404, "Curriculum not found");
 
@@ -95,13 +166,6 @@ exports.updateCurriculum = async (req, res) => {
       action: "CURRICULUM_UPDATED",
       description: `Updated curriculum: ${curriculum.subject}`,
       moduleName: "Curriculum",
-      notification: {
-        title: "Curriculum Updated",
-        message: `The curriculum for ${curriculum.subject} has been updated.`,
-        type: "info",
-        link: `/curriculum`
-      },
-      notifyAdmins: true
     });
 
     return sendSuccess(res, 200, "Curriculum updated successfully", curriculum);
@@ -112,19 +176,19 @@ exports.updateCurriculum = async (req, res) => {
 
 exports.deleteCurriculum = async (req, res) => {
   try {
-    const curriculum = await Curriculum.findByIdAndDelete(req.params.id);
+    // Instead of hard deleting, we deactivate
+    const curriculum = await Curriculum.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
     if (!curriculum) return sendError(res, 404, "Curriculum not found");
 
     ActivityNotificationService.dispatchActivityEvent({
       user: req.user,
-      action: "CURRICULUM_DELETED",
-      description: `Deleted curriculum: ${curriculum.subject}`,
+      action: "CURRICULUM_DEACTIVATED",
+      description: `Deactivated curriculum: ${curriculum.subject}`,
       moduleName: "Curriculum",
-      notifyAdmins: true
     });
 
-    return sendSuccess(res, 200, "Curriculum deleted successfully");
+    return sendSuccess(res, 200, "Curriculum deactivated successfully");
   } catch (error) {
-    return sendError(res, 500, "Failed to delete curriculum", error);
+    return sendError(res, 500, "Failed to deactivate curriculum", error);
   }
 };

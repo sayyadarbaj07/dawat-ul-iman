@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { Book, CheckCircle, Clock, Loader2, Plus, Trash2, Edit } from "lucide-react";
+import { Book, CheckCircle, Clock, Loader2, AlertCircle } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -17,25 +17,16 @@ export default function Curriculum() {
     
     const [activeTab, setActiveTab] = useState("diniyat");
     const [curriculums, setCurriculums] = useState([]);
-    const [apiClasses, setApiClasses] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    // Form states
-    const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({ classId: "", subject: "", book: "", progress: 0, status: "On Track" });
-    const [isEditing, setIsEditing] = useState(null);
-    const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [currRes, classRes] = await Promise.all([
-                    curriculumApi.list(),
-                    classApi.getClasses()
+                const [currRes] = await Promise.all([
+                    curriculumApi.list()
                 ]);
                 
                 if (currRes.success) setCurriculums(currRes.data);
-                if (classRes.success) setApiClasses(classRes.data);
             } catch (error) {
                 console.error("Failed to fetch data", error);
             } finally {
@@ -45,72 +36,49 @@ export default function Curriculum() {
         fetchData();
     }, []);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setSubmitting(true);
-        try {
-            if (isEditing) {
-                const res = await curriculumApi.update(isEditing, formData);
-                if (res.success) {
-                    setCurriculums(prev => prev.map(c => c._id === isEditing ? res.data : c));
-                    resetForm();
-                }
-            } else {
-                const res = await curriculumApi.create(formData);
-                if (res.success) {
-                    setCurriculums(prev => [res.data, ...prev]);
-                    resetForm();
-                }
-            }
-        } catch (error) {
-            console.error("Submission failed", error);
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this subject?")) return;
-        try {
-            const res = await curriculumApi.remove(id);
-            if (res.success) {
-                setCurriculums(prev => prev.filter(c => c._id !== id));
-            }
-        } catch (error) {
-            console.error("Delete failed", error);
-        }
-    };
-
-    const handleEdit = (item) => {
-        setFormData({
-            classId: item.classId?._id || item.classId || "",
-            subject: item.subject,
-            book: item.book,
-            progress: item.progress,
-            status: item.status
-        });
-        setIsEditing(item._id);
-        setShowForm(true);
-        setActiveTab(item.department || activeTab);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const resetForm = () => {
-        setFormData({ classId: "", subject: "", book: "", progress: 0, status: "On Track" });
-        setIsEditing(null);
-        setShowForm(false);
-    };
-
     const departments = ["diniyat", "hifz", "alimiyat", "qirat", "contemporary"];
     
-    // Group classes by department
-    const classesByDept = departments.reduce((acc, dept) => {
-        acc[dept] = apiClasses.filter(c => c.department === dept);
+    // Group curricula by department
+    const curriculumsByDept = departments.reduce((acc, dept) => {
+        acc[dept] = curriculums.filter(c => c.department === dept);
         return acc;
     }, {});
 
-    // Available classes for current active tab (for form)
-    const activeClasses = classesByDept[activeTab] || [];
+    const getStatusColor = (status) => {
+        switch (status) {
+            case "Completed":
+            case "Ahead":
+                return "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30";
+            case "On Track":
+            case "Almost Complete":
+                return "text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30";
+            case "Behind":
+            case "Delayed":
+                return "text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30";
+            default:
+                return "text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800";
+        }
+    };
+
+    const getStatusIcon = (status) => {
+        switch (status) {
+            case "Completed": return <CheckCircle className="h-4 w-4" />;
+            case "Ahead": return <CheckCircle className="h-4 w-4" />;
+            case "On Track": return <Clock className="h-4 w-4" />;
+            case "Almost Complete": return <Clock className="h-4 w-4" />;
+            case "Behind": return <AlertCircle className="h-4 w-4" />;
+            case "Delayed": return <AlertCircle className="h-4 w-4" />;
+            default: return <Book className="h-4 w-4" />;
+        }
+    };
+
+    const calculatePercentage = (curr) => {
+        if (curr.totalLessons > 0) {
+            const completed = curr.completedLessonsList?.length || 0;
+            return Math.min(100, Math.round((completed / curr.totalLessons) * 100));
+        }
+        return curr.progress || 0; // Fallback to legacy progress
+    };
 
     if (loading) {
         return (
@@ -124,241 +92,122 @@ export default function Curriculum() {
         <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
             <PageHeader 
                 title={tr("curriculum", "pageTitle")}
-                description={tr("curriculum", "pageSubtitle")}
+                description="Global Overview of Curriculum Assignments"
                 showBack={true}
                 backLabel={tr("common", "backToDashboard")}
-                actions={
-                    isAdmin && !showForm ? (
-                        <button 
-                            onClick={() => { resetForm(); setShowForm(true); }}
-                            className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors text-sm font-medium w-full sm:w-auto justify-center"
-                        >
-                            <Plus className="h-4 w-4" /> {tr("curriculum", "addSubject")}
-                        </button>
-                    ) : null
-                }
             />
-
-            {isAdmin && showForm && (
-                <Card className="bg-muted/30 border-dashed border-2">
-                    <CardHeader className="pb-4">
-                        <CardTitle className="text-lg">{isEditing ? tr("curriculum", "editSubject") : tr("curriculum", "addNewSubject")}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium">{tr("curriculum", "class")}</label>
-                                    <select 
-                                        value={formData.classId} 
-                                        onChange={e => setFormData({...formData, classId: e.target.value})}
-                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        required={!isEditing} 
-                                    >
-                                        <option value="" disabled>{tr("curriculum", "selectClass")}</option>
-                                        {activeClasses.map(c => (
-                                            <option key={c._id} value={c._id}>{c.fullName}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium">{tr("common", "status")}</label>
-                                    <select 
-                                        value={formData.status} 
-                                        onChange={e => setFormData({...formData, status: e.target.value})}
-                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        required
-                                    >
-                                        <option value="On Track">{tr("curriculum", "onTrack")}</option>
-                                        <option value="Delayed">{tr("curriculum", "delayed")}</option>
-                                        <option value="Almost Complete">{tr("curriculum", "almostComplete")}</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium">{tr("curriculum", "subjectName")}</label>
-                                    <input 
-                                        type="text" 
-                                        value={formData.subject} 
-                                        onChange={e => setFormData({...formData, subject: e.target.value})}
-                                        placeholder="e.g. Quran Recitation"
-                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium">{tr("curriculum", "bookName")}</label>
-                                    <input 
-                                        type="text" 
-                                        value={formData.book} 
-                                        onChange={e => setFormData({...formData, book: e.target.value})}
-                                        placeholder="e.g. Tajweed-ul-Quran"
-                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-1.5 md:col-span-2">
-                                    <label className="text-sm font-medium flex justify-between">
-                                        <span>{tr("curriculum", "progress")}</span>
-                                        <span className="text-primary">{formData.progress}%</span>
-                                    </label>
-                                    <input 
-                                        type="range" 
-                                        min="0" max="100" 
-                                        value={formData.progress} 
-                                        onChange={e => setFormData({...formData, progress: Number(e.target.value)})}
-                                        className="w-full accent-primary h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-2 pt-2">
-                                <button 
-                                    type="button" 
-                                    onClick={resetForm}
-                                    className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
-                                >
-                                    {tr("common", "cancel")}
-                                </button>
-                                <button 
-                                    type="submit" 
-                                    disabled={submitting}
-                                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors flex items-center gap-2"
-                                >
-                                    {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                                    {isEditing ? tr("curriculum", "updateSubject") : tr("curriculum", "saveSubject")}
-                                </button>
-                            </div>
-                        </form>
-                    </CardContent>
-                </Card>
+            
+            {isAdmin && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md text-sm text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800 mb-4">
+                    <strong>Note:</strong> To assign or edit a curriculum for a class, go to <a href="/classes" className="underline font-semibold">Classes</a> and click the <strong>Manage Syllabus</strong> button in the actions menu.
+                </div>
             )}
 
-            <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); if (showForm && !isEditing) setFormData({...formData, classId: ""}); }} className="w-full">
-                <TabsList className="grid w-full max-w-3xl grid-cols-5">
-                    <TabsTrigger value="diniyat">{tr("curriculum", "diniyat")}</TabsTrigger>
-                    <TabsTrigger value="hifz">{tr("curriculum", "hifz")}</TabsTrigger>
-                    <TabsTrigger value="alimiyat">{tr("curriculum", "alimiyat")}</TabsTrigger>
-                    <TabsTrigger value="qirat">{tr("curriculum", "qirat")}</TabsTrigger>
-                    <TabsTrigger value="contemporary">{tr("curriculum", "contemporary")}</TabsTrigger>
+            <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full" dir="ltr">
+                <TabsList className="flex w-full overflow-x-auto justify-start border-b rounded-none bg-transparent h-auto p-0 pb-1 gap-4 hide-scrollbar">
+                    {departments.map((dept) => (
+                        <TabsTrigger 
+                            key={dept} 
+                            value={dept}
+                            className="capitalize rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2 py-3"
+                        >
+                            {dept}
+                        </TabsTrigger>
+                    ))}
                 </TabsList>
 
-                {departments.map((dept) => {
-                    const deptCurriculums = curriculums.filter(c => c.department === dept);
-                    const deptClasses = classesByDept[dept] || [];
-                    
-                    // Legacy records have no classId
-                    const legacyCurriculums = deptCurriculums.filter(c => !c.classId);
-
-                    return (
-                        <TabsContent key={dept} value={dept} className="mt-6 space-y-8">
-                            {deptCurriculums.length === 0 ? (
-                                <EmptyState 
-                                  title="No Subjects Found"
-                                  description={isAdmin ? "Click 'Add Subject' to create one for this department." : "There is currently no curriculum data for this department."}
-                                  icon={Book}
-                                />
-                            ) : (
-                                <>
-                                    {/* Grouped by specific class */}
-                                    {deptClasses.map(cls => {
-                                        const classSubjects = deptCurriculums.filter(c => c.classId && (c.classId._id === cls._id || c.classId === cls._id));
-                                        if (classSubjects.length === 0) return null;
-
-                                        return (
-                                            <div key={cls._id} className="space-y-3">
-                                                <h3 className="text-xl font-bold border-b pb-2">{cls.fullName}</h3>
-                                                <div className="grid gap-4 md:grid-cols-2">
-                                                    {classSubjects.map((subject) => (
-                                                        <SubjectCard 
-                                                            key={subject._id} 
-                                                            subject={subject} 
-                                                            isAdmin={isAdmin} 
-                                                            handleEdit={handleEdit} 
-                                                            handleDelete={handleDelete} 
-                                                            tr={tr} 
-                                                        />
-                                                    ))}
+                {departments.map((dept) => (
+                    <TabsContent key={dept} value={dept} className="mt-6">
+                        {curriculumsByDept[dept].length === 0 ? (
+                            <EmptyState 
+                                icon={Book}
+                                title={`No Curriculum for ${dept}`}
+                                description="No curriculum assignments have been added for this department yet."
+                            />
+                        ) : (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {curriculumsByDept[dept].map((item, idx) => (
+                                    <motion.div 
+                                        key={item._id}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: idx * 0.05 }}
+                                    >
+                                        <Card className="h-full hover:shadow-md transition-shadow relative overflow-hidden group">
+                                            {/* Status indicator line */}
+                                            <div className={`absolute top-0 left-0 w-1 h-full ${
+                                                item.status === 'Completed' || item.status === 'Ahead' ? 'bg-green-500' :
+                                                item.status === 'Behind' || item.status === 'Delayed' ? 'bg-amber-500' :
+                                                'bg-blue-500'
+                                            }`} />
+                                            
+                                            <CardContent className="p-5 pl-6">
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <div>
+                                                        <h3 className="font-semibold text-lg">{item.subject}</h3>
+                                                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                                            <Book className="h-3.5 w-3.5" /> 
+                                                            {item.book}
+                                                        </p>
+                                                    </div>
+                                                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${getStatusColor(item.status)}`}>
+                                                        {getStatusIcon(item.status)}
+                                                        {item.status}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
-
-                                    {/* Legacy / Unassigned bucket */}
-                                    {legacyCurriculums.length > 0 && (
-                                        <div className="space-y-3 mt-8 p-4 bg-muted/20 border rounded-lg">
-                                            <h3 className="text-lg font-bold text-amber-600 flex items-center gap-2">
-                                                Legacy / Unassigned
-                                                <span className="text-xs bg-amber-100 px-2 py-1 rounded-full font-normal">Needs Manual Assignment</span>
-                                            </h3>
-                                            <div className="grid gap-4 md:grid-cols-2">
-                                                {legacyCurriculums.map((subject) => (
-                                                    <SubjectCard 
-                                                        key={subject._id} 
-                                                        subject={subject} 
-                                                        isAdmin={isAdmin} 
-                                                        handleEdit={handleEdit} 
-                                                        handleDelete={handleDelete} 
-                                                        tr={tr} 
-                                                    />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </TabsContent>
-                    );
-                })}
-            </Tabs>
-        </motion.div>
-    );
-}
-
-function SubjectCard({ subject, isAdmin, handleEdit, handleDelete, tr }) {
-    return (
-        <Card className="group hover:border-primary/20 transition-colors">
-            <CardHeader className="pb-2">
-                <div className="flex justify-between items-start gap-4">
-                    <div className="min-w-0 flex-1">
-                        <CardTitle className="text-lg truncate flex items-center gap-2">
-                            {subject.subject}
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1 truncate">
-                            <Book className="h-4 w-4 shrink-0"/> {subject.book}
-                        </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                        <div className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1
-                            ${subject.status === 'On Track' ? 'bg-green-100 text-green-700' :
-                            subject.status === 'Delayed' ? 'bg-amber-100 text-amber-700' :
-                            'bg-blue-100 text-blue-700'}`}>
-                            {subject.status === 'On Track' ? <CheckCircle className="h-3 w-3"/> : <Clock className="h-3 w-3"/>}
-                            {subject.status}
-                        </div>
-                        {isAdmin && (
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                    type="button"
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEdit(subject); }} 
-                                    className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
-                                    title="Edit"
-                                >
-                                    <Edit className="h-3.5 w-3.5" />
-                                </button>
-                                <button 
-                                    onClick={() => handleDelete(subject._id)} 
-                                    className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors"
-                                    title="Delete"
-                                >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </button>
+                                                
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-5 text-sm">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-muted-foreground text-xs uppercase tracking-wider">Class</span>
+                                                        <span className="font-medium truncate" title={item.classId?.fullName || "Unassigned"}>
+                                                            {item.classId?.fullName || <span className="text-muted-foreground italic">Unassigned</span>}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-muted-foreground text-xs uppercase tracking-wider">Teacher</span>
+                                                        <span className="font-medium truncate" title={item.teacherId?.name || "Unassigned"}>
+                                                            {item.teacherId?.name || <span className="text-muted-foreground italic">Unassigned</span>}
+                                                        </span>
+                                                    </div>
+                                                    {item.academicYear && (
+                                                        <div className="flex flex-col mt-1 col-span-2">
+                                                            <span className="text-muted-foreground text-xs uppercase tracking-wider">Academic Year</span>
+                                                            <span className="font-medium">{item.academicYear}</span>
+                                                        </div>
+                                                    )}
+                                                    {item.totalLessons > 0 && (
+                                                        <div className="flex flex-col mt-1 col-span-2">
+                                                            <span className="text-muted-foreground text-xs uppercase tracking-wider">Target</span>
+                                                            <span className="font-medium">{item.annualTarget} / {item.totalLessons} Lessons</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between items-end text-sm">
+                                                        <span className="font-medium">Progress</span>
+                                                        <span className="font-bold text-lg">{calculatePercentage(item)}%</span>
+                                                    </div>
+                                                    <ProgressBar value={calculatePercentage(item)} className="h-2.5" />
+                                                    {item.totalLessons > 0 ? (
+                                                        <p className="text-xs text-muted-foreground text-right mt-1">
+                                                            {item.completedLessonsList?.length || 0} of {item.totalLessons} lessons taught
+                                                        </p>
+                                                    ) : (
+                                                        <p className="text-xs text-muted-foreground text-right mt-1">
+                                                            Legacy Progress Record
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </motion.div>
+                                ))}
                             </div>
                         )}
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <ProgressBar value={subject.progress} label={tr("curriculum", "syllabusCompleted")} colorClass={subject.progress > 75 ? "bg-green-500" : subject.progress > 40 ? "bg-primary" : "bg-amber-500"}/>
-            </CardContent>
-        </Card>
+                    </TabsContent>
+                ))}
+            </Tabs>
+        </motion.div>
     );
 }

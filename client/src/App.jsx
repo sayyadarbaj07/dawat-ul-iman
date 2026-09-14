@@ -17,7 +17,11 @@ import Dashboard from "@/pages/Dashboard";
 import Students from "@/pages/Students";
 import Promotions from "@/pages/Promotions";
 import Teachers from "@/pages/Teachers";
+import Employees from "@/pages/Employees";
+import EmployeeAttendance from "@/pages/EmployeeAttendance";
 import Curriculum from "@/pages/Curriculum";
+import StudentProfile from "@/pages/StudentProfile";
+import TeacherProfile from "@/pages/TeacherProfile";
 import Attendance from "./pages/Attendance";
 import Exams from "@/pages/Exams";
 import Finance from "@/pages/Finance";
@@ -34,6 +38,7 @@ import Classes from "@/pages/Classes";
 import ClassAttendanceOverview from "@/pages/ClassAttendanceOverview";
 import ClassAttendanceDetail from "@/pages/ClassAttendanceDetail";
 import DataResolution from "@/pages/DataResolution";
+import Payroll from "@/pages/Payroll";
 
 import NotFound from "@/pages/not-found";
 const queryClient = new QueryClient();
@@ -78,8 +83,12 @@ function Router() {
           <Switch>
             <Route path="/" component={Dashboard} />
             <Route path="/students" component={Students} />
+            <Route path="/students/:studentId" component={StudentProfile} />
             <Route path="/promotions" component={Promotions} />
             <Route path="/teachers" component={Teachers} />
+            <Route path="/teachers/:teacherId" component={TeacherProfile} />
+            <Route path="/employees" component={Employees} />
+            <Route path="/employee-attendance" component={EmployeeAttendance} />
             <Route path="/curriculum" component={Curriculum} />
             <Route path="/attendance" component={Attendance} />
             <Route path="/exams" component={Exams} />
@@ -96,6 +105,7 @@ function Router() {
             <Route path="/class-attendance" component={ClassAttendanceOverview} />
             <Route path="/class-attendance/:classId" component={ClassAttendanceDetail} />
             <Route path="/data-resolution" component={DataResolution} />
+            <Route path="/payroll" component={Payroll} />
             <Route component={NotFound} />
           </Switch>
         </Layout>

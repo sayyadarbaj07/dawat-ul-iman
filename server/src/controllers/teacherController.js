@@ -52,10 +52,14 @@ const Class = require("../models/classModel");
 
 exports.createTeacher = async (req, res) => {
   try {
-    const { username, password, isActive, ...teacherData } = req.body;
+    const { username, password, isActive, joiningDate, deactivationDate, ...teacherData } = req.body;
 
     if (!username || !password) {
       return sendError(res, 400, "Username and password are required for teacher accounts");
+    }
+    
+    if (!joiningDate || isNaN(new Date(joiningDate).getTime())) {
+      return sendError(res, 400, "Valid joining date is required for new teachers");
     }
 
     // Process teachingAssignments if provided
@@ -124,8 +128,13 @@ exports.createTeacher = async (req, res) => {
       // Create Teacher profile linked to User
       const payload = {
         ...teacherData,
+        joiningDate: new Date(joiningDate),
+        deactivationDate: deactivationDate ? new Date(deactivationDate) : null,
         userId: user._id,
       };
+      if (payload.deactivationDate && payload.deactivationDate < payload.joiningDate) {
+        return sendError(res, 400, "Deactivation date cannot be earlier than joining date");
+      }
       if (req.file) {
         payload.photo = `/uploads/profiles/${req.file.filename}`;
       }
@@ -187,6 +196,24 @@ exports.updateTeacher = async (req, res) => {
       delete payload.assignedClasses;
     }
 
+    if (payload.joiningDate && isNaN(new Date(payload.joiningDate).getTime())) {
+      return sendError(res, 400, "Valid joining date is required");
+    }
+    if (payload.deactivationDate && isNaN(new Date(payload.deactivationDate).getTime())) {
+      return sendError(res, 400, "Valid deactivation date is required");
+    }
+    
+    // Fetch existing teacher to compare dates if not fully provided
+    const existingTeacher = await Teacher.findById(req.params.id);
+    if (!existingTeacher) return sendError(res, 404, "Teacher not found");
+    
+    const effectiveJoiningDate = payload.joiningDate ? new Date(payload.joiningDate) : existingTeacher.joiningDate;
+    const effectiveDeactivationDate = payload.deactivationDate !== undefined ? (payload.deactivationDate ? new Date(payload.deactivationDate) : null) : existingTeacher.deactivationDate;
+    
+    if (effectiveDeactivationDate && effectiveJoiningDate && effectiveDeactivationDate < effectiveJoiningDate) {
+      return sendError(res, 400, "Deactivation date cannot be earlier than joining date");
+    }
+
     if (req.file) {
       payload.photo = `/uploads/profiles/${req.file.filename}`;
     }
@@ -203,10 +230,26 @@ exports.updateTeacher = async (req, res) => {
 
 exports.deleteTeacher = async (req, res) => {
   try {
-    const teacher = await Teacher.findByIdAndDelete(req.params.id);
+    const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return sendError(res, 404, "Teacher not found");
-    return sendSuccess(res, 200, "Teacher deleted successfully");
+
+    const deactivationDate = req.body.deactivationDate || new Date();
+    if (teacher.joiningDate && new Date(deactivationDate) < new Date(teacher.joiningDate)) {
+      return sendError(res, 400, "Deactivation date cannot be earlier than joining date");
+    }
+
+    // Soft delete via User model
+    const user = await User.findById(teacher.userId);
+    if (user) {
+      user.isActive = false;
+      await user.save();
+    }
+    
+    teacher.deactivationDate = deactivationDate;
+    await teacher.save();
+
+    return sendSuccess(res, 200, "Teacher deactivated successfully");
   } catch (error) {
-    return sendError(res, 500, "Failed to delete teacher", error);
+    return sendError(res, 500, "Failed to deactivate teacher", error);
   }
 };

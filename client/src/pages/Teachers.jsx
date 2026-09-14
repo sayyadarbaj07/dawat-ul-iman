@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
@@ -16,9 +17,9 @@ import { teacherApi, attendanceApi, classApi, curriculumApi, pdfApi } from "@/li
 
 export default function Teachers() {
     const { tr, language } = useLanguage();
+    const [, setLocation] = useLocation();
     const [searchTerm, setSearchTerm] = useState("");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedTeacher, setSelectedTeacher] = useState(null);
     const [teacherAttendanceSummary, setTeacherAttendanceSummary] = useState(null);
@@ -40,6 +41,7 @@ export default function Teachers() {
       password: "",
       confirmPassword: "",
       isActive: true,
+      joiningDate: "",
       photo: null,
     });
 
@@ -50,6 +52,7 @@ export default function Teachers() {
       salary: "",
       classesAssigned: "",
       assignedClassIds: [],
+      joiningDate: "",
       photo: null,
     });
 
@@ -108,6 +111,7 @@ export default function Teachers() {
         payload.append("username", formData.username);
         payload.append("password", formData.password);
         payload.append("isActive", formData.isActive);
+        payload.append("joiningDate", formData.joiningDate);
         if (formData.photo) {
           payload.append("photo", formData.photo);
         }
@@ -116,7 +120,7 @@ export default function Teachers() {
         setIsAddModalOpen(false);
         setFormData({
           name: "", subject: "", mobile: "", salary: "", classesAssigned: "", assignedClassIds: [],
-          username: "", password: "", confirmPassword: "", isActive: true, photo: null
+          username: "", password: "", confirmPassword: "", isActive: true, joiningDate: "", photo: null
         });
         loadTeachers();
       } catch (error) {
@@ -124,22 +128,7 @@ export default function Teachers() {
       }
     };
 
-    const openViewModal = async (teacher) => {
-      setSelectedTeacher(teacher);
-      setIsViewModalOpen(true);
-      setTeacherAttendanceSummary(null);
-      try {
-        setLoadingSummary(true);
-        const res = await attendanceApi.getTeacherSummary(teacher._id || teacher.id);
-        if (res.data) {
-          setTeacherAttendanceSummary(res.data);
-        }
-      } catch (error) {
-        console.error("Failed to load attendance summary", error);
-      } finally {
-        setLoadingSummary(false);
-      }
-    };
+
 
     const openEditModal = (teacher) => {
       setSelectedTeacher(teacher);
@@ -151,6 +140,7 @@ export default function Teachers() {
         classesAssigned: teacher.classesAssigned || "",
         assignedClassIds: teacher.assignedClassIds || [],
         teachingAssignments: teacher.teachingAssignments || [],
+        joiningDate: teacher.joiningDate ? new Date(teacher.joiningDate).toISOString().split('T')[0] : "",
       });
       setIsEditModalOpen(true);
     };
@@ -165,6 +155,7 @@ export default function Teachers() {
         payload.append("salary", Number(editFormData.salary));
         payload.append("classesAssigned", Number(editFormData.classesAssigned));
         payload.append("teachingAssignments", JSON.stringify(editFormData.teachingAssignments));
+        payload.append("joiningDate", editFormData.joiningDate);
         editFormData.assignedClassIds.forEach(c => payload.append("assignedClassIds[]", c));
         if (editFormData.photo) {
           payload.append("photo", editFormData.photo);
@@ -178,12 +169,19 @@ export default function Teachers() {
     };
 
     const handleDelete = async (id) => {
+      const dateStr = window.prompt(tr("teachers", "deactivateDatePrompt") || "Enter effective deactivation date (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
+      if (dateStr === null) return;
+      if (isNaN(new Date(dateStr).getTime())) {
+         alert("Invalid date format. Please use YYYY-MM-DD.");
+         return;
+      }
       if (!confirm(tr("teachers", "deleteTeacherConfirm"))) return;
       try {
-        await teacherApi.remove(id);
+        await teacherApi.remove(id, { deactivationDate: dateStr });
         loadTeachers();
       } catch (error) {
         console.error(error);
+        alert(error.message || "Failed to deactivate");
       }
     };
 
@@ -239,11 +237,17 @@ export default function Teachers() {
                       <Input dir="ltr" id="salary" required type="number" placeholder="25000" value={formData.salary} onChange={e => setFormData({...formData, salary: e.target.value})}/>
                     </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="classes">{tr("teachers", "classesCount")}</Label>
-                    <Input dir="ltr" id="classes" required type="number" placeholder="4" value={formData.classesAssigned} onChange={e => setFormData({...formData, classesAssigned: e.target.value})}/>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="joiningDate">{tr("teachers", "joiningDate") || "Joining Date"}</Label>
+                      <Input dir="ltr" id="joiningDate" type="date" required value={formData.joiningDate} onChange={e => setFormData({...formData, joiningDate: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="classes">{tr("teachers", "classesCount")}</Label>
+                      <Input dir="ltr" id="classes" required type="number" placeholder="4" value={formData.classesAssigned} onChange={e => setFormData({...formData, classesAssigned: e.target.value})}/>
+                    </div>
                   </div>
-                  <div className="grid gap-2">
+                  <div className="grid gap-2 mt-4">
                     <Label>{tr("teachers", "assignClasses")}</Label>
                     <div className="flex flex-wrap gap-4 mt-1">
                       {apiClasses.map((cls) => (
@@ -337,11 +341,17 @@ export default function Teachers() {
                       <Input dir="ltr" id="edit-salary" required type="number" value={editFormData.salary} onChange={e => setEditFormData({...editFormData, salary: e.target.value})}/>
                     </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-classes">{tr("teachers", "classesCount")}</Label>
-                    <Input dir="ltr" id="edit-classes" required type="number" value={editFormData.classesAssigned} onChange={e => setEditFormData({...editFormData, classesAssigned: e.target.value})}/>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-joiningDate">{tr("teachers", "joiningDate") || "Joining Date"}</Label>
+                      <Input dir="ltr" id="edit-joiningDate" type="date" required value={editFormData.joiningDate} onChange={e => setEditFormData({...editFormData, joiningDate: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-classes">{tr("teachers", "classesCount")}</Label>
+                      <Input dir="ltr" id="edit-classes" required type="number" value={editFormData.classesAssigned} onChange={e => setEditFormData({...editFormData, classesAssigned: e.target.value})}/>
+                    </div>
                   </div>
-                  <div className="grid gap-2 mt-2">
+                  <div className="grid gap-2 mt-4">
                     <Label>{tr("teachers", "assignClasses")}</Label>
                     <div className="flex flex-wrap gap-4 mt-1">
                       {apiClasses.map((cls) => (
@@ -376,135 +386,7 @@ export default function Teachers() {
             </DialogContent>
           </Dialog>
 
-          {/* View Modal */}
-          <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-            <DialogContent className="sm:max-w-[400px]">
-              <DialogHeader>
-                <DialogTitle>{tr("teachers", "viewProfile")}</DialogTitle>
-                <DialogDescription>
-                  {tr("teachers", "viewProfile")} - {selectedTeacher?.name}
-                </DialogDescription>
-              </DialogHeader>
-              {selectedTeacher && (
-                <div className="grid gap-4 py-4">
-                  {selectedTeacher.photo && (
-                    <div className="flex justify-center mb-4">
-                      <img src={`http://localhost:5000${selectedTeacher.photo}`} alt={selectedTeacher.name} className="h-24 w-24 rounded-full object-cover border" />
-                    </div>
-                  )}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-muted/20 p-4 rounded-xl border border-border/50">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "id")}</span>
-                      <span className="font-medium text-foreground text-xs font-mono">{(selectedTeacher._id || selectedTeacher.id).slice(-6).toUpperCase()}</span>
-                    </div>
-                    
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "usernameEmail")}</span>
-                      <span className="font-medium text-foreground">{selectedTeacher.userId?.username || "—"}</span>
-                    </div>
-                    
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "fullName")}</span>
-                      <span className="font-medium text-foreground">{selectedTeacher.name}</span>
-                    </div>
-                    
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "primarySubject")}</span>
-                      <span className="font-medium text-foreground">{selectedTeacher.subject}</span>
-                    </div>
-                    
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "mobileNumber")}</span>
-                      <span className="font-medium text-foreground">{selectedTeacher.mobile}</span>
-                    </div>
-                    
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "classesAssigned")}</span>
-                      <span className="font-medium text-foreground">
-                        {selectedTeacher.assignedClassIds && selectedTeacher.assignedClassIds.length > 0
-                          ? selectedTeacher.assignedClassIds.map(id => {
-                              const match = apiClasses.find(c => c._id === id);
-                              return match ? match.fullName : id.slice(-6).toUpperCase();
-                            }).join(", ")
-                          : selectedTeacher.assignedClasses && selectedTeacher.assignedClasses.length > 0 
-                            ? selectedTeacher.assignedClasses.join(", ") 
-                            : selectedTeacher.classesAssigned}
-                      </span>
-                    </div>
-                    
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{tr("teachers", "salaryLabel")}</span>
-                      <span className="font-medium text-foreground">{formatLocalizedNumber(selectedTeacher.salary, language)}</span>
-                    </div>
-                  </div>
 
-                  {/* Attendance Summary Section */}
-                  <div className="mt-4 pt-4 border-t">
-                    <h4 className="text-sm font-semibold mb-3">{tr("teachers", "attendanceSummary")}</h4>
-                    {loadingSummary ? (
-                      <div className="text-xs text-muted-foreground">{tr("teachers", "loadingSummary")}</div>
-                    ) : teacherAttendanceSummary ? (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm">
-                          <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
-                            <div className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">{tr("teachers", "total")}</div>
-                            <div className="font-bold text-lg text-foreground mt-1">{formatLocalizedNumber(teacherAttendanceSummary.summary?.total || 0, language)}</div>
-                          </div>
-                          <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
-                            <div className="text-emerald-700 text-[10px] font-semibold uppercase tracking-wider">{tr("teachers", "present")}</div>
-                            <div className="font-bold text-lg text-emerald-700 mt-1">{formatLocalizedNumber(teacherAttendanceSummary.summary?.present || 0, language)}</div>
-                          </div>
-                          <div className="bg-red-500/10 p-3 rounded-xl border border-red-500/20">
-                            <div className="text-red-700 text-[10px] font-semibold uppercase tracking-wider">{tr("teachers", "absent")}</div>
-                            <div className="font-bold text-lg text-red-700 mt-1">{formatLocalizedNumber(teacherAttendanceSummary.summary?.absent || 0, language)}</div>
-                          </div>
-                          <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
-                            <div className="text-amber-700 text-[10px] font-semibold uppercase tracking-wider">{tr("teachers", "late")}</div>
-                            <div className="font-bold text-lg text-amber-700 mt-1">{formatLocalizedNumber(teacherAttendanceSummary.summary?.late || 0, language)}</div>
-                          </div>
-                        </div>
-                        
-                        {teacherAttendanceSummary.records && teacherAttendanceSummary.records.length > 0 && (
-                          <div className="mt-2">
-                            <div className="text-xs font-medium text-gray-500 mb-2">{tr("teachers", "recentRecords")}</div>
-                            <div className="max-h-32 overflow-y-auto rounded border">
-                              <Table>
-                                <TableBody>
-                                  {teacherAttendanceSummary.records.slice(0, 5).map(record => (
-                                    <TableRow key={record._id}>
-                                      <TableCell className="py-1 text-xs">{formatLocalizedDate(record.date, language)}</TableCell>
-                                      <TableCell className="py-1 text-xs text-end">
-                                        <span className={`px-2 py-0.5 rounded-full ${record.status === 'Present' ? 'bg-green-100 text-green-700' : record.status === 'Absent' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                                          {record.status}
-                                        </span>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">{tr("teachers", "noAttendanceRecords")}</div>
-                    )}
-                  </div>
-                </div>
-              )}
-              <DialogFooter className="sm:justify-start flex flex-row items-center gap-2">
-                <BackButton onClick={() => setIsViewModalOpen(false)} />
-                <Button 
-                  type="button" 
-                  variant="default"
-                  onClick={() => pdfApi.downloadPdf(pdfApi.getTeacherIdCard(selectedTeacher._id || selectedTeacher.id, language), `Teacher_ID_Card_${(selectedTeacher._id || selectedTeacher.id)}.pdf`)}
-                >
-                  <FileText className="me-2 h-4 w-4"/>
-                  {tr("teachers", "generateIdCard") || "Generate ID Card"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
 
         <div className="bg-card rounded-lg border shadow-sm">
           <div className="p-4 border-b flex items-center justify-between">
@@ -565,7 +447,7 @@ export default function Teachers() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>{tr("teachers", "actions")}</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => openViewModal(teacher)}>
+                            <DropdownMenuItem onClick={() => setLocation(`/teachers/${teacher._id || teacher.id}`)}>
                               <FileText className="me-2 h-4 w-4"/>
                               {tr("teachers", "viewProfile")}
                             </DropdownMenuItem>

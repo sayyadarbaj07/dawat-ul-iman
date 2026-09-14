@@ -112,6 +112,11 @@ export default function Attendance() {
       } else if (user?.role === "admin") {
         setAssignedClasses(activeApiClasses);
         setClassFilter(activeApiClasses[0]?._id || ""); // default to first class ID
+        
+        // Fetch full teacher list for Admin
+        const teacherListRes = await teacherApi.list();
+        const allTeachers = teacherListRes.data?.data || teacherListRes.data || [];
+        setTeachers(allTeachers);
       }
     } catch (error) {
       console.error("Failed to load initial data", error);

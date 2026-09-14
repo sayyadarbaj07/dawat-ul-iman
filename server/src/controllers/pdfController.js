@@ -7,15 +7,17 @@ const Transaction = require("../models/transactionModel");
 const Attendance = require("../models/attendanceModel");
 const Exam = require("../models/examModel");
 const ExamResult = require("../models/examResultModel");
+const TeacherSalary = require("../models/teacherSalaryModel");
 const { getTotalWorkingDays, getStudentAttendanceForPDF } = require("../services/attendanceService");
 const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
 const urduPdfHelper = require("../utils/pdf/urduPdfHelper");
 const numberToWords = require("../utils/pdf/numberToWords");
+const { applyInstitutionalTemplate } = require("../utils/pdf/institutionalReportTemplate");
 
 const PDF_FONT_PATHS = {
   english: "Helvetica",
   englishBold: "Helvetica-Bold",
-  urdu: path.join(__dirname, "../utils/pdf/fonts/Amiri-Regular.ttf")
+  urdu: path.join(__dirname, "../utils/fonts/Jameel Noori Nastaleeq.ttf")
 };
 
 const URDU_LABELS = {
@@ -57,11 +59,14 @@ const generatePDF = (res, title, generateContent, filters = null, options = {}) 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${title.replace(/\s+/g, "_")}.pdf"`);
   
+  // Apply Institutional Template
+  applyInstitutionalTemplate(doc, options);
+  
   doc.pipe(res);
   
   const isUrdu = options.language === 'ur';
 
-  // Header
+  // Title rendering directly below the header
   if (isUrdu) {
     if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
       doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
@@ -70,32 +75,16 @@ const generatePDF = (res, title, generateContent, filters = null, options = {}) 
     }
 
     doc.font("UrduFont");
-    urduPdfHelper.drawTextRTL(doc, "دعوتِ ایمان مدرسہ", 550, doc.y, { font: "UrduFont", fontSize: 24, align: "right" });
-    doc.moveDown(0.5);
-    urduPdfHelper.drawTextRTL(doc, "123 Islamic Center Road, Cityville, State 12345", 550, doc.y, { font: "Helvetica", fontSize: 10, align: "right" });
-    urduPdfHelper.drawTextRTL(doc, "Phone: +1 234 567 8900 | Email: contact@dawatuliman.edu", 550, doc.y, { font: "Helvetica", fontSize: 10, align: "right" });
-    doc.moveDown(0.5);
     urduPdfHelper.drawTextRTL(doc, options.translatedTitle || title, 550, doc.y, { font: "UrduFont", fontSize: 16, align: "right" });
     
     doc.moveDown(0.5);
     urduPdfHelper.drawTextRTL(doc, `${new Date().getFullYear()}-${new Date().getFullYear() + 1} :${URDU_LABELS.academicYear}`, 550, doc.y, { font: "UrduFont", fontSize: 9 });
     doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 50, doc.y - 12, { font: "Helvetica", fontSize: 9 }); // LTR default drawing for the date on the left
-    
-    doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
     doc.moveDown(0.5);
   } else {
-    doc.fontSize(24).font("Helvetica-Bold").text("Dawat-ul-Iman Madrasa", { align: "center" });
-    doc.fontSize(10).font("Helvetica").text("123 Islamic Center Road, Cityville, State 12345", { align: "center" });
-    doc.text("Phone: +1 234 567 8900 | Email: contact@dawatuliman.edu", { align: "center" });
-    doc.moveDown(0.5);
     doc.fontSize(16).font("Helvetica-Bold").text(title, { align: "center" });
-    
     doc.fontSize(9).font("Helvetica").text(`Academic Year: ${new Date().getFullYear()}-${new Date().getFullYear() + 1}`, 50, doc.y, { align: "left" });
     doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 50, doc.y, { align: "right" });
-    
-    doc.moveDown(0.5);
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
     doc.moveDown(0.5);
   }
 
@@ -285,6 +274,210 @@ exports.generateStudentIdCard = async (req, res) => {
   } catch (error) {
     console.error("ID Card generation failed:", error);
     res.status(500).json({ message: "Failed to generate ID card" });
+  }
+};
+
+exports.generateTeacherSalarySlip = async (req, res) => {
+  try {
+    const { salaryId } = req.params;
+    const mongoose = require("mongoose");
+    if (!mongoose.Types.ObjectId.isValid(salaryId)) {
+      return res.status(400).json({ message: "Invalid Salary ID" });
+    }
+    
+    // RBAC/IDOR Validation is handled inside the controller here
+    // since PDF routes use generic protect without specific Teacher auth.
+    // Actually, we'll verify it right away.
+    const salary = await TeacherSalary.findById(salaryId).populate("teacherId", "name nameUrdu teacherId designation department joiningDate").lean();
+    
+    if (!salary) {
+      return res.status(404).json({ message: "Salary record not found" });
+    }
+
+    if (req.user.role === "teacher") {
+      // Must be own salary
+      if (salary.teacherId.userId?.toString() !== req.user._id.toString() && salary.teacherId._id?.toString() !== req.user.teacherId?.toString()) {
+        // Fallback: Need to check user->teacher relation correctly.
+        // Let's explicitly query Teacher if populated doesn't have userId
+        const teacherRec = await Teacher.findOne({ userId: req.user._id }).lean();
+        if (!teacherRec || teacherRec._id.toString() !== salary.teacherId._id.toString()) {
+           return res.status(403).json({ message: "Unauthorized to view this salary slip" });
+        }
+      }
+    } else if (req.user.role !== "admin") {
+      // Accountant and others blocked per policy
+      return res.status(403).json({ message: "Unauthorized role" });
+    }
+
+    const language = resolvePdfLanguage(req.query.language);
+    const isUrdu = language === "ur";
+
+    const title = salary.status === "Paid" 
+      ? (isUrdu ? URDU_LABELS.teacherSalarySlip : "Teacher Salary Slip")
+      : (isUrdu ? URDU_LABELS.salaryCalculationBreakdown : "Salary Calculation Breakdown");
+
+    generatePDF(res, `Teacher_Salary_${salary.teacherId.name.replace(/\s+/g, '_')}_${salary.month}_${salary.year}`, (doc) => {
+      const fontRegular = isUrdu ? "UrduFont" : PDF_FONT_PATHS.english;
+      const fontBold = isUrdu ? "UrduFont" : PDF_FONT_PATHS.englishBold;
+      
+      const teacherName = isUrdu ? (salary.teacherId.nameUrdu || salary.teacherId.name) : salary.teacherId.name;
+      const salaryPeriodStr = `${salary.month}/${salary.year}`;
+
+      const drawRow = (label, value, y, alignLeft = false) => {
+         // Background row alternating is nice, but keeping it simple and structural.
+         if (isUrdu) {
+             doc.font(fontRegular).fontSize(14);
+             urduPdfHelper.drawTextRTL(doc, label, 500, y, { font: fontBold, fontSize: 14 });
+             // values might be LTR, but we'll draw them strictly positioned.
+             doc.font(PDF_FONT_PATHS.english).fontSize(12);
+             doc.text(String(value), 100, y, { width: 250, align: "right" });
+         } else {
+             doc.font(fontBold).fontSize(10).text(label, 50, y, { width: 150 });
+             doc.font(fontRegular).fontSize(10).text(String(value), 200, y, { width: 300 });
+         }
+      };
+
+      const drawSectionHeader = (text, y) => {
+        doc.rect(50, y, 500, 24).fill("#047857");
+        doc.fillColor("white");
+        if (isUrdu) {
+           doc.font(fontBold).fontSize(16);
+           urduPdfHelper.drawTextRTL(doc, text, 540, y + 2, { font: fontBold, fontSize: 16, color: 'white' });
+        } else {
+           doc.font(fontBold).fontSize(12).text(text, 60, y + 4);
+        }
+        doc.fillColor("black");
+      };
+
+      let yPos = doc.y;
+
+      // TEACHER INFORMATION
+      drawSectionHeader(isUrdu ? URDU_LABELS.name : "Teacher Information", yPos);
+      yPos += 30;
+      
+      drawRow(isUrdu ? URDU_LABELS.name : "Name", teacherName, yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.teacherId : "Teacher ID", salary.teacherId.teacherId || "ΓÇö", yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.designation : "Designation", salary.teacherId.designation || "ΓÇö", yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.department : "Department", salary.teacherId.department || "ΓÇö", yPos);
+      yPos += 20;
+      
+      const joiningDateStr = salary.teacherId.joiningDate ? new Date(salary.teacherId.joiningDate).toLocaleDateString() : "ΓÇö";
+      drawRow(isUrdu ? URDU_LABELS.joiningDate : "Joining Date", joiningDateStr, yPos);
+      yPos += 20;
+      
+      drawRow(isUrdu ? URDU_LABELS.salaryPeriod : "Salary Period", salaryPeriodStr, yPos);
+      yPos += 35;
+
+      // SALARY BREAKDOWN
+      drawSectionHeader(isUrdu ? URDU_LABELS.salaryCalculationBreakdown : "Salary Breakdown", yPos);
+      yPos += 30;
+      drawRow(isUrdu ? URDU_LABELS.monthlySalary : "Monthly Salary", salary.monthlySalarySnapshot || 0, yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.dailySalary : "Daily Salary", salary.dailySalary ? salary.dailySalary.toFixed(2) : 0, yPos);
+      yPos += 35;
+
+      // ATTENDANCE SUMMARY
+      drawSectionHeader(isUrdu ? URDU_LABELS.attendanceSummary : "Attendance Summary", yPos);
+      yPos += 30;
+      // We don't have presentDays in the schema explicitly unless we derive it, but the user said "If presentDays does NOT exist: DO NOT add it merely for the PDF." 
+      drawRow(isUrdu ? URDU_LABELS.absent : "Absent Days", salary.absentDays || 0, yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.late : "Late Days", salary.lateDays || 0, yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.leave : "Leave Taken", salary.leaveTaken || 0, yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.allowedLeave : "Allowed Leave", salary.allowedLeave || 0, yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.extraLeave : "Extra Leave", salary.extraLeave || 0, yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.sundays : "Sundays", salary.sundays || 0, yPos);
+      yPos += 35;
+
+      // DEDUCTIONS
+      drawSectionHeader(isUrdu ? URDU_LABELS.deductions : "Deductions", yPos);
+      yPos += 30;
+      drawRow(isUrdu ? URDU_LABELS.leaveDeduction : "Leave Deduction", salary.leaveDeduction || 0, yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.absentDeduction : "Absent Deduction", salary.absentDeduction || 0, yPos);
+      yPos += 20;
+      drawRow(isUrdu ? URDU_LABELS.totalDeduction : "Total Deduction", salary.totalDeduction || 0, yPos);
+      yPos += 35;
+
+      // CHECK IF NEW PAGE NEEDED
+      if (yPos > 600) {
+          doc.addPage();
+          yPos = 50;
+      }
+
+      // NET SALARY
+      drawSectionHeader(isUrdu ? URDU_LABELS.payableSalary : "NET / PAYABLE SALARY", yPos);
+      yPos += 30;
+      doc.font(fontBold).fontSize(14);
+      if (isUrdu) {
+         doc.text(String(salary.payableSalary || 0), 50, yPos, { width: 500, align: "center" });
+      } else {
+         doc.text(String(salary.payableSalary || 0), 50, yPos, { width: 500, align: "center" });
+      }
+      yPos += 35;
+
+      // PAYMENT INFORMATION
+      drawSectionHeader(isUrdu ? URDU_LABELS.paymentInformation : "Payment Information", yPos);
+      yPos += 30;
+      
+      const statusStr = salary.status === "Paid" ? (isUrdu ? URDU_LABELS.paid : "Paid") : (isUrdu ? URDU_LABELS.draft : "Draft");
+      drawRow(isUrdu ? URDU_LABELS.status : "Status", statusStr, yPos);
+      yPos += 20;
+
+      if (salary.status === "Paid") {
+          const pDate = salary.paymentDate ? new Date(salary.paymentDate).toLocaleDateString() : "ΓÇö";
+          drawRow(isUrdu ? URDU_LABELS.paymentDate : "Payment Date", pDate, yPos);
+          yPos += 20;
+          drawRow(isUrdu ? URDU_LABELS.paymentMethod : "Payment Method", salary.paymentMethod || "ΓÇö", yPos);
+          yPos += 20;
+          drawRow(isUrdu ? URDU_LABELS.paymentReference : "Payment Reference", salary.paymentReference || "ΓÇö", yPos);
+          yPos += 20;
+          if (salary.financeTransactionId) {
+             drawRow(isUrdu ? URDU_LABELS.financeTransactionID : "Finance Transaction ID", String(salary.financeTransactionId), yPos);
+             yPos += 20;
+          }
+      } else {
+          drawRow(isUrdu ? URDU_LABELS.paymentDate : "Payment Date", "ΓÇö", yPos);
+          yPos += 20;
+          drawRow(isUrdu ? URDU_LABELS.paymentMethod : "Payment Method", "ΓÇö", yPos);
+          yPos += 20;
+      }
+      
+      if (salary.remarks) {
+          drawRow(isUrdu ? URDU_LABELS.remarks : "Remarks", salary.remarks, yPos);
+          yPos += 20;
+      }
+
+      yPos += 60;
+      // SIGNATURE
+      if (yPos > 680) {
+          doc.addPage();
+          yPos = 50;
+      }
+
+      doc.moveTo(400, yPos).lineTo(550, yPos).stroke();
+      if (isUrdu) {
+         doc.font(fontRegular).fontSize(10);
+         urduPdfHelper.drawTextRTL(doc, URDU_LABELS.authorizedSignature, 550, yPos + 5, { font: fontRegular, fontSize: 10, align: "center" });
+      } else {
+         doc.font(fontRegular).fontSize(10).text("Authorized Signature", 400, yPos + 5, { width: 150, align: "center" });
+      }
+
+    }, null, { language, translatedTitle: title });
+
+  } catch (error) {
+    console.error("Teacher Salary Slip PDF Error:", error);
+    if (error.name === "CastError") {
+       return res.status(400).json({ message: "Invalid Salary ID" });
+    }
+    res.status(500).json({ message: "Failed to generate Salary Slip PDF", error: error.message });
   }
 };
 
@@ -1095,8 +1288,6 @@ exports.generateFeeReceiptPDF = async (req, res) => {
     // Rest of drawing colors reset to black
     doc.fillColor("black").strokeColor("black");
 
-    // === HEADER ===
-    
     // LEFT Header
     doc.fontSize(12).font(englishBold).fillColor("#3b5998").text("JAMIA", 25, 25);
     doc.fontSize(22).font(englishBold).fillColor("#d91176").text("DAWAT-UL-EIMAN", 25, 40);
@@ -1113,10 +1304,10 @@ exports.generateFeeReceiptPDF = async (req, res) => {
     doc.font(urduFont);
     // Green and Magenta split - for simplicity we render it in green
     doc.fillColor("#059669");
-    urduPdfHelper.drawTextRTL(doc, "جامعہ دعوۃ الایمان", 575, 25, { font: urduFont, fontSize: 32 });
+    urduPdfHelper.drawTextRTL(doc, "جامعہ دعوۃ الایمان", 575, 12, { font: urduFont, fontSize: 38 });
     
     doc.fillColor("black");
-    urduPdfHelper.drawTextRTL(doc, "چھ مینار مسجد، روشن پورہ، حضرت بالے پیر بیڑ(مہاراشٹر)", 575, 70, { font: urduFont, fontSize: 11 });
+    urduPdfHelper.drawTextRTL(doc, "چھ مینار مسجد، روشن پورہ، حضرت بالے پیر بیڑ(مہاراشٹر)", 575, 68, { font: urduFont, fontSize: 15 });
 
     // CENTER Logo
     const logoPath = path.join(__dirname, "../../../client/public/logo1.jpeg");
@@ -1138,26 +1329,27 @@ exports.generateFeeReceiptPDF = async (req, res) => {
     doc.moveTo(25, 175).lineTo(575, 175).stroke(); // Address
     doc.moveTo(25, 215).lineTo(575, 215).stroke(); // Amount
     
-    doc.font(urduFont).fontSize(12);
+    doc.font(urduFont).fontSize(20);
     
     // Line 1: Name
-    urduPdfHelper.drawTextRTL(doc, "اسم گرامی معطی", 575, 125);
+    urduPdfHelper.drawTextRTL(doc, "اسم گرامی معطی", 575, 120);
     // Explicitly left blank per verified semantics (no explicit donorName field in Transaction schema)
     
     // Line 2: Address
-    urduPdfHelper.drawTextRTL(doc, "مکمل پتہ:", 575, 160);
+    urduPdfHelper.drawTextRTL(doc, "مکمل پتہ:", 575, 155);
     // Leave address blank as per instructions (no field in schema)
     
     // Line 3: Amount in words
-    urduPdfHelper.drawTextRTL(doc, "رقم / اشیاء عبارت میں", 575, 200);
-    urduPdfHelper.drawTextRTL(doc, "بمد", 350, 200);
-    urduPdfHelper.drawTextRTL(doc, "بشکریہ وصول ہوئے۔", 130, 200);
+    urduPdfHelper.drawTextRTL(doc, "رقم / اشیاء عبارت میں", 575, 195);
+    urduPdfHelper.drawTextRTL(doc, "بمد", 350, 195);
+    urduPdfHelper.drawTextRTL(doc, "بشکریہ وصول ہوئے۔", 130, 195);
 
     const amountInWords = numberToWords(tx.amount, isUrdu ? "ur" : "en");
-    urduPdfHelper.drawTextRTL(doc, amountInWords, 460, 200);
+    doc.fontSize(16);
+    urduPdfHelper.drawTextRTL(doc, amountInWords, 450, 195);
     
     const purpose = tx.description || tx.category || "";
-    urduPdfHelper.drawTextRTL(doc, purpose.substring(0, 40), 320, 200);
+    urduPdfHelper.drawTextRTL(doc, purpose.substring(0, 40), 310, 195);
 
     // === AMOUNT BOX ===
     const boxY = 240;
@@ -1171,17 +1363,18 @@ exports.generateFeeReceiptPDF = async (req, res) => {
     doc.fillColor("black").font(englishBold).fontSize(14).text(tx.amount.toString(), 75, boxY + 6, { lineBreak: false });
 
     // === SIGNATURES ===
-    doc.font(urduFont).fontSize(12);
+    doc.font(urduFont).fontSize(16);
     
     // Center signature
-    urduPdfHelper.drawTextRTL(doc, "دستخط وصول کنندہ", 350, 275);
+    urduPdfHelper.drawTextRTL(doc, "دستخط وصول کنندہ", 350, 272);
     
     // Using UrduFont for Jazak Allah to be safe
-    doc.font(urduFont).fontSize(12);
-    urduPdfHelper.drawTextRTL(doc, "جزاک اللہ", 400, 245);
+    doc.font(urduFont).fontSize(20);
+    urduPdfHelper.drawTextRTL(doc, "جزاک اللہ", 400, 238);
     
     // Right signature
-    urduPdfHelper.drawTextRTL(doc, "دستخط صدر", 150, 275);
+    doc.font(urduFont).fontSize(16);
+    urduPdfHelper.drawTextRTL(doc, "دستخط صدر", 150, 272);
 
     doc.end();
 

@@ -25,6 +25,18 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const classRoutes = require("./routes/classRoutes");
 const dataResolutionRoutes = require("./routes/dataResolutionRoutes");
 const achievementRoutes = require("./routes/achievementRoutes");
+const studentDocumentRoutes = require("./routes/studentDocumentRoutes");
+const hostelRoutes = require("./routes/hostelRoutes");
+const studentTimelineRoutes = require("./routes/studentTimelineRoutes");
+const teacherDocumentRoutes = require("./routes/teacherDocumentRoutes");
+const teacherDutyRoutes = require("./routes/teacherDutyRoutes");
+const teacherTimetableRoutes = require("./routes/teacherTimetableRoutes");
+const teacherTimelineRoutes = require("./routes/teacherTimelineRoutes");
+
+const employeeRoutes = require("./routes/employeeRoutes");
+const employeeAttendanceRoutes = require("./routes/employeeAttendanceRoutes");
+const employeeSalaryRoutes = require("./routes/employeeSalaryRoutes");
+const teacherSalaryRoutes = require("./routes/teacherSalaryRoutes");
 const path = require("path");
 
 process.on('uncaughtException', (err) => {
@@ -116,10 +128,22 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/classes", classRoutes);
 app.use("/api/data-resolution", dataResolutionRoutes);
 app.use("/api/achievements", achievementRoutes);
+app.use("/api", studentDocumentRoutes);
+app.use("/api", hostelRoutes);
+app.use("/api", studentTimelineRoutes);
+app.use("/api", teacherDocumentRoutes);
+app.use("/api", teacherDutyRoutes);
+app.use("/api/teacher-timetable", teacherTimetableRoutes);
+app.use("/api/teacher-timeline", teacherTimelineRoutes);
 
+app.use("/api/employees", employeeRoutes);
+app.use("/api/employee-attendance", employeeAttendanceRoutes);
+app.use("/api/employee-salary", employeeSalaryRoutes);
+app.use("/api/teacher-salary", teacherSalaryRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use((req, res) => {
+  console.log("404 FALLTHROUGH:", req.method, req.originalUrl);
   res.status(404).json({ success: false, message: "Route not found" });
 });
 

@@ -15,3 +15,16 @@ export { settingsApi } from "./settings";
 export { notificationApi } from "./notification";
 export { classApi } from "./classApi";
 export { achievementApi } from "./achievement";
+export { employeeApi } from "./employee";
+export { employeeAttendanceApi } from "./employeeAttendance";
+export { employeeSalaryApi } from "./employeeSalary";
+export { teacherSalaryApi } from "./teacherSalary";
+export { studentDocumentsApi } from "./studentDocuments";
+
+
+export { default as hostelApi } from './hostel';
+export { studentTimelineApi } from './studentTimeline';
+export { teacherDutiesApi } from './teacherDuties';
+export { teacherDocumentsApi } from './teacherDocuments';
+export { teacherTimetableApi } from './teacherTimetable';
+export { teacherTimelineApi } from './teacherTimeline';

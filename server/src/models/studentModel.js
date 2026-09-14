@@ -39,17 +39,38 @@ const studentSchema = new mongoose.Schema(
     address: { type: String, trim: true, default: "" },
     contactNumber: { type: String, trim: true, default: "" },
     email: { type: String, trim: true, lowercase: true, default: "" },
+    whatsapp: { type: String, trim: true, default: "" },
+    city: { type: String, trim: true, default: "" },
+    district: { type: String, trim: true, default: "" },
+    state: { type: String, trim: true, default: "" },
+    pinCode: { type: String, trim: true, default: "" },
     guardianName: { type: String, trim: true, default: "" },
     guardianContact: { type: String, trim: true, default: "" },
     guardianRelation: { type: String, trim: true, default: "" },
+    guardians: [
+      {
+        name: { type: String, trim: true, default: "" },
+        relation: { type: String, trim: true, default: "" },
+        mobile: { type: String, trim: true, default: "" },
+        whatsapp: { type: String, trim: true, default: "" },
+        occupation: { type: String, trim: true, default: "" },
+        address: { type: String, trim: true, default: "" },
+        emergencyContact: { type: Boolean, default: false }
+      }
+    ],
     photo: { type: String, default: "" },
     residential: { type: Boolean, default: true },
     status: {
       type: String,
-      enum: ["active", "inactive"],
+      enum: ["active", "inactive", "on_leave", "transferred", "completed"],
       default: "active",
     },
     admissionDate: { type: Date, default: Date.now },
+    admissionYear: { type: String, trim: true, default: "" },
+    previousInstitution: { type: String, trim: true, default: "" },
+    previousClass: { type: String, trim: true, default: "" },
+    admissionReference: { type: String, trim: true, default: "" },
+    joiningDate: { type: Date, default: null },
     attendancePercent: { type: Number, default: 0, min: 0, max: 100 },
     notes: { type: String, trim: true, default: "" },
     promotionHistory: [
@@ -77,8 +98,22 @@ const studentSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   },
 );
+
+studentSchema.virtual("age").get(function () {
+  if (!this.dateOfBirth) return undefined;
+  const today = new Date();
+  const birthDate = new Date(this.dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+});
 
 studentSchema.index({
   name: "text",

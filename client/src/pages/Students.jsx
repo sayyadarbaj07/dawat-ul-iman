@@ -43,9 +43,11 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
+import { useLocation } from "wouter";
 import { formatLocalizedNumber, formatLocalizedDate, formatLocalizedPercent, getLocalizedStudentName } from "@/utils/localizationUtils";
 
 export default function Students() {
+  const [, setLocation] = useLocation();
   const { tr, language } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -78,7 +80,6 @@ export default function Students() {
     section: "",
   });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentAttendanceSummary, setStudentAttendanceSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
@@ -382,27 +383,6 @@ export default function Students() {
     }
   };
 
-  const openViewModal = async (student) => {
-    setSelectedStudent(student);
-    setIsViewModalOpen(true);
-    setStudentAttendanceSummary(null);
-    setStudentAcademicHistory([]);
-    const studentId = student._id || student.id || student.studentId;
-    try {
-      setLoadingSummary(true);
-      const res = await attendanceApi.getStudentSummary(studentId);
-      if (res.data) {
-        setStudentAttendanceSummary(res.data);
-      }
-      setStudentAttendanceSummary(res.data);
-    } catch (err) {
-      console.error(err);
-      setStudentAttendanceSummary(null);
-    } finally {
-      setLoadingSummary(false);
-    }
-  };
-
   const loadStudentAcademicHistory = async (studentId) => {
     try {
       setLoadingAcademicHistory(true);
@@ -419,10 +399,9 @@ export default function Students() {
 
 
   const handleViewProfile = (student) => {
-    openViewModal(student);
     const id = student._id || student.id || student.studentId;
     if (id) {
-      loadStudentAcademicHistory(id);
+      setLocation(`/students/${id}`);
     }
   };
 
@@ -874,292 +853,6 @@ export default function Students() {
           </DialogContent>
         </Dialog>
 
-        {/* View Modal */}
-        <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-          <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-background">
-            {selectedStudent && (
-              <div className="flex flex-col h-full max-h-[90vh]">
-                {/* Header Profile Section */}
-                <div className="relative px-6 pt-10 pb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-b flex flex-col md:flex-row items-center md:items-start gap-6 shrink-0">
-                  <div className="relative">
-                    <div className="h-28 w-28 md:h-32 md:w-32 rounded-full overflow-hidden border-4 border-background shadow-md bg-muted flex items-center justify-center shrink-0">
-                      {selectedStudent.photo ? (
-                        <img 
-                          src={`http://localhost:5000${selectedStudent.photo}`} 
-                          alt={selectedStudent.fullName || selectedStudent.name} 
-                          className="h-full w-full object-cover" 
-                          onError={(e) => { e.target.src = ""; e.target.className = "hidden"; }}
-                        />
-                      ) : (
-                        <span className="text-4xl font-semibold text-muted-foreground uppercase">
-                          {(selectedStudent.fullName || selectedStudent.name || "S").charAt(0)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex-1 text-center md:text-start pt-2">
-                    <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-2">
-                      <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-                        {getLocalizedStudentName(selectedStudent, language)}
-                      </h2>
-                      <div className="flex items-center justify-center gap-2">
-                        <Badge variant={selectedStudent.status === 'active' ? 'default' : 'secondary'} className="rounded-full px-3 shadow-sm">
-                          {selectedStudent.status === 'active' ? 'Active' : 'Inactive'}
-                        </Badge>
-                        <Badge variant="outline" className="rounded-full px-3 shadow-sm bg-background">
-                          {selectedStudent.residential ? "Residential" : "Day Scholar"}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap justify-center md:justify-start gap-x-6 gap-y-2 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1.5 font-medium">
-                        <span className="text-foreground/70">ID:</span>
-                        <span className="font-mono text-foreground">{selectedStudent.studentId || selectedStudent.id}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 font-medium">
-                        <span className="text-foreground/70">Class:</span>
-                        <span className="capitalize text-foreground">{selectedStudent.studentClass || selectedStudent.className}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 font-medium">
-                        <span className="text-foreground/70">Section:</span>
-                        <span className="text-foreground">{selectedStudent.section || "—"}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Scrollable Content */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-muted/10">
-                  
-                  {/* Grid 1: Personal & Parent Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Personal Information */}
-                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
-                      <h3 className="font-semibold text-lg border-b pb-2">{tr("students", "personalInfo")}</h3>
-                      <div className="grid grid-cols-2 gap-y-4 gap-x-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{tr("students", "dateOfBirth")}</p>
-                          <p className="font-medium text-foreground">{formatLocalizedDate(selectedStudent.dateOfBirth, language)}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{tr("students", "gender")}</p>
-                          <p className="font-medium text-foreground capitalize">{selectedStudent.gender || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{tr("students", "contact")}</p>
-                          <p className="font-medium text-foreground">{selectedStudent.contactNumber || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{tr("students", "email")}</p>
-                          <p className="font-medium text-foreground truncate" title={selectedStudent.email}>{selectedStudent.email || "—"}</p>
-                        </div>
-                        <div className="col-span-2">
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{tr("students", "address")}</p>
-                          <p className="font-medium text-foreground">{selectedStudent.address || "—"}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Parent/Guardian Info */}
-                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
-                      <h3 className="font-semibold text-lg border-b pb-2">{tr("students", "parentInfo")}</h3>
-                      <div className="grid grid-cols-2 gap-y-4 gap-x-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Father</p>
-                          <p className="font-medium text-foreground">{selectedStudent.fatherName || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Mother</p>
-                          <p className="font-medium text-foreground">{selectedStudent.motherName || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Guardian</p>
-                          <p className="font-medium text-foreground">{selectedStudent.guardianName || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Relation</p>
-                          <p className="font-medium text-foreground">{selectedStudent.guardianRelation || "—"}</p>
-                        </div>
-                        <div className="col-span-2">
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Guardian Contact</p>
-                          <p className="font-medium text-foreground">{selectedStudent.guardianContact || "—"}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Grid 2: Academic & Attendance */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Academic Information */}
-                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
-                      <h3 className="font-semibold text-lg border-b pb-2">Academic Details</h3>
-                      <div className="grid grid-cols-2 gap-y-4 gap-x-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Roll Number</p>
-                          <p className="font-medium text-foreground">{selectedStudent.rollNumber || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Admission No</p>
-                          <p className="font-medium text-foreground">{selectedStudent.admissionNumber || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">School Class</p>
-                          <p className="font-medium text-foreground">{selectedStudent.schoolClass || "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">Admission Date</p>
-                          <p className="font-medium text-foreground">{formatLocalizedDate(selectedStudent.admissionDate, language)}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Attendance Summary */}
-                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
-                      <h3 className="font-semibold text-lg border-b pb-2">{tr("students", "attendance")}</h3>
-                      {loadingSummary ? (
-                        <div className="text-sm text-muted-foreground p-4 text-center">{tr("common", "loading")}</div>
-                      ) : studentAttendanceSummary ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                          <div className="bg-muted/50 p-3 rounded-xl border border-border/50">
-                            <div className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider">Total</div>
-                            <div className="font-bold text-xl text-foreground mt-1">{formatLocalizedNumber(studentAttendanceSummary.summary?.total || 0, language)}</div>
-                          </div>
-                          <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
-                            <div className="text-emerald-700 text-[10px] font-bold uppercase tracking-wider">{tr("attendance", "present")}</div>
-                            <div className="font-bold text-xl text-emerald-700 mt-1">{formatLocalizedNumber(studentAttendanceSummary.summary?.present || 0, language)}</div>
-                          </div>
-                          <div className="bg-red-500/10 p-3 rounded-xl border border-red-500/20">
-                            <div className="text-red-700 text-[10px] font-bold uppercase tracking-wider">{tr("attendance", "absent")}</div>
-                            <div className="font-bold text-xl text-red-700 mt-1">{formatLocalizedNumber(studentAttendanceSummary.summary?.absent || 0, language)}</div>
-                          </div>
-                          <div className="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20">
-                            <div className="text-amber-700 text-[10px] font-bold uppercase tracking-wider">{tr("attendance", "late")}</div>
-                            <div className="font-bold text-xl text-amber-700 mt-1">{formatLocalizedNumber(studentAttendanceSummary.summary?.late || 0, language)}</div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground p-4 text-center">{tr("attendance", "noRecordsFound")}</div>
-                      )}
-                    </div>
-                  </div>
-
-
-
-                  {/* Exam & Result Performance */}
-                  <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
-                    <div className="flex justify-between items-center border-b pb-2">
-                      <h3 className="font-semibold text-lg">Academic Performance</h3>
-                    </div>
-                    {loadingAcademicHistory ? (
-                      <div className="text-sm text-muted-foreground text-center p-4">Loading performance...</div>
-                    ) : studentAcademicHistory && studentAcademicHistory.length > 0 ? (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader className="bg-muted/40">
-                            <TableRow>
-                              <TableHead className="font-semibold">Year</TableHead>
-                              <TableHead className="font-semibold">Class</TableHead>
-                              <TableHead className="font-semibold">Exam</TableHead>
-                              <TableHead className="text-end font-semibold">Score</TableHead>
-                              <TableHead className="text-center font-semibold">Grade</TableHead>
-                              <TableHead className="font-semibold text-center">Result</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {studentAcademicHistory.map((hist, i) => (
-                              <TableRow key={i}>
-                                <TableCell className="font-medium text-sm">{hist.academicYear}</TableCell>
-                                <TableCell className="text-sm text-muted-foreground">{hist.className}</TableCell>
-                                <TableCell className="text-sm">
-                                  <span className="font-medium text-foreground">{hist.examName || hist.examType}</span>
-                                </TableCell>
-                                <TableCell className="text-end font-semibold text-sm">{formatLocalizedPercent(hist.percentage, language)}</TableCell>
-                                <TableCell className="text-center font-bold text-sm">{hist.grade}</TableCell>
-                                <TableCell className="text-center text-sm">
-                                  <Badge variant={hist.status === 'Pass' ? 'soft-success' : 'destructive'} className="shadow-none">
-                                    {hist.status}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground p-6 text-center bg-muted/20 rounded-xl">No academic history found for this student.</div>
-                    )}
-                  </div>
-
-                  {/* Promotion History */}
-                  {selectedStudent.promotionHistory && selectedStudent.promotionHistory.length > 0 && (
-                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-4">
-                      <h3 className="font-semibold text-lg border-b pb-2">Promotion History</h3>
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader className="bg-muted/40">
-                            <TableRow>
-                              <TableHead className="font-semibold">Date</TableHead>
-                              <TableHead className="font-semibold">Year</TableHead>
-                              <TableHead className="font-semibold">From Class</TableHead>
-                              <TableHead className="font-semibold">To Class</TableHead>
-                              <TableHead className="font-semibold">Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {selectedStudent.promotionHistory.map((hist, i) => (
-                              <TableRow key={i}>
-                                <TableCell className="text-sm">{formatLocalizedDate(hist.date, language)}</TableCell>
-                                <TableCell className="font-medium text-sm">{hist.academicYear}</TableCell>
-                                <TableCell className="text-sm text-muted-foreground">{hist.fromClass}</TableCell>
-                                <TableCell className="text-sm font-medium">{hist.toClass}</TableCell>
-                                <TableCell className="text-sm">
-                                  <Badge variant="outline">{hist.status}</Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Notes */}
-                  {selectedStudent.notes && (
-                    <div className="bg-card rounded-2xl border shadow-sm p-5 space-y-2">
-                      <h3 className="font-semibold text-lg border-b pb-2">Notes</h3>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedStudent.notes}</p>
-                    </div>
-                  )}
-
-                </div>
-                
-                {/* Footer Action */}
-                <div className="px-6 py-4 bg-background border-t flex justify-between shrink-0 items-center">
-                  <Button 
-                    variant="default"
-                    className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-                    onClick={() => exportIdCard(selectedStudent._id, language)}
-                    disabled={isExportingStudentPDF === 'id_card'}
-                  >
-                    {isExportingStudentPDF === 'id_card' ? (
-                      <>
-                        <span className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>
-                        {tr("common", "generating") || "Generating..."}
-                      </>
-                    ) : (
-                      <>
-                        <User className="w-4 h-4" />
-                        {tr("students", "generateIdCard") || "Generate ID Card"}
-                      </>
-                    )}
-                  </Button>
-                  <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>Close Profile</Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
         <div className="bg-card rounded-lg border shadow-sm">
         <div className="p-4 border-b flex items-center justify-between">
           <div className="relative w-full max-w-sm">
@@ -1249,7 +942,7 @@ export default function Students() {
                           <DropdownMenuLabel>
                             {tr("students", "actions")}
                           </DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => openViewModal(student)}>
+                          <DropdownMenuItem onClick={() => handleViewProfile(student)}>
                             <FileText className="me-2 h-4 w-4" />
                             {tr("students", "viewProfile")}
                           </DropdownMenuItem>

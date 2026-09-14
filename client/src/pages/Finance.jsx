@@ -24,6 +24,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { useLanguage } from "@/context/LanguageContext";
 import { formatLocalizedNumber, formatLocalizedDate } from "@/utils/localizationUtils";
 import { financeApi, settingsApi } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const INCOME_CATEGORIES = ["Kafalat", "Atiya", "Zakat", "Sadqa", "Isale Sawab", "Other"];
 const EXPENSE_CATEGORIES = ["Tankha", "Food", "Medical", "Wazifa", "Other"];
@@ -32,6 +33,7 @@ const PAYMENT_MODES = ["Cash", "Bank", "Online"];
 const API_BASE_URL = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
 
 export default function Finance() {
+  const { user } = useAuth();
   const { tr, language } = useLanguage();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [transactions, setTransactions] = useState([]);
@@ -302,7 +304,9 @@ export default function Finance() {
                           >
                             {exportingId === tx._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                           </Button>
-                          <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleVoidTransaction(tx._id)}>{tr("finance", "void")}</Button>
+                          {user?.role === "admin" && (
+                            <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleVoidTransaction(tx._id)}>{tr("finance", "void")}</Button>
+                          )}
                         </>
                       )}
                     </div>

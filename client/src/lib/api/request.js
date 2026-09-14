@@ -23,7 +23,10 @@ export async function request(path, options = {}) {
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new Error(data?.message || "Request failed");
+    const error = new Error(data?.message || "Request failed");
+    error.response = { data };
+    error.status = response.status;
+    throw error;
   }
 
   return data;

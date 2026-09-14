@@ -2,6 +2,7 @@ const studentService = require("../services/studentService");
 const fs = require("fs");
 const path = require("path");
 const ActivityNotificationService = require("../services/activityNotificationService");
+const { createStudentTimelineEvent } = require("../services/studentTimelineService");
 
 const sendSuccess = (res, statusCode, message, data = null) => {
   const payload = { success: true, message };
@@ -48,6 +49,18 @@ exports.createStudent = async (req, res) => {
       },
       notifyAdmins: true,
       classId: student.classId
+    });
+
+    createStudentTimelineEvent({
+      studentId: student._id,
+      eventType: "STUDENT_CREATED",
+      performedBy: req.user._id,
+      descriptionKey: "student_created",
+      metadata: {
+        name: student.name,
+        rollNumber: student.rollNumber,
+        admissionNumber: student.admissionNumber
+      }
     });
 
     return sendSuccess(res, 201, "Student created successfully", student);
@@ -147,6 +160,20 @@ exports.updateStudent = async (req, res) => {
 
     const student = await studentService.updateStudent(req.params.id, payload);
 
+    // Calculate changed fields for timeline metadata
+    const changedFields = {};
+    Object.keys(payload).forEach(key => {
+      // Exclude passwords or deep complex objects for simplicity/security
+      if (key === 'password' || key === 'photo') return;
+      // Weak comparison for string/number equivalents
+      if (String(existingStudent[key]) !== String(student[key])) {
+        changedFields[key] = {
+          previous: existingStudent[key],
+          new: student[key]
+        };
+      }
+    });
+
     // Dispatch Activity (No global notification for basic updates to avoid noise)
     ActivityNotificationService.dispatchActivityEvent({
       user: req.user,
@@ -155,6 +182,18 @@ exports.updateStudent = async (req, res) => {
       moduleName: "Students",
       notifyAdmins: false // Just log it, don't spam notifications
     });
+
+    if (Object.keys(changedFields).length > 0) {
+      createStudentTimelineEvent({
+        studentId: student._id,
+        eventType: "STUDENT_UPDATED",
+        performedBy: req.user._id,
+        descriptionKey: "student_updated",
+        metadata: {
+          changedFields
+        }
+      });
+    }
 
     return sendSuccess(res, 200, "Student updated successfully", student);
   } catch (error) {
@@ -220,6 +259,18 @@ exports.promoteStudent = async (req, res) => {
       },
       notifyAdmins: true,
       classId: student.classId
+    });
+
+    createStudentTimelineEvent({
+      studentId: student._id,
+      eventType: "STUDENT_PROMOTED",
+      performedBy: req.user._id,
+      descriptionKey: "student_promoted",
+      metadata: {
+        previousClassId: req.body.previousClassId || null,
+        newClassId: req.body.newClassId || req.body.classId,
+        newClassName: req.body.newClassName || req.body.className
+      }
     });
 
     return sendSuccess(res, 200, "Student promoted successfully", student);

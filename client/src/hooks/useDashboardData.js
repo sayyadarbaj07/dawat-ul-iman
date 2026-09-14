@@ -103,7 +103,7 @@ export function useDashboardData(user) {
 
       try {
         const [studentRes, teacherRes, reportRes, meRes] = await Promise.allSettled([
-          studentApi.list(),
+          role === "accountant" ? Promise.reject(new Error("Unauthorized")) : studentApi.list(),
           role === "admin" ? teacherApi.list() : Promise.reject(new Error("Unauthorized")),
           reportApi.getSummary(),
           role === "teacher" ? teacherApi.getMe() : Promise.resolve(null),
@@ -241,10 +241,10 @@ export function useDashboardData(user) {
         const [financeRes, financeSumRes, examRes, eventRes, logRes, meetingRes] = await Promise.allSettled([
           canAccessFinance ? financeApi.list() : Promise.reject(new Error("Unauthorized")),
           canAccessFinance ? financeApi.summary() : Promise.reject(new Error("Unauthorized")),
-          examApi.listExams(),
-          eventApi.list(),
+          role === "accountant" ? Promise.reject(new Error("Unauthorized")) : examApi.listExams(),
+          role === "accountant" ? Promise.reject(new Error("Unauthorized")) : eventApi.list(),
           role === "admin" ? activityLogApi.list() : Promise.resolve({ data: [] }),
-          meetingApi.list(),
+          role === "accountant" ? Promise.reject(new Error("Unauthorized")) : meetingApi.list(),
         ]);
 
         if (cancelled) return;

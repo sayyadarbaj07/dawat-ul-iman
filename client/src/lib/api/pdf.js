@@ -7,6 +7,9 @@ export const pdfApi = {
   getTeacherIdCard(teacherId, language = 'en') {
     return `/pdf/teacher/${teacherId}/id-card?language=${language}`;
   },
+  getTeacherSalarySlip(salaryId, language = 'en') {
+    return `${API_BASE}/pdf/teacher-salary/${salaryId}?language=${language}`;
+  },
   getStudentReportCard(studentId, examId, language = 'en') {
     const query = new URLSearchParams({ examId, language }).toString();
     return `${API_BASE}/pdf/student/${studentId}/report-card?${query}`;

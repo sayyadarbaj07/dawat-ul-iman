@@ -41,7 +41,10 @@ export default function Reports() {
     { id: "results", label: tr("reports", "catResults"), icon: Award },
     { id: "attendance", label: tr("reports", "catAttendance"), icon: CalendarCheck },
     { id: "finance", label: tr("reports", "catFinance"), icon: Landmark },
-  ];
+  ].filter(cat => {
+    if (user?.role === "accountant") return cat.id === "finance";
+    return true;
+  });
 
   const ALL_REPORTS = [
     // Student Reports
@@ -75,7 +78,7 @@ export default function Reports() {
   ];
 
   
-  const [activeTab, setActiveTab] = useState("students");
+  const [activeTab, setActiveTab] = useState(user?.role === "accountant" ? "finance" : "students");
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);

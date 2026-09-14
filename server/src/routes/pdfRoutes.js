@@ -15,6 +15,9 @@ router.route("/student/:id/id-card")
 router.route("/teacher/:id/id-card")
   .get(authorize("admin", "teacher"), pdfController.generateTeacherIdCard);
 
+router.route("/teacher-salary/:salaryId")
+  .get(authorize("admin", "teacher"), pdfController.generateTeacherSalarySlip);
+
 router.route("/student/:id/yearly-result")
   .get(authorize("admin", "teacher"), pdfController.generateYearlyResultPDF);
 
@@ -33,7 +36,7 @@ router.route("/finance/summary")
 router.route("/finance/receipt/:id")
   .get(authorize("admin", "accountant"), pdfController.generateFeeReceiptPDF);
 router.route("/weak-students")
-  .get(authorize("admin", "teacher", "accountant"), checkClassAccess, pdfController.generateWeakStudentsReport);
+  .get(authorize("admin", "teacher"), checkClassAccess, pdfController.generateWeakStudentsReport);
 
 router.route("/attendance/class")
   .get(authorize("admin", "teacher"), checkClassAccess, pdfController.generateClassAttendancePDF);
@@ -41,7 +44,7 @@ router.route("/attendance/student/:id")
   .get(authorize("admin", "teacher"), pdfController.generateStudentAttendancePDF);
 
 router.route("/student-list")
-  .get(authorize("admin", "teacher", "accountant"), checkClassAccess, pdfController.generateStudentListPDF);
+  .get(authorize("admin", "teacher"), checkClassAccess, pdfController.generateStudentListPDF);
 
 // ...
 

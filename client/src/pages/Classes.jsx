@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, ShieldAlert, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Edit, CheckCircle, XCircle, BookOpen } from "lucide-react";
+import ClassSyllabusModal from "@/components/classes/ClassSyllabusModal";
 import { classApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,11 @@ export default function Classes() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState(null);
+
+  // Syllabus Modal State
+  const [isSyllabusOpen, setIsSyllabusOpen] = useState(false);
+  const [selectedClassForSyllabus, setSelectedClassForSyllabus] = useState(null);
+
   const [formData, setFormData] = useState({
     department: "",
     name: "",
@@ -198,6 +204,19 @@ export default function Classes() {
                         <Edit className="h-4 w-4" />
                       </Button>
                       <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedClassForSyllabus(cls);
+                          setIsSyllabusOpen(true);
+                        }}
+                        title="Manage Syllabus"
+                        className="flex items-center gap-1"
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        <span>Syllabus</span>
+                      </Button>
+                      <Button
                         variant={cls.status === "active" ? "destructive" : "default"}
                         size="sm"
                         onClick={() => toggleStatus(cls)}
@@ -285,6 +304,15 @@ export default function Classes() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Class Syllabus Modal */}
+      {selectedClassForSyllabus && (
+        <ClassSyllabusModal
+          open={isSyllabusOpen}
+          onOpenChange={setIsSyllabusOpen}
+          classData={selectedClassForSyllabus}
+        />
+      )}
     </div>
   );
 }

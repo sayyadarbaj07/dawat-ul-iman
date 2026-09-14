@@ -20,7 +20,7 @@ const studentValidationRules = [
     .withMessage("Invalid gender value"),
   body("status")
     .optional()
-    .isIn(["active", "inactive"])
+    .isIn(["active", "inactive", "on_leave", "transferred", "completed"])
     .withMessage("Invalid status"),
   body("residential")
     .optional()

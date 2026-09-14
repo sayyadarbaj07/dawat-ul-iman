@@ -31,7 +31,10 @@ export const teacherApi = {
       body: formData,
     });
   },
-  remove(id) {
-    return request(`/teachers/${id}`, { method: "DELETE" });
+  remove(id, payload) {
+    return request(`/teachers/${id}`, { 
+      method: "DELETE",
+      body: payload ? JSON.stringify(payload) : undefined
+    });
   }
 };
