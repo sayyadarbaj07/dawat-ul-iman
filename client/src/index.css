@@ -4,6 +4,22 @@
 @import "./print.css";
 @plugin "@tailwindcss/typography";
 
+@font-face {
+  font-family: 'Jameel Noori Nastaleeq';
+  src: url('/fonts/Jameel Noori Nastaleeq.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Aslam';
+  src: url('/fonts/Aslam.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -272,8 +288,12 @@
     font-family: 'Jameel Noori Nastaleeq', 'Noto Sans Arabic', sans-serif;
   }
 
-  .font-urdu-bold {
+  .font-aslam {
     font-family: 'Aslam', 'Noto Sans Arabic', sans-serif;
+  }
+
+  .font-urdu-bold {
+    font-family: 'Jameel Noori Nastaleeq', 'Noto Sans Arabic', sans-serif;
     font-weight: bold;
   }
 }

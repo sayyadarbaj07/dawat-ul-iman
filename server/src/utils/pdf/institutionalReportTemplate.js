@@ -48,18 +48,26 @@ function drawInstitutionalHeader(doc, isUrdu) {
   doc.text("431122 (MS)", innerMargin + 10, innerMargin + 75);
 
   // Right Side (Urdu Identity)
-  // Ensure Urdu font is registered
+  // Ensure Urdu fonts are registered
   const urduFontPath = path.join(__dirname, "../fonts/Jameel Noori Nastaleeq.ttf");
+  const aslamFontPath = path.join(__dirname, "../fonts/urdu-fonts/Aslam.ttf");
+  
   if (fs.existsSync(urduFontPath)) {
     doc.registerFont("UrduFont", urduFontPath);
   } else {
     doc.registerFont("UrduFont", "Helvetica"); // Fallback
   }
+  
+  if (fs.existsSync(aslamFontPath)) {
+    doc.registerFont("AslamFont", aslamFontPath);
+  } else {
+    doc.registerFont("AslamFont", "UrduFont"); // Fallback to Jameel if Aslam missing
+  }
 
   // Draw Urdu Text RTL
   doc.fillColor("#c8105e"); // Match magenta tone for Urdu Title
-  urduPdfHelper.drawTextRTL(doc, "جامعہ", doc.page.width - innerMargin - 10, innerMargin + 5, { font: "UrduFont", fontSize: 16, align: "right" });
-  urduPdfHelper.drawTextRTL(doc, "دعوت الایمان", doc.page.width - innerMargin - 10, innerMargin + 20, { font: "UrduFont", fontSize: 26, align: "right" });
+  urduPdfHelper.drawTextRTL(doc, "جامعہ", doc.page.width - innerMargin - 10, innerMargin + 5, { font: "AslamFont", fontSize: 20, align: "right" });
+  urduPdfHelper.drawTextRTL(doc, "دعوت الایمان", doc.page.width - innerMargin - 10, innerMargin + 20, { font: "AslamFont", fontSize: 30, align: "right" });
 
   doc.fillColor("#000000"); // Address black
   urduPdfHelper.drawTextRTL(doc, "چہ مینار مسجد، روشن پورہ، حضرت بالے پیر بیڑ (مہاراشٹر)", doc.page.width - innerMargin - 10, innerMargin + 55, { font: "UrduFont", fontSize: 10, align: "right" });

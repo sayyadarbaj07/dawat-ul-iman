@@ -5,7 +5,7 @@ const classSchema = new mongoose.Schema(
     department: {
       type: String,
       required: true,
-      enum: ["diniyat", "hifz", "alimiyat", "qirat", "contemporary", "arabic"],
+      enum: ["diniyat", "hifz", "alimiyat", "qirat", "contemporary", "arabic", "school"],
     },
     name: {
       type: String,

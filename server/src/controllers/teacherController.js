@@ -1,4 +1,5 @@
 const Teacher = require("../models/teacherModel");
+const mongoose = require("mongoose");
 const User = require("../models/userModel");
 
 const sendSuccess = (res, statusCode, message, data = null) => {
@@ -229,27 +230,67 @@ exports.updateTeacher = async (req, res) => {
 };
 
 exports.deleteTeacher = async (req, res) => {
-  try {
-    const teacher = await Teacher.findById(req.params.id);
-    if (!teacher) return sendError(res, 404, "Teacher not found");
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    const deactivationDate = req.body.deactivationDate || new Date();
-    if (teacher.joiningDate && new Date(deactivationDate) < new Date(teacher.joiningDate)) {
-      return sendError(res, 400, "Deactivation date cannot be earlier than joining date");
+    try {
+      const teacher = await Teacher.findById(req.params.id).session(session);
+      if (!teacher) {
+        await session.abortTransaction();
+        session.endSession();
+        return sendError(res, 404, "Teacher not found");
+      }
+
+      const teacherId = teacher._id;
+
+      // 1. Delete teacher-owned models
+      const TeacherDuty = require("../models/teacherDutyModel");
+      await TeacherDuty.deleteMany({ teacherId }).session(session);
+
+      const TeacherTimetable = require("../models/teacherTimetableModel");
+      await TeacherTimetable.deleteMany({ teacherId }).session(session);
+
+      const TeacherTimeline = require("../models/teacherTimelineModel");
+      await TeacherTimeline.deleteMany({ teacherId }).session(session);
+
+      const TeacherTeachingProgress = require("../models/teacherTeachingProgressModel");
+      await TeacherTeachingProgress.deleteMany({ teacherId }).session(session);
+
+      const TeacherSalary = require("../models/teacherSalaryModel");
+      await TeacherSalary.deleteMany({ teacherId }).session(session);
+
+      const TeacherDocument = require("../models/teacherDocumentModel");
+      await TeacherDocument.deleteMany({ teacherId }).session(session);
+
+      const Curriculum = require("../models/curriculumModel");
+      await Curriculum.deleteMany({ teacherId }).session(session);
+
+      const EmployeeAttendance = require("../models/employeeAttendanceModel");
+      await EmployeeAttendance.updateMany(
+        { "records.employeeId": teacherId },
+        { $pull: { records: { employeeId: teacherId } } }
+      ).session(session);
+
+      // 2. Delete linked User if safe
+      if (teacher.userId) {
+        const user = await User.findById(teacher.userId).session(session);
+        // Only delete if role is explicitly teacher (ensure they aren't admin shared)
+        if (user && user.role === 'teacher') {
+          await User.findByIdAndDelete(user._id).session(session);
+        }
+      }
+
+      // 3. Delete the teacher record
+      await Teacher.findByIdAndDelete(teacherId).session(session);
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return sendSuccess(res, 200, "Teacher permanently deleted successfully.");
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      console.error("Cascade delete teacher error:", error);
+      return sendError(res, 500, "Failed to permanently delete teacher", error);
     }
-
-    // Soft delete via User model
-    const user = await User.findById(teacher.userId);
-    if (user) {
-      user.isActive = false;
-      await user.save();
-    }
-    
-    teacher.deactivationDate = deactivationDate;
-    await teacher.save();
-
-    return sendSuccess(res, 200, "Teacher deactivated successfully");
-  } catch (error) {
-    return sendError(res, 500, "Failed to deactivate teacher", error);
-  }
-};
+  };

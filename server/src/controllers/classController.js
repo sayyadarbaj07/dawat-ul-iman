@@ -1,6 +1,11 @@
 const Class = require("../models/classModel");
 const Student = require("../models/studentModel");
 const Attendance = require("../models/attendanceModel");
+const Exam = require("../models/examModel");
+const ExamResult = require("../models/examResultModel");
+const Curriculum = require("../models/curriculumModel");
+const Teacher = require("../models/teacherModel");
+const Meeting = require("../models/meetingModel");
 const mongoose = require("mongoose");
 
 const sendSuccess = (res, statusCode, message, data = null) => {
@@ -138,21 +143,88 @@ exports.updateClassStatus = async (req, res) => {
     // Dependency check for soft-delete
     if (status === "inactive") {
       const studentCount = await Student.countDocuments({ classId: id });
-      if (studentCount > 0) {
-        return sendError(res, 400, `Cannot deactivate class. ${studentCount} students are currently assigned to this class.`);
-      }
-
       const attendanceCount = await Attendance.countDocuments({ classId: id });
-      if (attendanceCount > 0) {
-        return sendError(res, 400, `Cannot deactivate class. ${attendanceCount} attendance records depend on this class.`);
+      
+      if (studentCount > 0 || attendanceCount > 0) {
+        return sendError(res, 400, "Cannot deactivate this class because students or attendance records are linked to it.");
       }
     }
 
     const classObj = await Class.findByIdAndUpdate(id, { status }, { new: true, runValidators: true });
     if (!classObj) return sendError(res, 404, "Class not found");
 
-    return sendSuccess(res, 200, "Class status updated successfully", classObj);
+    const message = status === "inactive" ? "Class deactivated successfully." : "Class activated successfully.";
+    return sendSuccess(res, 200, message, classObj);
   } catch (error) {
     return sendError(res, 500, "Failed to update class status", error);
   }
 };
+
+exports.deleteClass = async (req, res) => {
+    // Requires MongoDB transactions. If not available, we use sequential updates.
+    // For now, doing sequential but careful operations.
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
+    try {
+      const { id } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return sendError(res, 400, "Invalid class ID");
+      }
+
+      // Check if class exists
+      const classObj = await Class.findById(id).session(session);
+      if (!classObj) {
+        await session.abortTransaction();
+        session.endSession();
+        return sendError(res, 404, "Class not found");
+      }
+
+      // 1. Delete class-owned models
+      await Attendance.deleteMany({ classId: id }).session(session);
+      const exams = await Exam.find({ classId: id }).session(session);
+      const examIds = exams.map(e => e._id);
+      if (examIds.length > 0) {
+        await ExamResult.deleteMany({ examId: { $in: examIds } }).session(session);
+        await Exam.deleteMany({ classId: id }).session(session);
+      }
+      await Curriculum.deleteMany({ classId: id }).session(session);
+      await Meeting.deleteMany({ classId: id }).session(session);
+      
+      const ClassRollCounter = require("../models/classRollCounterModel");
+      await ClassRollCounter.deleteMany({ classId: id }).session(session);
+
+      const Achievement = require("../models/achievementModel");
+      await Achievement.deleteMany({ classId: id }).session(session);
+
+      // 2. Set classId to null for students belonging to this class
+      await Student.updateMany({ classId: id }, { $set: { classId: null } }).session(session);
+
+      // 3. Remove class assignments from teachers
+      await Teacher.updateMany(
+        { assignedClassIds: id },
+        { $pull: { assignedClassIds: id } }
+      ).session(session);
+      await Teacher.updateMany(
+        { "teachingAssignments.classId": id },
+        { $pull: { teachingAssignments: { classId: id } } }
+      ).session(session);
+
+      // 4. Safely nullify classId in Transactions (Institutional records are kept)
+      const Transaction = require("../models/transactionModel");
+      await Transaction.updateMany({ classId: id }, { $set: { classId: null } }).session(session);
+
+      // 5. Delete the class itself
+      await Class.findByIdAndDelete(id).session(session);
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return sendSuccess(res, 200, "Class permanently deleted successfully.");
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      console.error("Cascade delete class error:", error);
+      return sendError(res, 500, "Failed to permanently delete class", error);
+    }
+  };

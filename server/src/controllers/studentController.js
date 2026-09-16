@@ -202,44 +202,45 @@ exports.updateStudent = async (req, res) => {
 };
 
 exports.deleteStudent = async (req, res) => {
-  try {
-    const existingStudent = await studentService.getStudentById(req.params.id);
-    if (!existingStudent) return sendError(res, 404, "Student not found");
-
-    if (req.user && req.user.role === "teacher") {
-      const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
-      const hasAccess = await verifyTeacherClassAccess(req.user, existingStudent.classId, existingStudent.className || existingStudent.studentClass);
-      if (!hasAccess) {
-        return sendError(res, 403, "Forbidden: You are not authorized to delete this student.");
+    try {
+      const existingStudent = await studentService.getStudentById(req.params.id);
+      if (!existingStudent) return sendError(res, 404, "Student not found");
+  
+      // Enforce ADMIN ONLY at controller level to be safe
+      if (req.user && req.user.role !== "admin") {
+        return sendError(res, 403, "Forbidden: Only administrators can permanently delete students.");
       }
-    }
-
-    const student = await studentService.deleteStudent(req.params.id);
-    
-    if (existingStudent.photo) {
-      const oldPath = path.join(__dirname, "../../", existingStudent.photo);
-      if (fs.existsSync(oldPath)) {
-        try {
-          fs.unlinkSync(oldPath);
-        } catch (err) {
-          console.error("Failed to delete old photo:", err);
+  
+      await studentService.deleteStudent(req.params.id);
+      
+      if (existingStudent.photo) {
+        const oldPath = path.join(__dirname, "../../", existingStudent.photo);
+        if (fs.existsSync(oldPath)) {
+          try {
+            fs.unlinkSync(oldPath);
+          } catch (err) {
+            console.error("Failed to delete old photo:", err);
+          }
         }
       }
+  
+      const ActivityNotificationService = require("../services/activityNotificationService");
+      if (ActivityNotificationService && ActivityNotificationService.dispatchActivityEvent) {
+        ActivityNotificationService.dispatchActivityEvent({
+          user: req.user,
+          action: "STUDENT_DELETED",
+          description: `Deleted student: ${existingStudent.name}`,
+          moduleName: "Students",
+          notifyAdmins: false
+        });
+      }
+  
+      return sendSuccess(res, 200, "Student permanently deleted successfully");
+    } catch (error) {
+      console.error("Delete Student Error:", error);
+      return sendError(res, 500, "Failed to delete student", error);
     }
-
-    ActivityNotificationService.dispatchActivityEvent({
-      user: req.user,
-      action: "STUDENT_DELETED",
-      description: `Deleted student: ${existingStudent.name}`,
-      moduleName: "Students",
-      notifyAdmins: false
-    });
-
-    return sendSuccess(res, 200, "Student deleted successfully");
-  } catch (error) {
-    return sendError(res, 500, "Failed to delete student", error);
-  }
-};
+  };
 
 exports.promoteStudent = async (req, res) => {
   try {

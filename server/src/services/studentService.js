@@ -2,8 +2,46 @@ const Student = require("../models/studentModel");
 
 const Class = require("../models/classModel");
 const ClassRollCounter = require("../models/classRollCounterModel");
+const AdmissionCounter = require("../models/admissionCounterModel");
 
 class StudentService {
+  async _getNextAdmissionNumber() {
+    let counter = await AdmissionCounter.findOneAndUpdate(
+      { _id: 'global' },
+      { $inc: { lastAdmissionNumber: 1 } },
+      { new: true, upsert: false }
+    );
+    if (counter) return counter.lastAdmissionNumber.toString();
+    
+    // Find max legacy admission number safely
+    const students = await Student.find({}).select("admissionNumber").lean();
+    let maxAdm = 0;
+    for (const student of students) {
+      if (student.admissionNumber) {
+        const str = student.admissionNumber.trim();
+        if (/^\d+$/.test(str)) {
+          const parsed = parseInt(str, 10);
+          if (parsed > maxAdm) maxAdm = parsed;
+        }
+      }
+    }
+    const nextAdm = maxAdm + 1;
+    
+    try {
+      counter = await AdmissionCounter.create({ _id: 'global', lastAdmissionNumber: nextAdm });
+      return counter.lastAdmissionNumber.toString();
+    } catch (e) {
+      if (e.code === 11000) {
+        counter = await AdmissionCounter.findOneAndUpdate(
+          { _id: 'global' },
+          { $inc: { lastAdmissionNumber: 1 } },
+          { new: true }
+        );
+        if (counter) return counter.lastAdmissionNumber.toString();
+      }
+      throw e;
+    }
+  }
   async createStudent(payload) {
     if (payload.classId) {
       const cls = await Class.findById(payload.classId);
@@ -23,6 +61,7 @@ class StudentService {
         throw new Error("Failed to assign roll number: " + err.message);
       }
     }
+    payload.admissionNumber = await this._getNextAdmissionNumber();
     const student = await Student.create(payload);
     return student;
   }
@@ -143,8 +182,65 @@ class StudentService {
   }
 
   async deleteStudent(id) {
-    return Student.findByIdAndDelete(id);
-  }
+      const mongoose = require("mongoose");
+      const session = await mongoose.startSession();
+      session.startTransaction();
+
+      try {
+        const student = await Student.findById(id).session(session);
+        if (!student) {
+          await session.abortTransaction();
+          session.endSession();
+          throw new Error("Student not found");
+        }
+
+        const studentObjId = new mongoose.Types.ObjectId(id);
+
+        // 1. Delete student-owned models
+        const Achievement = require("../models/achievementModel");
+        await Achievement.deleteMany({ studentId: studentObjId }).session(session);
+
+        const ExamResult = require("../models/examResultModel");
+        await ExamResult.deleteMany({ studentId: studentObjId }).session(session);
+
+        const HostelAllocation = require("../models/hostelAllocationModel");
+        await HostelAllocation.deleteMany({ studentId: studentObjId }).session(session);
+
+        const StudentDocument = require("../models/studentDocumentModel");
+        await StudentDocument.deleteMany({ studentId: studentObjId }).session(session);
+
+        const StudentLearningProgress = require("../models/studentLearningProgressModel");
+        await StudentLearningProgress.deleteMany({ studentId: studentObjId }).session(session);
+
+        const StudentTimeline = require("../models/studentTimelineModel");
+        await StudentTimeline.deleteMany({ studentId: studentObjId }).session(session);
+
+        // 2. Remove student from Attendance arrays
+        const Attendance = require("../models/attendanceModel");
+        await Attendance.updateMany(
+          { "records.studentId": studentObjId },
+          { $pull: { records: { studentId: studentObjId } } }
+        ).session(session);
+
+        // 3. Safely nullify studentId in Transactions (Institutional records are kept)
+        const Transaction = require("../models/transactionModel");
+        await Transaction.updateMany(
+          { referenceId: studentObjId },
+          { $set: { referenceId: null } }
+        ).session(session);
+
+        // 4. Delete the student
+        await Student.findByIdAndDelete(id).session(session);
+
+        await session.commitTransaction();
+        session.endSession();
+        return { success: true };
+      } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
+      }
+    }
   async promoteStudent(id, promotionData, user) {
     const student = await Student.findById(id);
     if (!student) throw new Error("Student not found");
@@ -167,24 +263,32 @@ class StudentService {
       toClass = promotionData.toClass || promotionData.studentClass || promotionData.className;
     }
 
-    const historyEntry = {
-      fromAcademicYear: promotionData.fromAcademicYear,
-      toAcademicYear: promotionData.toAcademicYear,
-      fromClass: student.studentClass || student.className || "Unknown",
-      toClass,
-      status: promotionData.status || "Promoted",
-      date: new Date(),
-      updatedBy: user ? user._id : null,
-      notes: promotionData.notes || ""
-    };
+    let toRollNumber = "";
+      if (cls) {
+        toRollNumber = (await this._getNextRollNumber(cls._id)).toString();
+      }
+  
+      const historyEntry = {
+        fromAcademicYear: promotionData.fromAcademicYear,
+        toAcademicYear: promotionData.toAcademicYear,
+        fromClass: student.studentClass || student.className || "Unknown",
+        fromRollNumber: student.rollNumber || "",
+        toClass,
+        toRollNumber,
+        status: promotionData.status || "Promoted",
+        date: new Date(),
+        updatedBy: user ? user._id : null,
+        notes: promotionData.notes || ""
+      };
 
     student.promotionHistory.push(historyEntry);
     
     if (cls) {
-      student.classId = cls._id;
-      // We deliberately DO NOT dual-write className/studentClass
-      // to avoid conflicting string formats vs ObjectIds.
-    } else {
+        student.classId = cls._id;
+        student.rollNumber = historyEntry.toRollNumber;
+        // We deliberately DO NOT dual-write className/studentClass
+        // to avoid conflicting string formats vs ObjectIds.
+      } else {
       if (promotionData.className) student.className = promotionData.className;
       if (promotionData.studentClass) student.studentClass = promotionData.studentClass;
     }

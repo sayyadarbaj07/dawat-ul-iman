@@ -64,10 +64,12 @@ const getSummary = async (req, res) => {
 
 const getWeakStudentsReport = async (req, res) => {
   try {
-    const { class: className } = req.query;
+    const { class: className, classId } = req.query;
     
     const initialMatch = { status: "active" };
-    if (className && className !== "all") {
+    if (classId) {
+      initialMatch.classId = new (require("mongoose")).Types.ObjectId(classId);
+    } else if (className && className !== "all") {
       initialMatch.$or = [{ studentClass: className }, { className: className }];
     }
 
@@ -204,10 +206,12 @@ const getDetailedFinanceReport = async (req, res) => {
 
 // Helper for Student List Report Data
 const fetchStudentListData = async (query) => {
-  const { class: className, status } = query;
+  const { class: className, classId, status } = query;
   
   const matchStage = {};
-  if (className && className !== "all") {
+  if (classId) {
+    matchStage.classId = new (require("mongoose")).Types.ObjectId(classId);
+  } else if (className && className !== "all") {
     matchStage.$or = [{ studentClass: className }, { className: className }];
   }
   if (status && status !== "all") matchStage.status = status;
@@ -268,11 +272,15 @@ const exportStudentListExcel = async (req, res) => {
 
 // Helper for Exam Analytics Data
 const fetchExamAnalyticsData = async (query) => {
-  const { examType, class: className } = query;
+  const { examType, class: className, classId } = query;
   
   const matchStage = {};
   if (examType && examType !== "all") matchStage.examType = examType;
-  if (className && className !== "all") matchStage.class = className;
+  if (classId) {
+    matchStage.classId = new (require("mongoose")).Types.ObjectId(classId);
+  } else if (className && className !== "all") {
+    matchStage.class = className;
+  }
 
   const exams = await Exam.find(matchStage).lean();
   if (!exams.length) return [];

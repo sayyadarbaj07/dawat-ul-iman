@@ -74,7 +74,8 @@
     "discardChanges": "تبدیلیاں ضائع کریں",
     "selectClass": "جماعت منتخب کریں...",
     "noClassAssigned": "کوئی جماعت تفویض نہیں",
-    "unauthorizedExport": "پی ڈی ایف برآمد کرنے کی اجازت نہیں"
+    "unauthorizedExport": "پی ڈی ایف برآمد کرنے کی اجازت نہیں",
+    "legacy": "پرانا"
   },
   "auth": {
     "welcomeBack": "خوش آمدید",
@@ -1121,5 +1122,34 @@
     "teacherId": "استاد کی آئی ڈی",
     "joiningDate": "تاریخ شمولیت",
     "authorizedSignature": "مجاز دستخط"
+  },
+  "syllabus": {
+    "manageSyllabus": "نصاب کا انتظام",
+    "syllabusDescription": "اس کلاس کے لیے مرکزی نصاب کی تفویض۔",
+    "activeAssignments": "فعال تفویضات",
+    "inactiveAssignments": "غیر فعال تفویضات",
+    "assignSyllabus": "نصاب تفویض کریں",
+    "noActiveSyllabus": "اس کلاس کے لیے ابھی تک کوئی فعال نصاب تفویض نہیں کیا گیا۔",
+    "book": "کتاب",
+    "academicYear": "تعلیمی سال",
+    "legacy": "پرانا",
+    "assignedTeacher": "تفویض کردہ استاد",
+    "unassigned": "غیر تفویض شدہ",
+    "viewTargetDetails": "ہدف کی تفصیلات دیکھیں",
+    "totalLessons": "کل اسباق",
+    "annualTarget": "سالانہ ہدف",
+    "completed": "مکمل",
+    "subject": "مضمون",
+    "bookSyllabusName": "کتاب / نصاب کا نام",
+    "assignTeacher": "استاد تفویض کریں",
+    "selectTeacher": "استاد منتخب کریں...",
+    "noTeacherAssigned": "اس کلاس کے لیے کوئی استاد تفویض نہیں کیا گیا",
+    "advancedTargets": "اعلیٰ اہداف (اختیاری)",
+    "totalLessonsUnits": "کل اسباق / یونٹس",
+    "annualTargetLessons": "سالانہ ہدف (اسباق)",
+    "firstHalfTarget": "پہلی ششماہی کا ہدف",
+    "secondHalfTarget": "دوسری ششماہی کا ہدف",
+    "saveAssignment": "تفویض محفوظ کریں",
+    "failedToSave": "نصاب محفوظ کرنے میں ناکام"
   }
 }

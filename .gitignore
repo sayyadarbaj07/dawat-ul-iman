@@ -6,7 +6,6 @@ node_modules/
 .env.*
 !.env.example
 
-
 # Build
 dist/
 build/
@@ -27,3 +26,30 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Private Documents & Uploads
+server/private_documents/
+server/private_teacher_documents/
+server/db_dump.json
+
+# QA & Audit Scripts
+server/audit*.js
+server/audit*.json
+server/check*.js
+server/test*.js
+server/test*.txt
+server/qa_*.js
+server/qa-*.js
+server/forensic_*.js
+server/verify*.js
+server/clean*.js
+server/detect_orphans.js
+scratch/
+server/scratch/
+*.patch
+*.diff
+*.rej
+*.pdf
+
+# Accidental Typo files
+*ystem modules and reports*

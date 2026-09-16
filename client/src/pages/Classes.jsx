@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Edit, CheckCircle, XCircle, BookOpen } from "lucide-react";
+import { Plus, Edit, CheckCircle, XCircle, BookOpen, Trash2, Filter } from "lucide-react";
 import ClassSyllabusModal from "@/components/classes/ClassSyllabusModal";
 import { classApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -55,20 +55,37 @@ export default function Classes() {
     section: "",
   });
 
+  const [statusFilter, setStatusFilter] = useState("active");
+
   const { data: classesResponse, isLoading } = useQuery({
     queryKey: ["classes"],
     queryFn: () => classApi.getClasses(),
   });
 
-  const classes = classesResponse?.data || [];
+  const allClasses = classesResponse?.data || [];
+  const classes = allClasses.filter(c => statusFilter === "all" || c.status === statusFilter);
 
   const mutation = useMutation({
     mutationFn: (data) =>
       editingClass
         ? classApi.updateClass(editingClass._id, data)
         : classApi.createClass(data),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries(["classes"]);
+    onSuccess: (res, id) => {
+        queryClient.setQueriesData({ queryKey: ["classes"] }, (oldData) => {
+          if (!oldData) return oldData;
+          if (oldData.data && Array.isArray(oldData.data)) {
+            return { ...oldData, data: oldData.data.filter(item => item._id !== id) };
+          } else if (oldData.students) {
+            return { ...oldData, students: oldData.students.filter(item => item._id !== id) };
+          } else if (oldData.classes) {
+            return { ...oldData, classes: oldData.classes.filter(item => item._id !== id) };
+          } else if (oldData.teachers) {
+            return { ...oldData, teachers: oldData.teachers.filter(item => item._id !== id) };
+          } else if (Array.isArray(oldData)) {
+            return oldData.filter(item => item._id !== id);
+          }
+          return oldData;
+        });
       setIsModalOpen(false);
       toast({
         title: "Success",
@@ -87,10 +104,24 @@ export default function Classes() {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }) => classApi.updateClassStatus(id, status),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries(["classes"]);
+    onSuccess: (res, id) => {
+        queryClient.setQueriesData({ queryKey: ["classes"] }, (oldData) => {
+          if (!oldData) return oldData;
+          if (oldData.data && Array.isArray(oldData.data)) {
+            return { ...oldData, data: oldData.data.filter(item => item._id !== id) };
+          } else if (oldData.students) {
+            return { ...oldData, students: oldData.students.filter(item => item._id !== id) };
+          } else if (oldData.classes) {
+            return { ...oldData, classes: oldData.classes.filter(item => item._id !== id) };
+          } else if (oldData.teachers) {
+            return { ...oldData, teachers: oldData.teachers.filter(item => item._id !== id) };
+          } else if (Array.isArray(oldData)) {
+            return oldData.filter(item => item._id !== id);
+          }
+          return oldData;
+        });
       toast({
-        title: "Status Updated",
+        title: "Success",
         description: res.message || "Class status updated successfully",
       });
     },
@@ -99,6 +130,38 @@ export default function Classes() {
         variant: "destructive",
         title: "Error",
         description: error.response?.data?.message || error.message || "Failed to update status",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => classApi.deleteClass(id),
+    onSuccess: (res, id) => {
+        queryClient.setQueriesData({ queryKey: ["classes"] }, (oldData) => {
+          if (!oldData) return oldData;
+          if (oldData.data && Array.isArray(oldData.data)) {
+            return { ...oldData, data: oldData.data.filter(item => item._id !== id) };
+          } else if (oldData.students) {
+            return { ...oldData, students: oldData.students.filter(item => item._id !== id) };
+          } else if (oldData.classes) {
+            return { ...oldData, classes: oldData.classes.filter(item => item._id !== id) };
+          } else if (oldData.teachers) {
+            return { ...oldData, teachers: oldData.teachers.filter(item => item._id !== id) };
+          } else if (Array.isArray(oldData)) {
+            return oldData.filter(item => item._id !== id);
+          }
+          return oldData;
+        });
+      toast({
+        title: "Success",
+        description: res.message || "Class deleted successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.response?.data?.message || error.message || "Failed to delete class",
       });
     },
   });
@@ -143,6 +206,12 @@ export default function Classes() {
     statusMutation.mutate({ id: cls._id, status: newStatus });
   };
 
+  const handleDelete = (cls) => {
+    if (window.confirm("PERMANENT DELETE\n\nAre you sure you want to permanently delete this class? This will also delete related disposable records (e.g. attendance, exams) but preserve institutional financial history. This cannot be undone.")) {
+      deleteMutation.mutate(cls._id);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -150,11 +219,24 @@ export default function Classes() {
           title="Class Management (Phase 6)"
           description="Manage departments, names, and sections of all classes."
         />
-        {isAdmin && (
-          <Button onClick={() => handleOpenModal()} className="bg-primary">
-            <Plus className="h-4 w-4 mr-2" /> Add Class
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px]">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Filter Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active Only</SelectItem>
+              <SelectItem value="inactive">Inactive Only</SelectItem>
+              <SelectItem value="all">All Classes</SelectItem>
+            </SelectContent>
+          </Select>
+          {isAdmin && (
+            <Button onClick={() => handleOpenModal()} className="bg-primary">
+              <Plus className="h-4 w-4 mr-2" /> Add Class
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="rounded-md border bg-card">
@@ -200,6 +282,7 @@ export default function Classes() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenModal(cls)}
+                        title="Edit Class"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -211,21 +294,30 @@ export default function Classes() {
                           setIsSyllabusOpen(true);
                         }}
                         title="Manage Syllabus"
-                        className="flex items-center gap-1"
+                        className="hidden sm:inline-flex items-center gap-1"
                       >
                         <BookOpen className="h-4 w-4" />
                         <span>Syllabus</span>
                       </Button>
                       <Button
-                        variant={cls.status === "active" ? "destructive" : "default"}
+                        variant={cls.status === "active" ? "secondary" : "default"}
                         size="sm"
                         onClick={() => toggleStatus(cls)}
+                        title={cls.status === "active" ? "Deactivate Class" : "Activate Class"}
                       >
                         {cls.status === "active" ? (
                           <XCircle className="h-4 w-4" />
                         ) : (
                           <CheckCircle className="h-4 w-4" />
                         )}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(cls)}
+                        title="Permanently Delete Class"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   )}
@@ -261,7 +353,9 @@ export default function Classes() {
                     <SelectItem value="hifz">Hifz</SelectItem>
                     <SelectItem value="alimiyat">Alimiyat</SelectItem>
                     <SelectItem value="qirat">Qirat</SelectItem>
+                    <SelectItem value="arabic">Arabic</SelectItem>
                     <SelectItem value="contemporary">Contemporary</SelectItem>
+                    <SelectItem value="school">School</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

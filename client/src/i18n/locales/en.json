@@ -74,7 +74,8 @@
     "discardChanges": "Discard Changes",
     "selectClass": "Select a class...",
     "noClassAssigned": "No class assigned",
-    "unauthorizedExport": "Unauthorized to export PDF"
+    "unauthorizedExport": "Unauthorized to export PDF",
+    "legacy": "Legacy"
   },
   "auth": {
     "welcomeBack": "Welcome back",
@@ -1133,5 +1134,34 @@
     "teacherId": "Teacher ID",
     "joiningDate": "Joining Date",
     "authorizedSignature": "Authorized Signature"
+  },
+  "syllabus": {
+    "manageSyllabus": "Manage Syllabus",
+    "syllabusDescription": "Central Curriculum Assignments for this class.",
+    "activeAssignments": "Active Assignments",
+    "inactiveAssignments": "Inactive Assignments",
+    "assignSyllabus": "Assign Syllabus",
+    "noActiveSyllabus": "No active syllabus assigned to this class yet.",
+    "book": "Book",
+    "academicYear": "Academic Year",
+    "legacy": "Legacy",
+    "assignedTeacher": "Assigned Teacher",
+    "unassigned": "Unassigned",
+    "viewTargetDetails": "View Target Details",
+    "totalLessons": "Total Lessons",
+    "annualTarget": "Annual Target",
+    "completed": "Completed",
+    "subject": "Subject",
+    "bookSyllabusName": "Book / Syllabus Name",
+    "assignTeacher": "Assign Teacher",
+    "selectTeacher": "Select teacher...",
+    "noTeacherAssigned": "No teacher assigned to this class",
+    "advancedTargets": "Advanced Targets (Optional)",
+    "totalLessonsUnits": "Total Lessons / Units",
+    "annualTargetLessons": "Annual Target (Lessons)",
+    "firstHalfTarget": "First Half Target",
+    "secondHalfTarget": "Second Half Target",
+    "saveAssignment": "Save Assignment",
+    "failedToSave": "Failed to save curriculum"
   }
 }

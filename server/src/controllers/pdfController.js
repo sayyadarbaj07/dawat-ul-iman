@@ -11,6 +11,7 @@ const TeacherSalary = require("../models/teacherSalaryModel");
 const { getTotalWorkingDays, getStudentAttendanceForPDF } = require("../services/attendanceService");
 const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
 const urduPdfHelper = require("../utils/pdf/urduPdfHelper");
+const { toUrduDigits } = require("../utils/pdf/digitLocalization");
 const numberToWords = require("../utils/pdf/numberToWords");
 const { applyInstitutionalTemplate } = require("../utils/pdf/institutionalReportTemplate");
 
@@ -237,14 +238,18 @@ exports.generateStudentIdCard = async (req, res) => {
       currentY += yStep;
       
       if (rollNoStr) {
-        urduPdfHelper.drawTextRTL(doc, `${rollNoStr} :رول نمبر`, 230, currentY);
-        currentY += yStep;
-      }
+          doc.font(fontRegular);
+          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.rollNo + ":", 230, currentY);
+          urduPdfHelper.drawTextRTL(doc, toUrduDigits(rollNoStr), 230 - 80, currentY);
+          currentY += yStep;
+        }
       
       if (admNoStr) {
-        urduPdfHelper.drawTextRTL(doc, `${admNoStr} :داخلہ نمبر`, 230, currentY);
-      }
-    } else {
+          doc.font(fontRegular);
+          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.admissionNo + ":", 230, currentY);
+          urduPdfHelper.drawTextRTL(doc, toUrduDigits(admNoStr), 230 - 80, currentY);
+        }
+      } else {
       doc.fontSize(12).font(fontBold).text(nameStr, labelX, currentY, { width: 150 });
       currentY += 18;
       
@@ -1077,166 +1082,262 @@ exports.generateClassMarksheetsPDF = async (req, res) => {
 };
 
 exports.generateFinanceSummary = async (req, res) => {
-  try {
-    const { startDate, endDate, academicYear, status, type } = req.query;
-    const language = resolvePdfLanguage(req.query.language);
-    const isUrdu = language === 'ur';
-
-    let filter = { status: "Completed" };
-    if (status) filter.status = status;
-    if (type) filter.type = type;
-    if (academicYear) filter.academicYear = academicYear;
-    
-    let dateStr = "All Time";
-    if (startDate && endDate) {
-        filter.date = {
-            $gte: new Date(startDate),
-            $lte: new Date(endDate)
-        };
-        dateStr = `${startDate} to ${endDate}`;
-    }
-
-    const transactions = await Transaction.find(filter)
-      .populate("recordedBy", "name")
-      .sort({ date: -1 })
-      .lean();
-    
-    let totalIncome = 0;
-    let totalExpense = 0;
-
-    transactions.forEach(tx => {
-      if (tx.type === "income") totalIncome += tx.amount;
-      if (tx.type === "expense") totalExpense += tx.amount;
-    });
-
-    const currentBalance = totalIncome - totalExpense;
-
-    generatePDF(res, "Finance Report", (doc) => {
-      const RIGHT_MARGIN = 550;
-      const LEFT_MARGIN = 50;
-
-      if (isUrdu) {
-        if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
-          doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
-        } else {
-          doc.registerFont("UrduFont", "Helvetica");
-        }
-
-        const fontRegular = "UrduFont";
-        const fontBold = "UrduFont";
-
-        doc.fontSize(10).font(fontRegular);
-        urduPdfHelper.drawTextRTL(doc, `${dateStr} :مقررہ مدت`, RIGHT_MARGIN, doc.y);
-        if (academicYear) {
-          urduPdfHelper.drawTextRTL(doc, `${academicYear} :تعلیمی سال`, RIGHT_MARGIN, doc.y);
-        }
-        doc.moveDown();
-
-        // Summary Header
-        doc.fontSize(12).font(fontBold);
-        const ySummary = doc.y;
-        urduPdfHelper.drawTextRTL(doc, `${totalIncome} Rs :کل آمدنی`, RIGHT_MARGIN, ySummary);
-        urduPdfHelper.drawTextRTL(doc, `${totalExpense} Rs :کل اخراجات`, LEFT_MARGIN + 150, ySummary);
-        doc.moveDown();
-        
-        urduPdfHelper.drawTextRTL(doc, `${currentBalance} Rs :موجودہ بیلنس`, RIGHT_MARGIN, doc.y, { font: fontBold, fontSize: 14 });
-        doc.moveDown(2);
-        
-        // Transactions Table
-        const tableTop = doc.y;
-        doc.fontSize(10).font(fontBold);
-        
-        urduPdfHelper.drawTextRTL(doc, "تاریخ", RIGHT_MARGIN, tableTop);
-        urduPdfHelper.drawTextRTL(doc, "تفصیل", 460, tableTop);
-        urduPdfHelper.drawTextRTL(doc, "زمرہ", 260, tableTop);
-        urduPdfHelper.drawTextRTL(doc, "طریقہ", 180, tableTop);
-        urduPdfHelper.drawTextRTL(doc, "رقم", 80, tableTop);
-        
-        doc.moveTo(LEFT_MARGIN, tableTop + 15).lineTo(RIGHT_MARGIN, tableTop + 15).stroke();
-        
-        let y = tableTop + 20;
-        
-        transactions.forEach(tx => {
-          if (y > 700) {
-            doc.addPage();
-            y = 50;
-          }
-          
-          const txDate = new Date(tx.date).toLocaleDateString();
-          doc.fillColor(tx.type === "income" ? "green" : "red");
-          
-          doc.font("Helvetica").fontSize(10);
-          doc.text(txDate, RIGHT_MARGIN - 50, y);
-          
-          doc.font(fontRegular);
-          urduPdfHelper.drawTextRTL(doc, tx.description || "", 460, y, { width: 170 });
-          urduPdfHelper.drawTextRTL(doc, tx.category || "-", 260, y);
-          doc.font("Helvetica");
-          doc.text(tx.paymentMode || "Cash", 120, y);
-          
-          const sign = tx.type === "income" ? "+" : "-";
-          doc.text(`${sign} Rs ${tx.amount}`, 50, y);
-          
-          y += 15;
-        });
-
-        doc.fillColor("black");
-
-      } else {
-        doc.fontSize(10).font("Helvetica");
-        doc.text(`Date Range: ${dateStr}`);
-        if (academicYear) doc.text(`Academic Year: ${academicYear}`);
-        doc.moveDown();
-
-        // Summary Header
-        doc.fontSize(12).font("Helvetica-Bold");
-        doc.text(`Total Income: Rs ${totalIncome}`, { continued: true }).text(` | Total Expense: Rs ${totalExpense}`, { align: "right" });
-        doc.moveDown();
-        doc.fontSize(14).text(`Current Balance: Rs ${currentBalance}`, { underline: true });
-        doc.moveDown(2);
-        
-        // Transactions Table
-        const tableTop = doc.y;
-        doc.fontSize(9).font("Helvetica-Bold");
-        doc.text("Date", 50, tableTop);
-        doc.text("Description", 120, tableTop);
-        doc.text("Category", 300, tableTop);
-        doc.text("Mode", 380, tableTop);
-        doc.text("Amount", 450, tableTop, { align: "right" });
-        doc.moveTo(50, tableTop + 12).lineTo(550, tableTop + 12).stroke();
-        
-        let y = tableTop + 20;
-        doc.font("Helvetica");
-
-        transactions.forEach(tx => {
-          if (y > 700) {
-            doc.addPage();
-            y = 50;
-          }
-          
-          const txDate = new Date(tx.date).toLocaleDateString();
-          doc.fillColor(tx.type === "income" ? "green" : "red");
-          
-          doc.text(txDate, 50, y);
-          doc.text(tx.description, 120, y, { width: 170 });
-          doc.text(tx.category || "-", 300, y);
-          doc.text(tx.paymentMode || "Cash", 380, y);
-          
-          const sign = tx.type === "income" ? "+" : "-";
-          doc.text(`${sign} Rs ${tx.amount}`, 450, y, { align: "right" });
-          
-          y += 15;
-        });
-
-        doc.fillColor("black");
+    try {
+      const { startDate, endDate, academicYear, status, type } = req.query;
+      const language = resolvePdfLanguage(req.query.language);
+      const isUrdu = language === 'ur';
+  
+      let filter = { status: "Completed" };
+      if (status) filter.status = status;
+      if (type) filter.type = type;
+      if (academicYear) filter.academicYear = academicYear;
+      
+      let dateStr = "All Time";
+      if (startDate && endDate) {
+          filter.date = {
+              $gte: new Date(startDate),
+              $lte: new Date(endDate)
+          };
+          dateStr = `${startDate} to ${endDate}`;
       }
-    }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle: "مالیاتی رپورٹ" });
-  } catch (error) {
-    res.status(500).json({ message: "Error generating Finance PDF", error: error.message });
-  }
-};
+  
+      const transactions = await Transaction.find(filter)
+        .populate("recordedBy", "name")
+        .sort({ date: -1 })
+        .lean();
+      
+      let totalIncome = 0;
+      let totalExpense = 0;
+  
+      transactions.forEach(tx => {
+        if (tx.type === "income") totalIncome += tx.amount;
+        if (tx.type === "expense") totalExpense += tx.amount;
+      });
+  
+      const currentBalance = totalIncome - totalExpense;
+  
+      generatePDF(res, "Finance Report", (doc) => {
+        const LEFT_MARGIN = 50;
+        const RIGHT_MARGIN = doc.page.width - 50;
+        const USABLE_WIDTH = RIGHT_MARGIN - LEFT_MARGIN;
+  
+        // Define column widths
+        const colDateW = 70;
+        const colAmountW = 80;
+        const colModeW = 80;
+        const colCatW = 90;
+        // The rest goes to description
+        const colDescW = USABLE_WIDTH - colDateW - colAmountW - colModeW - colCatW;
+  
+        if (isUrdu) {
+          if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
+            doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
+          } else {
+            doc.registerFont("UrduFont", "Helvetica");
+          }
+  
+          const fontRegular = "UrduFont";
+          const fontBold = "UrduFont";
+  
+          doc.fontSize(10);
+          
+          // Header Stats
+          const statY = doc.y;
+          doc.font(fontBold);
+          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.dateRange + ":", RIGHT_MARGIN, statY);
+          doc.font("Helvetica");
+          doc.text(dateStr, RIGHT_MARGIN - 80 - doc.widthOfString(dateStr), statY + 2); // approximate offset
+          
+          if (academicYear) {
+            doc.font(fontBold);
+            urduPdfHelper.drawTextRTL(doc, URDU_LABELS.academicYear + ":", LEFT_MARGIN + 150, statY);
+            doc.font("Helvetica");
+            doc.text(academicYear, LEFT_MARGIN + 150 - 80 - doc.widthOfString(academicYear), statY + 2);
+          }
+          doc.moveDown();
+  
+          // Summary Section
+          doc.fontSize(12);
+          const ySummary = doc.y;
+          doc.font(fontBold);
+          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.totalIncome + ":", RIGHT_MARGIN, ySummary);
+          doc.font("Helvetica-Bold");
+          doc.fillColor("green").text(`Rs ${totalIncome}`, RIGHT_MARGIN - 90 - doc.widthOfString(`Rs ${totalIncome}`), ySummary + 2);
+          doc.fillColor("black");
 
-exports.generateFeeReceiptPDF = async (req, res) => {
+          doc.font(fontBold);
+          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.totalExpense + ":", LEFT_MARGIN + 180, ySummary);
+          doc.font("Helvetica-Bold");
+          doc.fillColor("red").text(`Rs ${totalExpense}`, LEFT_MARGIN + 180 - 90 - doc.widthOfString(`Rs ${totalExpense}`), ySummary + 2);
+          doc.fillColor("black");
+          doc.moveDown();
+          
+          const yBal = doc.y;
+          doc.fontSize(14).font(fontBold);
+          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.currentBalance + ":", RIGHT_MARGIN, yBal);
+          doc.font("Helvetica-Bold");
+          const balText = `Rs ${currentBalance}`;
+          doc.text(balText, RIGHT_MARGIN - 110 - doc.widthOfString(balText), yBal + 2);
+          doc.moveDown(2);
+          
+          // Transactions Table Header (RTL Visual Order)
+          const drawTableHeaderUR = (y) => {
+            doc.fontSize(10).font(fontBold).fillColor("black");
+            let currX = RIGHT_MARGIN;
+            urduPdfHelper.drawTextRTL(doc, URDU_LABELS.date, currX, y, { width: colDateW });
+            currX -= colDateW;
+            urduPdfHelper.drawTextRTL(doc, URDU_LABELS.description, currX, y, { width: colDescW });
+            currX -= colDescW;
+            urduPdfHelper.drawTextRTL(doc, URDU_LABELS.category, currX, y, { width: colCatW });
+            currX -= colCatW;
+            urduPdfHelper.drawTextRTL(doc, URDU_LABELS.paymentMode, currX, y, { width: colModeW });
+            currX -= colModeW;
+            urduPdfHelper.drawTextRTL(doc, URDU_LABELS.amount, currX, y, { width: colAmountW });
+            doc.moveTo(LEFT_MARGIN, y + 15).lineTo(RIGHT_MARGIN, y + 15).stroke();
+          };
+
+          let tableY = doc.y;
+          drawTableHeaderUR(tableY);
+          
+          let y = tableY + 20;
+          
+          transactions.forEach(tx => {
+            doc.fontSize(10);
+            const txDate = new Date(tx.date).toLocaleDateString();
+            const sign = tx.type === "income" ? "+" : "-";
+            const amtText = `${sign} Rs ${tx.amount}`;
+            const desc = tx.description || "";
+            const cat = tx.category || "-";
+            const mode = tx.paymentMode || "Cash";
+
+            // Calculate height needed
+            doc.font(fontRegular);
+            const descH = doc.heightOfString(desc, { features: ['rtla'], width: colDescW }) || 15;
+            const catH = doc.heightOfString(cat, { features: ['rtla'], width: colCatW }) || 15;
+            const rowH = Math.max(descH, catH, 15) + 10; // padding
+
+            if (y + rowH > doc.page.height - 50) {
+              doc.addPage();
+              y = 50;
+              drawTableHeaderUR(y);
+              y += 20;
+            }
+            
+            let currX = RIGHT_MARGIN;
+            
+            // Date (LTR)
+            doc.font("Helvetica").fillColor("black");
+            doc.text(txDate, currX - colDateW, y + 2, { width: colDateW, align: "right" });
+            currX -= colDateW;
+
+            // Description (RTL)
+            doc.font(fontRegular);
+            urduPdfHelper.drawTextRTL(doc, desc, currX, y, { width: colDescW });
+            currX -= colDescW;
+
+            // Category (RTL)
+            urduPdfHelper.drawTextRTL(doc, cat, currX, y, { width: colCatW });
+            currX -= colCatW;
+
+            // Mode (LTR fallback if no Urdu modes)
+            doc.font("Helvetica");
+            doc.text(mode, currX - colModeW, y + 2, { width: colModeW, align: "right" });
+            currX -= colModeW;
+
+            // Amount (LTR)
+            doc.fillColor(tx.type === "income" ? "green" : "red").font("Helvetica-Bold");
+            doc.text(amtText, currX - colAmountW, y + 2, { width: colAmountW, align: "right" });
+            
+            y += rowH;
+          });
+  
+          doc.fillColor("black");
+  
+        } else {
+          // English Render
+          doc.fontSize(10).font("Helvetica");
+          doc.text(`Date Range: ${dateStr}`);
+          if (academicYear) doc.text(`Academic Year: ${academicYear}`);
+          doc.moveDown();
+  
+          // Summary Header
+          doc.fontSize(12).font("Helvetica-Bold");
+          doc.text(`Total Income: Rs ${totalIncome}`, { continued: true }).text(` | Total Expense: Rs ${totalExpense}`, { align: "right" });
+          doc.moveDown();
+          doc.fontSize(14).text(`Current Balance: Rs ${currentBalance}`, { underline: true });
+          doc.moveDown(2);
+          
+          // Transactions Table Header (LTR)
+          const drawTableHeaderEN = (y) => {
+            doc.fontSize(9).font("Helvetica-Bold").fillColor("black");
+            let currX = LEFT_MARGIN;
+            doc.text("Date", currX, y, { width: colDateW });
+            currX += colDateW;
+            doc.text("Description", currX, y, { width: colDescW });
+            currX += colDescW;
+            doc.text("Category", currX, y, { width: colCatW });
+            currX += colCatW;
+            doc.text("Mode", currX, y, { width: colModeW });
+            currX += colModeW;
+            doc.text("Amount", currX, y, { width: colAmountW, align: "right" });
+            doc.moveTo(LEFT_MARGIN, y + 12).lineTo(RIGHT_MARGIN, y + 12).stroke();
+          };
+
+          let tableTop = doc.y;
+          drawTableHeaderEN(tableTop);
+          
+          let y = tableTop + 20;
+  
+          transactions.forEach(tx => {
+            doc.fontSize(9).font("Helvetica");
+            const txDate = new Date(tx.date).toLocaleDateString();
+            const sign = tx.type === "income" ? "+" : "-";
+            const amtText = `${sign} Rs ${tx.amount}`;
+            const desc = tx.description || "";
+            const cat = tx.category || "-";
+            const mode = tx.paymentMode || "Cash";
+
+            // Calculate height needed
+            const descH = doc.heightOfString(desc, { width: colDescW }) || 15;
+            const catH = doc.heightOfString(cat, { width: colCatW }) || 15;
+            const rowH = Math.max(descH, catH, 15) + 10; // padding
+
+            if (y + rowH > doc.page.height - 50) {
+              doc.addPage();
+              y = 50;
+              drawTableHeaderEN(y);
+              y += 20;
+            }
+            
+            let currX = LEFT_MARGIN;
+            doc.fillColor("black");
+            doc.text(txDate, currX, y, { width: colDateW });
+            currX += colDateW;
+            
+            doc.text(desc, currX, y, { width: colDescW });
+            currX += colDescW;
+
+            doc.text(cat, currX, y, { width: colCatW });
+            currX += colCatW;
+
+            doc.text(mode, currX, y, { width: colModeW });
+            currX += colModeW;
+            
+            doc.fillColor(tx.type === "income" ? "green" : "red").font("Helvetica-Bold");
+            doc.text(amtText, currX, y, { width: colAmountW, align: "right" });
+            
+            y += rowH;
+          });
+  
+          doc.fillColor("black");
+        }
+      }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle: isUrdu ? URDU_LABELS.financeReport : "Finance Report" });
+    } catch (error) {
+      res.status(500).json({ message: "Error generating Finance PDF", error: error.message });
+    }
+  };
+
+  exports.generateFeeReceiptPDF = async (req, res) => {
   try {
     const language = resolvePdfLanguage(req.query.language);
     const isUrdu = language === 'ur';

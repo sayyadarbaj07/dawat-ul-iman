@@ -59,6 +59,7 @@ export function BrandLogo({
             className={cn(
               "text-[10px] sm:text-xs text-current/70",
               textClassName,
+              "font-aslam" // Apply Aslam strictly to institution name
             )}
           >
             {settings?.instituteNameUrdu || "جامعہ دعوۃ الایمان"}

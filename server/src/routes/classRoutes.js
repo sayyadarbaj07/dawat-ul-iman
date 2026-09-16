@@ -12,5 +12,6 @@ router.get("/:id", protect, authorize("admin", "teacher"), classController.getCl
 router.post("/", protect, authorize("admin"), classController.createClass);
 router.put("/:id", protect, authorize("admin"), classController.updateClass);
 router.patch("/:id/status", protect, authorize("admin"), classController.updateClassStatus);
+router.delete("/:id", protect, authorize("admin"), classController.deleteClass);
 
 module.exports = router;
