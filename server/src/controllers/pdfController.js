@@ -11,6 +11,7 @@ const TeacherSalary = require("../models/teacherSalaryModel");
 const { getTotalWorkingDays, getStudentAttendanceForPDF } = require("../services/attendanceService");
 const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
 const urduPdfHelper = require("../utils/pdf/urduPdfHelper");
+const financeSummaryHtml = require("../utils/pdf/financeSummaryHtml");
 const { toUrduDigits } = require("../utils/pdf/digitLocalization");
 const numberToWords = require("../utils/pdf/numberToWords");
 const { applyInstitutionalTemplate } = require("../utils/pdf/institutionalReportTemplate");
@@ -1079,6 +1080,57 @@ exports.generateClassMarksheetsPDF = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Error generating class marksheets PDF", error: error.message });
   }
+};
+
+
+exports.generateFinanceSummaryPuppeteerTest = async (req, res) => {
+    try {
+      const { startDate, endDate, academicYear, status, type } = req.query;
+      const language = resolvePdfLanguage(req.query.language);
+      
+      let filter = { status: "Completed" };
+      if (status) filter.status = status;
+      if (type) filter.type = type;
+      if (academicYear) filter.academicYear = academicYear;
+      
+      let dateStr = "All Time";
+      if (startDate && endDate) {
+          filter.date = {
+              $gte: new Date(startDate),
+              $lte: new Date(endDate)
+          };
+          dateStr = `${startDate} to ${endDate}`;
+      }
+  
+      const transactions = await Transaction.find(filter)
+        .populate("recordedBy", "name")
+        .sort({ date: -1 })
+        .lean();
+      
+      let totalIncome = 0;
+      let totalExpense = 0;
+  
+      transactions.forEach(tx => {
+        if (tx.type === "income") totalIncome += tx.amount;
+        if (tx.type === "expense") totalExpense += tx.amount;
+      });
+  
+      const currentBalance = totalIncome - totalExpense;
+  
+      await financeSummaryHtml.generateFinanceSummaryHTMLPDF(res, {
+        transactions,
+        dateStr,
+        academicYear,
+        totalIncome,
+        totalExpense,
+        currentBalance,
+        language,
+        URDU_LABELS
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Error generating Finance PDF", error: error.message });
+    }
 };
 
 exports.generateFinanceSummary = async (req, res) => {

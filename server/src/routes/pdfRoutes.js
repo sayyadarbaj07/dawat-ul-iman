@@ -2,9 +2,13 @@ const express = require("express");
 const router = express.Router();
 const pdfController = require("../controllers/pdfController");
 const { protect, authorize, checkClassAccess } = require("../middleware/authMiddleware");
+const smokeTestController = require("../controllers/smokeTestController");
 
 // All routes are protected
 router.use(protect);
+
+router.route("/puppeteer-smoke-test")
+  .get(smokeTestController.puppeteerSmokeTest);
 
 router.route("/student/:id/report-card")
   .get(authorize("admin", "teacher"), pdfController.generateStudentReportCard);
