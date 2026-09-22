@@ -20,7 +20,7 @@ import {
 import { FileEdit, CalendarDays, Plus, CheckCircle2, XCircle } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatLocalizedDate, formatLocalizedNumber, formatLocalizedPercent, getLocalizedStudentName } from "@/utils/localizationUtils";
-import { examApi, studentApi } from "@/lib/api";
+import { examApi, studentApi, classApi } from "@/lib/api";
 import { CLASS_TREE, getAllClassesFlat } from "@/lib/classTree";
 
 export default function Exams() {
@@ -29,6 +29,7 @@ export default function Exams() {
 
   const [exams, setExams] = useState([]);
   const [students, setStudents] = useState([]);
+  const [canonicalClasses, setCanonicalClasses] = useState([]);
   
   // Create Exam
   const [isAddExamOpen, setIsAddExamOpen] = useState(false);
@@ -115,6 +116,15 @@ export default function Exams() {
     }
   };
 
+  const loadClasses = async () => {
+    try {
+      const res = await classApi.getClasses();
+      setCanonicalClasses(res.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const loadStudents = async () => {
     try {
       const res = await studentApi.list();
@@ -145,7 +155,7 @@ export default function Exams() {
         examType: finalExamType,
         examName: examForm.examName,
         academicYear: examForm.academicYear,
-        class: `${examForm.studentClassCategory} - ${finalClassSub}`,
+        classId: examForm.classId,
         subjects: subjectArray,
         maxMarks: Number(examForm.maxMarks),
         passingMarks: Number(examForm.passingMarks),
@@ -173,7 +183,15 @@ export default function Exams() {
 
     // Filter students belonging to this class
     const cls = exam.class;
-    const clsStudents = students.filter(s => (s.studentClass || s.className) === cls);
+    let clsStudents = [];
+    if (exam.classId) {
+      clsStudents = students.filter(s => {
+        const studentClassId = s.classId && typeof s.classId === "object" ? s.classId._id : s.classId;
+        return String(studentClassId) === String(exam.classId);
+      });
+    } else {
+      clsStudents = students.filter(s => (s.studentClass || s.className) === cls);
+    }
     setStudentsForMarks(clsStudents);
   };
 

@@ -19,13 +19,13 @@ const examSchema = new mongoose.Schema(
     },
     class: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
     },
     classId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Class',
-      required: false,
+      required: function() { return this.isNew; },
     },
     date: {
       type: Date,

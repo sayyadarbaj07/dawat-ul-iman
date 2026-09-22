@@ -161,8 +161,6 @@ exports.updateClassStatus = async (req, res) => {
 };
 
 exports.deleteClass = async (req, res) => {
-    // Requires MongoDB transactions. If not available, we use sequential updates.
-    // For now, doing sequential but careful operations.
     const session = await mongoose.startSession();
     session.startTransaction();
     
@@ -180,41 +178,63 @@ exports.deleteClass = async (req, res) => {
         return sendError(res, 404, "Class not found");
       }
 
-      // 1. Delete class-owned models
+      // Perform safe, atomic cleanup using Mongoose deleteMany explicitly scoped to classId: id
+      // 1. Delete Students and their specific dependent canonical records
+      await Student.deleteMany({ classId: id }).session(session);
+      
+      // 2. Delete Attendance
       await Attendance.deleteMany({ classId: id }).session(session);
-      const exams = await Exam.find({ classId: id }).session(session);
-      const examIds = exams.map(e => e._id);
+      
+      // 3. Delete Exams and Results
+      const classExams = await Exam.find({ classId: id }).session(session);
+      const examIds = classExams.map(ex => ex._id);
+      
+      await Exam.deleteMany({ classId: id }).session(session);
       if (examIds.length > 0) {
         await ExamResult.deleteMany({ examId: { $in: examIds } }).session(session);
-        await Exam.deleteMany({ classId: id }).session(session);
       }
+      
+      // 4. Delete Curriculum and Meetings
       await Curriculum.deleteMany({ classId: id }).session(session);
       await Meeting.deleteMany({ classId: id }).session(session);
-      
-      const ClassRollCounter = require("../models/classRollCounterModel");
-      await ClassRollCounter.deleteMany({ classId: id }).session(session);
 
-      const Achievement = require("../models/achievementModel");
-      await Achievement.deleteMany({ classId: id }).session(session);
+      // 5. Delete Events
+      try {
+        const Event = require("../models/eventModel");
+        await Event.deleteMany({ classId: id }).session(session);
+      } catch (e) {
+        // Event might not exist
+      }
 
-      // 2. Set classId to null for students belonging to this class
-      await Student.updateMany({ classId: id }, { $set: { classId: null } }).session(session);
+      // 6. Delete Timetable
+      try {
+        const TeacherTimetable = require("../models/teacherTimetableModel");
+        await TeacherTimetable.deleteMany({ classId: id }).session(session);
+      } catch(e) {}
 
-      // 3. Remove class assignments from teachers
+      // 7. Delete Metadata
+      try {
+        const ClassRollCounter = require("../models/classRollCounterModel");
+        await ClassRollCounter.deleteMany({ classId: id }).session(session);
+      } catch(e) {}
+
+      try {
+        const Achievement = require("../models/achievementModel");
+        await Achievement.deleteMany({ classId: id }).session(session);
+      } catch(e) {}
+
+      // 8. Unassign Teacher canonical arrays without deleting the teacher
       await Teacher.updateMany(
-        { assignedClassIds: id },
-        { $pull: { assignedClassIds: id } }
-      ).session(session);
-      await Teacher.updateMany(
-        { "teachingAssignments.classId": id },
-        { $pull: { teachingAssignments: { classId: id } } }
+        { $or: [ { assignedClassIds: id }, { "teachingAssignments.classId": id } ] },
+        { 
+          $pull: { 
+            assignedClassIds: id, 
+            teachingAssignments: { classId: id } 
+          } 
+        }
       ).session(session);
 
-      // 4. Safely nullify classId in Transactions (Institutional records are kept)
-      const Transaction = require("../models/transactionModel");
-      await Transaction.updateMany({ classId: id }, { $set: { classId: null } }).session(session);
-
-      // 5. Delete the class itself
+      // 9. Delete the class itself
       await Class.findByIdAndDelete(id).session(session);
 
       await session.commitTransaction();
@@ -224,7 +244,8 @@ exports.deleteClass = async (req, res) => {
     } catch (error) {
       await session.abortTransaction();
       session.endSession();
-      console.error("Cascade delete class error:", error);
+      console.error("Safe delete class error:", error);
       return sendError(res, 500, "Failed to permanently delete class", error);
     }
   };
+

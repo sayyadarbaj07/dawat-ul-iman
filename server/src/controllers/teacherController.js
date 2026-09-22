@@ -63,7 +63,24 @@ exports.createTeacher = async (req, res) => {
       return sendError(res, 400, "Valid joining date is required for new teachers");
     }
 
-    // Process teachingAssignments if provided
+    const mongoose = require("mongoose");
+    const finalClassIds = new Set();
+    
+    // 1. Process explicitly provided assignedClassIds
+    if (teacherData.assignedClassIds && Array.isArray(teacherData.assignedClassIds)) {
+      for (const cid of teacherData.assignedClassIds) {
+        if (!mongoose.Types.ObjectId.isValid(cid)) {
+          return sendError(res, 400, `Invalid class ID format: ${cid}`);
+        }
+        const cls = await Class.findById(cid);
+        if (!cls || cls.status !== "active") {
+          return sendError(res, 400, `Invalid or inactive class ID provided: ${cid}`);
+        }
+        finalClassIds.add(cid.toString());
+      }
+    }
+
+    // 2. Process teachingAssignments if provided
     if (teacherData.teachingAssignments !== undefined) {
       if (typeof teacherData.teachingAssignments === 'string') {
         try {
@@ -72,14 +89,12 @@ exports.createTeacher = async (req, res) => {
       }
       if (Array.isArray(teacherData.teachingAssignments)) {
         const uniqueCombos = new Map();
-        const classIdSet = new Set();
         for (const assignment of teacherData.teachingAssignments) {
           if (!assignment.classId || !assignment.subjectId) continue;
           
           const subject = String(assignment.subjectId).trim();
           if (!subject) continue;
           
-          const mongoose = require("mongoose");
           if (!mongoose.Types.ObjectId.isValid(assignment.classId)) {
             return sendError(res, 400, `Invalid class ID format: ${assignment.classId}`);
           }
@@ -91,23 +106,15 @@ exports.createTeacher = async (req, res) => {
           const key = `${assignment.classId.toString()}_${subject.toLowerCase()}`;
           if (!uniqueCombos.has(key)) {
             uniqueCombos.set(key, { classId: assignment.classId, subjectId: subject });
-            classIdSet.add(assignment.classId.toString());
+            finalClassIds.add(assignment.classId.toString());
           }
         }
         teacherData.teachingAssignments = Array.from(uniqueCombos.values());
-        teacherData.assignedClassIds = Array.from(classIdSet);
-        delete teacherData.assignedClasses;
       }
-    } else if (teacherData.assignedClassIds && Array.isArray(teacherData.assignedClassIds)) {
-      // Legacy validation
-      for (const cid of teacherData.assignedClassIds) {
-        const cls = await Class.findById(cid);
-        if (!cls || cls.status !== "active") {
-          return sendError(res, 400, `Invalid or inactive class ID provided: ${cid}`);
-        }
-      }
-      delete teacherData.assignedClasses;
     }
+
+    teacherData.assignedClassIds = Array.from(finalClassIds);
+    delete teacherData.assignedClasses;
 
     // Check if username exists
     const existingUser = await User.findOne({ username });
@@ -155,7 +162,24 @@ exports.updateTeacher = async (req, res) => {
   try {
     const payload = { ...req.body };
     
-    // Process teachingAssignments if provided
+    const mongoose = require("mongoose");
+    const finalClassIds = new Set();
+    
+    // 1. Process explicitly provided assignedClassIds
+    if (payload.assignedClassIds && Array.isArray(payload.assignedClassIds)) {
+      for (const cid of payload.assignedClassIds) {
+        if (!mongoose.Types.ObjectId.isValid(cid)) {
+          return sendError(res, 400, `Invalid class ID format: ${cid}`);
+        }
+        const cls = await Class.findById(cid);
+        if (!cls || cls.status !== "active") {
+          return sendError(res, 400, `Invalid or inactive class ID provided: ${cid}`);
+        }
+        finalClassIds.add(cid.toString());
+      }
+    }
+
+    // 2. Process teachingAssignments if provided
     if (payload.teachingAssignments !== undefined) {
       if (typeof payload.teachingAssignments === 'string') {
         try {
@@ -164,13 +188,15 @@ exports.updateTeacher = async (req, res) => {
       }
       if (Array.isArray(payload.teachingAssignments)) {
         const uniqueCombos = new Map();
-        const classIdSet = new Set();
         for (const assignment of payload.teachingAssignments) {
           if (!assignment.classId || !assignment.subjectId) continue;
           
           const subject = String(assignment.subjectId).trim();
           if (!subject) continue;
           
+          if (!mongoose.Types.ObjectId.isValid(assignment.classId)) {
+            return sendError(res, 400, `Invalid class ID format: ${assignment.classId}`);
+          }
           const cls = await Class.findById(assignment.classId);
           if (!cls || cls.status !== "active") {
             return sendError(res, 400, `Invalid or inactive class ID provided: ${assignment.classId}`);
@@ -179,23 +205,15 @@ exports.updateTeacher = async (req, res) => {
           const key = `${assignment.classId.toString()}_${subject.toLowerCase()}`;
           if (!uniqueCombos.has(key)) {
             uniqueCombos.set(key, { classId: assignment.classId, subjectId: subject });
-            classIdSet.add(assignment.classId.toString());
+            finalClassIds.add(assignment.classId.toString());
           }
         }
         payload.teachingAssignments = Array.from(uniqueCombos.values());
-        payload.assignedClassIds = Array.from(classIdSet);
-        delete payload.assignedClasses;
       }
-    } else if (payload.assignedClassIds && Array.isArray(payload.assignedClassIds)) {
-      // Legacy validation
-      for (const cid of payload.assignedClassIds) {
-        const cls = await Class.findById(cid);
-        if (!cls || cls.status !== "active") {
-          return sendError(res, 400, `Invalid or inactive class ID provided: ${cid}`);
-        }
-      }
-      delete payload.assignedClasses;
     }
+
+    payload.assignedClassIds = Array.from(finalClassIds);
+    delete payload.assignedClasses;
 
     if (payload.joiningDate && isNaN(new Date(payload.joiningDate).getTime())) {
       return sendError(res, 400, "Valid joining date is required");

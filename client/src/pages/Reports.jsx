@@ -273,14 +273,29 @@ export default function Reports() {
           downloadPdf(pdfApi.getClassAttendanceReport({ classId, year, language }), `Yearly_Attendance_${language}.pdf`);
       }
       else if (selectedReport?.category === "finance") {
-          // For specific finance reports that have fixed types:
-          let finalType = txType;
-          let finalCategory = category;
+          // Build finance params explicitly — never serialize undefined/null as query strings
+          const financeParams = { language };
+          if (startDate) financeParams.startDate = startDate;
+          if (endDate) financeParams.endDate = endDate;
+
+          // Determine type: some reports force a specific type
+          let finalType = txType; // may be undefined if showType not in config
           if (selectedReport.id === "income_report") finalType = "income";
           if (selectedReport.id === "expense_report") finalType = "expense";
-          if (selectedReport.id === "donor_report") finalCategory = "Atiya"; // Using Atiya as donation category example
+          // Only add type if it is a real valid value
+          if (finalType && finalType !== "undefined" && finalType !== "null" && finalType !== "all") {
+              financeParams.type = finalType;
+          }
 
-          downloadPdf(pdfApi.getFinanceSummary({ ...filters, type: finalType, category: finalCategory, language }), `Finance_${selectedReport.id}_${language}.pdf`);
+          // Determine category
+          let finalCategory = category;
+          if (selectedReport.id === "donor_report") finalCategory = "Atiya";
+          // Only add category if it is a real valid value
+          if (finalCategory && finalCategory !== "undefined" && finalCategory !== "null" && finalCategory !== "all") {
+              financeParams.category = finalCategory;
+          }
+
+          downloadPdf(pdfApi.getFinanceSummary(financeParams), `Finance_${selectedReport.id}_${language}.pdf`);
       } 
       else if (selectedReport?.id === "student_list") {
           downloadPdf(pdfApi.getStudentListReport(classId, language), `Student_List_${classId || "All"}_${language}.pdf`);

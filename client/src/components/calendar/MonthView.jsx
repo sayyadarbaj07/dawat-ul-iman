@@ -1,6 +1,6 @@
 import React from "react";
 import { format, isSameMonth, isSameDay } from "date-fns";
-import { getMonthDays } from "./utils";
+import { getMonthDays, formatHijriDate } from "./utils";
 import { EventItem } from "./EventItem";
 import { useLanguage } from "@/context/LanguageContext";
 import { toUrduDigits } from "@/utils/localizationUtils";
@@ -45,11 +45,21 @@ export function MonthView({ currentDate, events, onEventClick, onDayClick }) {
                 }`}
               onClick={() => onDayClick(day)}
             >
-              <div className="flex justify-between items-center mb-1">
-                <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-primary text-white shadow-sm" : "text-foreground"
-                  }`}>
+              <div className="flex justify-between items-start">
+                <div
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-sm ${
+                    isToday
+                      ? "bg-primary text-primary-foreground font-bold"
+                      : !isCurrentMonth
+                      ? "text-muted-foreground/50"
+                      : "font-medium"
+                  }`}
+                >
                   {format(day, "d")}
-                </span>
+                </div>
+                <div className="text-[10px] font-medium text-muted-foreground/60 select-none">
+                  {formatHijriDate(day, language, 'day')}
+                </div>
               </div>
 
               <div className="flex flex-col gap-0.5 overflow-hidden flex-1">

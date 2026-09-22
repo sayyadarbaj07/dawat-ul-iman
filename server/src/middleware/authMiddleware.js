@@ -48,7 +48,7 @@ const authorize = (...roles) => {
   };
 };
 
-// Middleware for routes that receive `class` or `className` in req.query or req.body
+// Middleware for routes that receive `classId` in req.query, req.body, or req.params
 const checkClassAccess = async (req, res, next) => {
   if (req.user.role === "admin" || req.user.role === "accountant") {
     return next();
@@ -56,57 +56,27 @@ const checkClassAccess = async (req, res, next) => {
 
   if (req.user.role === "teacher") {
     try {
-      const requestedClassId = req.query.classId || req.body.classId;
-      const requestedClass = req.query.class || req.query.className || req.body.class || req.body.className;
-
-      if (!requestedClassId && (!requestedClass || requestedClass === "all")) {
-          // If a teacher requests all classes or misses the parameter but the endpoint allows it, we should ideally restrict them to only their classes.
-          // But since the query requires a specific class, we'll let it pass or block based on the specific logic below.
-          return next();
-      }
-
       const teacher = await Teacher.findOne({ userId: req.user._id }).lean();
       
-      // Check canonical classId if it's an ObjectId or convertible
-      if (requestedClassId && requestedClassId.toString().match(/^[0-9a-fA-F]{24}$/)) {
-        if (!teacher || !teacher.assignedClassIds || !teacher.assignedClassIds.some(id => id.toString() === requestedClassId.toString())) {
-          return res.status(403).json({ message: "Forbidden: You are not authorized to access data for this class" });
-        }
-        return next();
+      if (!teacher) {
+        return res.status(403).json({ message: "Teacher profile not found" });
       }
 
-      if (requestedClass) {
-        // Resolve legacy string against the Class collection ONLY if the mapping is exact and unique.
-        const exactMatches = await Class.find({
-          $or: [
-            { fullName: requestedClass },
-            { name: requestedClass },
-            { department: requestedClass }
-          ]
-        }).lean();
+      req.teacherAssignedClassIds = teacher.assignedClassIds || [];
 
-        let resolvedClassId = null;
-        if (exactMatches.length === 1) {
-          resolvedClassId = exactMatches[0]._id;
+      const requestedClassId = req.query.classId || req.body.classId || req.params.classId;
+
+      if (requestedClassId) {
+        if (!requestedClassId.toString().match(/^[0-9a-fA-F]{24}$/)) {
+          return res.status(400).json({ message: "Invalid classId format" });
         }
-
-        const hasClassIds = teacher.assignedClassIds && teacher.assignedClassIds.length > 0;
-
-        if (hasClassIds) {
-          if (resolvedClassId && teacher.assignedClassIds.some(id => id.toString() === resolvedClassId.toString())) {
-            return next();
-          }
+        
+        if (!req.teacherAssignedClassIds.some(id => id.toString() === requestedClassId.toString())) {
           return res.status(403).json({ message: "Forbidden: You are not authorized to access data for this class" });
-        }
-
-        // Legacy fallback: Only use teacher.assignedClasses as a temporary fallback when canonical assignedClassIds are unavailable
-        // AND the legacy value can be deterministically resolved (exactMatches.length === 1).
-        if (exactMatches.length === 1 && teacher.assignedClasses && teacher.assignedClasses.includes(requestedClass)) {
-          return next();
         }
       }
 
-      return res.status(403).json({ message: "Forbidden: You are not authorized to access data for this class" });
+      return next();
     } catch (error) {
       return res.status(500).json({ message: "Server error verifying class access" });
     }
@@ -131,9 +101,12 @@ const verifyTeacherClassAccess = async (user, classId, legacyClassName = null) =
       return false;
     }
 
+    // Normalize populated classId if necessary
+    const studentClassId = classId && typeof classId === "object" && classId._id ? classId._id : classId;
+
     // Check canonical classId if present
-    if (classId && classId.toString().match(/^[0-9a-fA-F]{24}$/)) {
-      if (hasClassIds && teacher.assignedClassIds.some(id => id.toString() === classId.toString())) {
+    if (studentClassId && studentClassId.toString().match(/^[0-9a-fA-F]{24}$/)) {
+      if (hasClassIds && teacher.assignedClassIds.some(id => String(id) === String(studentClassId))) {
         return true;
       }
       // CRITICAL: Do NOT fall back to legacyClassName if canonical classId failed.

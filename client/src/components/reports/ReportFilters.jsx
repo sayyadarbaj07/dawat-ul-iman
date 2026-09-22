@@ -81,22 +81,32 @@ export function ReportFilters({
     }
   }, [filters.class, config.showStudent, config.showExamType]);
 
+  // Format a Date object as YYYY-MM-DD using LOCAL date components.
+  // toISOString() must NOT be used here because it converts to UTC first,
+  // which shifts the date backward by 5h30m in IST (e.g. Sep 1 00:00 IST
+  // becomes Aug 31 18:30 UTC, producing "2026-08-31" instead of "2026-09-01").
+  const formatLocalDate = (date) => {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  };
+
   const handleDatePreset = (preset) => {
       const today = new Date();
       let start = "";
-      let end = today.toISOString().split('T')[0];
+      let end = formatLocalDate(today); // local date, no UTC conversion
 
       if (preset === "today") {
           start = end;
       } else if (preset === "thisWeek") {
-          const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
-          start = firstDay.toISOString().split('T')[0];
+          const firstDay = new Date(today);
+          firstDay.setDate(today.getDate() - today.getDay());
+          start = formatLocalDate(firstDay);
       } else if (preset === "thisMonth") {
           const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-          start = firstDay.toISOString().split('T')[0];
+          start = formatLocalDate(firstDay);
       } else if (preset === "thisYear") {
           const firstDay = new Date(today.getFullYear(), 0, 1);
-          start = firstDay.toISOString().split('T')[0];
+          start = formatLocalDate(firstDay);
       }
       handleChange("startDate", start);
       handleChange("endDate", end);

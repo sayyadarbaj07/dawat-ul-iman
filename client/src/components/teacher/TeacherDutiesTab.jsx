@@ -221,6 +221,7 @@ export function TeacherDutiesTab({ teacherId }) {
               <TableRow>
                 <TableHead>{tr("teacherProfile", "dutyType")}</TableHead>
                 <TableHead>{tr("teacherProfile", "title")}</TableHead>
+                <TableHead>{tr("teacherProfile", "frequency") || "Frequency"}</TableHead>
                 <TableHead>{tr("teacherProfile", "class")}</TableHead>
                 <TableHead>{tr("teacherProfile", "startDate")}</TableHead>
                 <TableHead>{tr("teacherProfile", "endDate")}</TableHead>
@@ -231,7 +232,7 @@ export function TeacherDutiesTab({ teacherId }) {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 7 : 6} className="h-24 text-center">
+                  <TableCell colSpan={isAdmin ? 8 : 7} className="h-24 text-center">
                     {tr("common", "loading") || "Loading..."}
                   </TableCell>
                 </TableRow>
@@ -245,6 +246,7 @@ export function TeacherDutiesTab({ teacherId }) {
                       <div className="font-medium">{duty.title}</div>
                       {duty.remarks && <div className="text-xs text-muted-foreground mt-1">{duty.remarks}</div>}
                     </TableCell>
+                    <TableCell>{duty.frequency === "daily" ? (tr("teacherProfile", "daily") || "Daily") : (duty.frequency || (tr("teacherProfile", "daily") || "Daily"))}</TableCell>
                     <TableCell>{duty.classId?.className || "—"}</TableCell>
                     <TableCell className="text-xs" dir="ltr">{formatLocalizedDate(duty.startDate, language)}</TableCell>
                     <TableCell className="text-xs" dir="ltr">{duty.endDate ? formatLocalizedDate(duty.endDate, language) : "—"}</TableCell>

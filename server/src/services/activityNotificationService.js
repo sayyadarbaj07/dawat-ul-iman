@@ -18,6 +18,7 @@ class ActivityNotificationService {
    * @param {Object} options.notification.relatedEntity - { entityId, entityModel }
    * @param {Boolean} [options.notifyAdmins=true] - Whether to notify all admins
    * @param {String} [options.classId=null] - If provided, notify teachers assigned to this classId
+   * @param {Object} [options.session=null] - Mongoose session for atomic transactions
    */
   static async dispatchActivityEvent({
     user,
@@ -26,11 +27,12 @@ class ActivityNotificationService {
     moduleName,
     notification,
     notifyAdmins = true,
-    classId = null
+    classId = null,
+    session = null
   }) {
     try {
       // 1. Log the Activity securely
-      await logActivity(user, action, description, moduleName);
+      await logActivity(user, action, description, moduleName, session);
 
       if (!notification) return; // No notification required
 

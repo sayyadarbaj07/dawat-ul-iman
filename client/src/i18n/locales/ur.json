@@ -256,6 +256,7 @@
     "email": "ای میل",
     "address": "پتہ",
     "admissionNumber": "داخلہ نمبر",
+    "rollNumber": "رول نمبر",
     "admissionDate": "داخلہ کی تاریخ",
     "section": "سیکشن",
     "residentialStatus": "رہائشی حیثیت",
@@ -784,6 +785,7 @@
     "institutional": "ادارہ جاتی (بلا جماعت)",
     "schedule": "مقرر کریں",
     "cancel": "منسوخ کریں",
+    "hijriReferenceNote": "گریگورین تاریخیں بنیادی ہیں۔ ہجری تاریخیں صرف حوالہ کے لیے ہیں۔",
     "January": "جنوری",
     "February": "فروری",
     "March": "مارچ",
@@ -1151,5 +1153,17 @@
     "secondHalfTarget": "دوسری ششماہی کا ہدف",
     "saveAssignment": "تفویض محفوظ کریں",
     "failedToSave": "نصاب محفوظ کرنے میں ناکام"
+  },
+  "departments": {
+    "diniyat": "شعبہ دینیات",
+    "hifz": "شعبہ حفظ",
+    "alimiyat": "شعبہ عالمیت",
+    "qirat": "شعبہ قراءت",
+    "contemporary": "عصری تعلیم",
+    "arabic": "عربی",
+    "school": "اسکول"
+  },
+  "days": {
+    "daily": "روزانہ"
   }
 }

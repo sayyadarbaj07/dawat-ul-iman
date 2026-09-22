@@ -35,7 +35,7 @@ const logActivity = async (req, action, description) => {
 
 // Authorization helper
 const checkTeacherAuth = async (req, teacherId) => {
-  if (req.user.role === "admin") return true;
+  if (req.user.role === "admin" || req.user.role === "accountant") return true;
   if (req.user.role === "teacher") {
     const teacher = await Teacher.findById(teacherId);
     if (teacher && teacher.userId.toString() === req.user._id.toString()) {
@@ -94,7 +94,8 @@ exports.getDuties = async (req, res) => {
 exports.createDuty = async (req, res) => {
   try {
     const { teacherId } = req.params;
-    const { dutyType, title, classId, startDate, endDate, remarks } = req.body;
+    const { dutyType, title, classId, startDate, endDate, remarks,
+      shift, frequency } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(teacherId)) {
       return sendError(res, 400, "Invalid teacherId format");
@@ -131,6 +132,8 @@ exports.createDuty = async (req, res) => {
       startDate,
       endDate,
       remarks,
+      shift,
+      frequency: frequency || "daily",
       assignedBy: req.user._id,
       status: "active",
       isActive: true
@@ -150,7 +153,8 @@ exports.createDuty = async (req, res) => {
 exports.updateDuty = async (req, res) => {
   try {
     const { id } = req.params;
-    const { dutyType, title, classId, startDate, endDate, remarks, status } = req.body;
+    const { dutyType, title, classId, startDate, endDate, remarks,
+      shift, frequency, status } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return sendError(res, 400, "Invalid duty ID format");
@@ -186,6 +190,8 @@ exports.updateDuty = async (req, res) => {
       startDate,
       endDate,
       remarks,
+      shift,
+      frequency,
       status
     };
 

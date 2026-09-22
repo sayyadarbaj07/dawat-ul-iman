@@ -93,8 +93,8 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
     const diffTime = today - editDate;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    // Allow if diffDays is between 0 and 7. If diffDays < 0 (future), maybe block too?
-    if (diffDays > 7 || diffDays < 0) {
+    // Allow if diffDays is between -1 (timezone edge case) and 7.
+    if (diffDays > 7 || diffDays < -1) {
       const err = new Error("Teachers can only edit attendance for today and the past 7 days. Contact Admin for older records.");
       err.status = 403;
       throw err;

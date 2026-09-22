@@ -60,6 +60,8 @@ const teacherSchema = new mongoose.Schema(
     fatherName: { type: String, trim: true },
     dateOfBirth: { type: Date },
     whatsapp: { type: String, trim: true },
+    address: { type: String, trim: true },
+    email: { type: String, trim: true },
     city: { type: String, trim: true },
     district: { type: String, trim: true },
     state: { type: String, trim: true },

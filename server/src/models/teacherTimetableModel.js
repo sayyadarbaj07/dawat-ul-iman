@@ -15,7 +15,7 @@ const teacherTimetableSchema = new mongoose.Schema(
     },
     dayOfWeek: {
       type: String,
-      enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+      enum: ["Daily", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
       required: true
     },
     startTime: {

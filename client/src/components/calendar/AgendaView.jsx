@@ -4,9 +4,10 @@ import { EventItem } from "./EventItem";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CalendarDays } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { formatHijriDate } from "./utils";
 
 export function AgendaView({ events, onEventClick }) {
-  const { tr } = useLanguage();
+  const { tr, language } = useLanguage();
   // Group events by day
   const groupedEvents = events.reduce((acc, event) => {
     const dateStr = format(event.start, "yyyy-MM-dd");
@@ -42,11 +43,16 @@ export function AgendaView({ events, onEventClick }) {
                 {format(date, "d")}
               </span>
               <span className={`text-sm font-bold uppercase mb-1 ${isToday ? "text-primary/80" : "text-muted-foreground"}`}>
-                {format(date, "EEEE")}
+                {language === "ur" ? tr("calendar", format(date, "EEEE")) : format(date, "EEEE")}
               </span>
               <span className="text-sm font-medium text-muted-foreground mb-1 ml-auto">
-                {format(date, "MMMM yyyy")}
+                {language === "ur" 
+                  ? `${tr("calendar", format(date, "MMMM"))} ${format(date, "yyyy")}`
+                  : format(date, "MMMM yyyy")}
               </span>
+            </div>
+            <div className="text-[11px] font-medium text-muted-foreground/70 mb-2 px-1">
+              {formatHijriDate(date, language, 'full')}
             </div>
 
             <div className="grid gap-3 pl-2 sm:pl-8">

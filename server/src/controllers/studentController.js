@@ -29,6 +29,14 @@ exports.createStudent = async (req, res) => {
       }
     }
     const payload = { ...req.body };
+    if (req.body.guardians && typeof req.body.guardians === 'string') {
+      try {
+        payload.guardians = JSON.parse(req.body.guardians);
+        if (!Array.isArray(payload.guardians)) throw new Error("Guardians must be an array");
+      } catch (err) {
+        return sendError(res, 400, "Validation failed: guardians must be a valid JSON array");
+      }
+    }
     if (req.file) {
       payload.photo = `/uploads/profiles/${req.file.filename}`;
     }
@@ -121,6 +129,14 @@ exports.getStudentById = async (req, res) => {
 exports.updateStudent = async (req, res) => {
   try {
     const payload = { ...req.body };
+    if (req.body.guardians && typeof req.body.guardians === 'string') {
+      try {
+        payload.guardians = JSON.parse(req.body.guardians);
+        if (!Array.isArray(payload.guardians)) throw new Error("Guardians must be an array");
+      } catch (err) {
+        return sendError(res, 400, "Validation failed: guardians must be a valid JSON array");
+      }
+    }
     const existingStudent = await studentService.getStudentById(req.params.id);
     if (!existingStudent) return sendError(res, 404, "Student not found");
 

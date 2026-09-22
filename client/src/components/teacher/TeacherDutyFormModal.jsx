@@ -27,7 +27,9 @@ export function TeacherDutyFormModal({
     classId: "",
     startDate: "",
     endDate: "",
-    remarks: ""
+    remarks: "",
+    shift: "",
+    frequency: "daily"
   });
   
   const [classes, setClasses] = useState([]);
@@ -42,7 +44,9 @@ export function TeacherDutyFormModal({
           classId: initialData.classId?._id || initialData.classId || "",
           startDate: initialData.startDate ? new Date(initialData.startDate).toISOString().split('T')[0] : "",
           endDate: initialData.endDate ? new Date(initialData.endDate).toISOString().split('T')[0] : "",
-          remarks: initialData.remarks || ""
+          remarks: initialData.remarks || "",
+          shift: initialData.shift || "",
+          frequency: initialData.frequency || "daily"
         });
       } else {
         setFormData({
@@ -51,7 +55,9 @@ export function TeacherDutyFormModal({
           classId: "",
           startDate: new Date().toISOString().split('T')[0],
           endDate: "",
-          remarks: ""
+          remarks: "",
+          shift: "",
+          frequency: "daily"
         });
       }
       setErrorMsg("");
@@ -146,14 +152,44 @@ export function TeacherDutyFormModal({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="title">{tr("teacherProfile", "title")} *</Label>
-            <Input 
-              id="title" 
-              required 
-              value={formData.title} 
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })} 
-            />
+          
+          {formData.dutyType === "hostel" && (
+            <div className="space-y-2 mt-4">
+              <Label htmlFor="shift">{tr("teacherProfile", "shift") || "Shift"} *</Label>
+              <select
+                id="shift"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                value={formData.shift || ""}
+                onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
+                required={formData.dutyType === "hostel"}
+              >
+                <option value="">-- Select Shift --</option>
+                <option value="Morning">Morning</option>
+                <option value="Evening">Evening</option>
+                <option value="Night">Night</option>
+              </select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">{tr("teacherProfile", "title")} *</Label>
+              <Input 
+                id="title" 
+                required 
+                value={formData.title} 
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="frequency">{tr("teacherProfile", "frequency") || "Frequency"} *</Label>
+              <Input 
+                id="frequency" 
+                value={tr("teacherProfile", "daily") || "Daily"} 
+                disabled 
+                className="bg-muted text-muted-foreground"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

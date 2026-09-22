@@ -143,6 +143,7 @@ class StudentService {
 
     const total = await Student.countDocuments(filter);
     const students = await Student.find(filter)
+      .populate("classId", "fullName department")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parsedLimit)
@@ -160,7 +161,7 @@ class StudentService {
   }
 
   async getStudentById(id) {
-    return Student.findById(id);
+    return Student.findById(id).populate("classId", "fullName department");
   }
 
   async updateStudent(id, payload) {
@@ -175,6 +176,11 @@ class StudentService {
       payload.className = undefined;
       payload.studentClass = undefined;
     }
+
+    // SECURITY: Prevent tampering with auto-generated identifiers
+    delete payload.rollNumber;
+    delete payload.admissionNumber;
+
     return Student.findByIdAndUpdate(id, payload, {
       new: true,
       runValidators: true,

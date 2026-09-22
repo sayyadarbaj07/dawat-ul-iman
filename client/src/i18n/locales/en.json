@@ -256,6 +256,7 @@
     "email": "Email",
     "address": "Address",
     "admissionNumber": "Admission Number",
+    "rollNumber": "Roll Number",
     "admissionDate": "Admission Date",
     "section": "Section",
     "residentialStatus": "Residential Status",
@@ -796,6 +797,7 @@
     "institutional": "Institutional (No Class)",
     "schedule": "Schedule",
     "cancel": "Cancel",
+    "hijriReferenceNote": "Gregorian dates are primary. Hijri dates are calculated for reference.",
     "January": "January",
     "February": "February",
     "March": "March",
@@ -1163,5 +1165,17 @@
     "secondHalfTarget": "Second Half Target",
     "saveAssignment": "Save Assignment",
     "failedToSave": "Failed to save curriculum"
+  },
+  "departments": {
+    "diniyat": "Shob-e-Deeniyat",
+    "hifz": "Shob-e-Hifz",
+    "alimiyat": "Shob-e-Alimiyat",
+    "qirat": "Shob-e-Qirat",
+    "contemporary": "Contemporary",
+    "arabic": "Arabic",
+    "school": "School"
+  },
+  "days": {
+    "daily": "Daily"
   }
 }

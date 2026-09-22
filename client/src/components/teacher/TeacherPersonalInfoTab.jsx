@@ -82,8 +82,16 @@ export function TeacherPersonalInfoTab({ teacher }) {
             <div className="font-medium" dir="ltr">{teacher?.whatsapp || "—"}</div>
           </div>
           <div className="space-y-1">
+            <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Email</div>
+            <div className="font-medium" dir="ltr">{teacher?.email || "—"}</div>
+          </div>
+          <div className="space-y-1">
             <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">{tr("teachers", "emergencyContact") || "Emergency Contact"}</div>
             <div className="font-medium" dir="ltr">{teacher?.emergencyContact || "—"}</div>
+          </div>
+          <div className="space-y-1 sm:col-span-2 md:col-span-3">
+            <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">{tr("teachers", "address") || "Address"}</div>
+            <div className="font-medium" dir="auto">{teacher?.address || "—"}</div>
           </div>
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">{tr("teachers", "city") || "City"}</div>
@@ -128,6 +136,14 @@ export function TeacherPersonalInfoTab({ teacher }) {
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">{tr("teachers", "department") || "Department"}</div>
             <div className="font-medium">{teacher?.department || "—"}</div>
+          </div>
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Experience</div>
+            <div className="font-medium">{teacher?.experience ? `${teacher.experience} Years` : "—"}</div>
+          </div>
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Weekly Periods</div>
+            <div className="font-medium">{teacher?.weeklyPeriods || "—"}</div>
           </div>
           {teacher?.status === "inactive" && teacher?.deactivationDate && (
             <div className="space-y-1">

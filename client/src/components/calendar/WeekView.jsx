@@ -1,8 +1,10 @@
 import React from "react";
 import { format, isSameDay } from "date-fns";
-import { getWeekDays } from "./utils";
+import { useLanguage } from "@/context/LanguageContext";
+import { getWeekDays, formatHijriDate } from "./utils";
 
 export function WeekView({ currentDate, events, onEventClick, onDayClick }) {
+  const { tr, language } = useLanguage();
   const days = getWeekDays(currentDate);
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
@@ -47,10 +49,14 @@ export function WeekView({ currentDate, events, onEventClick, onDayClick }) {
                 className="py-3 text-center border-r border-border/40 hover:bg-muted/30 cursor-pointer"
                 onClick={() => onDayClick(day)}
               >
-                <div className="text-[11px] font-bold uppercase text-muted-foreground">{format(day, "EEE")}</div>
-                <div className={`mx-auto mt-1 flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${isToday ? "bg-primary text-white shadow-sm" : "text-foreground"
-                  }`}>
-                  {format(day, "d")}
+                <div className="text-[11px] font-bold uppercase text-muted-foreground">
+                  {language === "ur" ? tr("calendar", format(day, "EEEE")) : format(day, "EEE")}
+                </div>
+                <div className={`mx-auto mt-1 flex flex-col items-center justify-center rounded text-sm font-bold ${isToday ? "bg-primary text-white shadow-sm px-2 py-1" : "text-foreground"}`}>
+                  <span>{format(day, "d")}</span>
+                </div>
+                <div className="text-[10px] mt-1 text-muted-foreground/80 font-medium">
+                  {formatHijriDate(day, language, 'day')}
                 </div>
               </div>
             );

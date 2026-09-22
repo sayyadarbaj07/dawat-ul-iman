@@ -23,10 +23,20 @@ const teacherDutySchema = new mongoose.Schema(
         "other"
       ]
     },
+    frequency: {
+      type: String,
+      enum: ["daily"],
+      default: "daily"
+    },
     title: {
       type: String,
       required: true,
       trim: true
+    },
+    shift: {
+      type: String,
+      enum: ["Morning", "Evening", "Night", ""],
+      default: ""
     },
     classId: {
       type: mongoose.Schema.Types.ObjectId,

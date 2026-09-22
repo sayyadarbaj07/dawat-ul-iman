@@ -1,6 +1,15 @@
 import { request } from "./request";
 
 export const examApi = {
+  getUnresolvedExams() {
+    return request("/exams/unresolved");
+  },
+  mapLegacyExamClass(examId, payload) {
+    return request(`/exams/${examId}/map-class`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
   listExams(params = {}) {
     const query = new URLSearchParams(params).toString();
     return request(`/exams${query ? `?${query}` : ''}`);

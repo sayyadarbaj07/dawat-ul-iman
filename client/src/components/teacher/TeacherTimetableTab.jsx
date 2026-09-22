@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAYS_OF_WEEK = ["Daily", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export function TeacherTimetableTab({ teacher }) {
   const { tr, language } = useLanguage();
@@ -255,7 +255,7 @@ export function TeacherTimetableTab({ teacher }) {
                 <Select value={formData.dayOfWeek} onValueChange={(val) => setFormData({...formData, dayOfWeek: val})}>
                   <SelectTrigger><SelectValue placeholder="Select day" /></SelectTrigger>
                   <SelectContent>
-                    {DAYS_OF_WEEK.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    {DAYS_OF_WEEK.map(d => <SelectItem key={d} value={d}>{tr("days", d.toLowerCase()) || d}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

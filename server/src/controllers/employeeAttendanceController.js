@@ -143,31 +143,27 @@ exports.createEmployeeAttendance = async (req, res) => {
       return sendError(res, 409, "Cannot mark new attendance for an inactive employee");
     }
 
-    // Check duplicate
-    const existing = await EmployeeAttendance.findOne({ employeeId, date: targetDate });
-    if (existing) {
-      return sendError(res, 409, "Attendance for this date already exists for this employee");
-    }
-
-    const newAttendance = new EmployeeAttendance({
-      employeeId,
-      date: targetDate,
+    const setFields = {
       status,
-      remarks,
-      markedBy: req.user._id,
       updatedBy: req.user._id
-    });
-
-    await newAttendance.save();
-    
-    await logActivity(req, "EMPLOYEE_ATTENDANCE_CREATED", `Admin created ${status} attendance for employee ${employee.name} on ${targetDate.toISOString().split('T')[0]}`);
-
-    return sendSuccess(res, 201, "Attendance created successfully", newAttendance);
-  } catch (error) {
-    // Mongo duplicate key error if race condition happens
-    if (error.code === 11000) {
-      return sendError(res, 409, "Attendance for this date already exists for this employee");
+    };
+    if (remarks !== undefined) {
+      setFields.remarks = remarks;
     }
+
+    const newAttendance = await EmployeeAttendance.findOneAndUpdate(
+      { employeeId, date: targetDate },
+      {
+        $set: setFields,
+        $setOnInsert: { markedBy: req.user._id }
+      },
+      { new: true, upsert: true }
+    );
+    
+    await logActivity(req, "EMPLOYEE_ATTENDANCE_CREATED", `Admin created/updated ${status} attendance for employee ${employee.name} on ${targetDate.toISOString().split('T')[0]}`);
+
+    return sendSuccess(res, 201, "Attendance created/updated successfully", newAttendance);
+  } catch (error) {
     return sendError(res, 500, "Error creating attendance", error);
   }
 };

@@ -70,13 +70,18 @@ exports.createTimetableEntry = async (req, res) => {
 
     const teacher = await Teacher.findById(teacherId);
     if (!teacher) return res.status(404).json({ message: "Teacher not found" });
-    if (!teacher.isActive) return res.status(400).json({ message: "Cannot assign timetable to inactive teacher" });
+    if (teacher.status !== 'active') return res.status(400).json({ message: "Cannot assign timetable to inactive teacher" });
 
     const classObj = await Class.findById(classId);
     if (!classObj) return res.status(404).json({ message: "Class not found" });
 
-    // Conflict checking
-    const existingEntries = await TeacherTimetable.find({ teacherId, dayOfWeek, isActive: true });
+    let checkDays = [dayOfWeek];
+    if (dayOfWeek === 'Daily') {
+      checkDays = ["Daily", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    } else {
+      checkDays = [dayOfWeek, "Daily"];
+    }
+    const existingEntries = await TeacherTimetable.find({ teacherId, dayOfWeek: { $in: checkDays }, isActive: true });
     
     for (const entry of existingEntries) {
       if (isOverlapping(entry.startTime, entry.endTime, startTime, endTime)) {
@@ -134,9 +139,15 @@ exports.updateTimetableEntry = async (req, res) => {
 
     if (checkIsActive) {
       // Conflict checking (excluding self)
+      let checkDays = [checkDay];
+      if (checkDay === 'Daily') {
+        checkDays = ["Daily", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+      } else {
+        checkDays = [checkDay, "Daily"];
+      }
       const existingEntries = await TeacherTimetable.find({ 
         teacherId: entryToUpdate.teacherId, 
-        dayOfWeek: checkDay, 
+        dayOfWeek: { $in: checkDays }, 
         isActive: true,
         _id: { $ne: id }
       });

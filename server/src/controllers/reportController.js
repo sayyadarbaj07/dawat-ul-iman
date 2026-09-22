@@ -145,7 +145,7 @@ const getWeakStudentsReport = async (req, res) => {
 
 // Helper for Detailed Finance Report Data
 const fetchDetailedFinanceData = async (query) => {
-  const { startDate, endDate, type, category } = query;
+  const { startDate, endDate, type, category, page, limit } = query;
 
   const matchStage = { status: "Completed" };
   if (startDate && endDate) {
@@ -162,34 +162,79 @@ const fetchDetailedFinanceData = async (query) => {
   if (type && type !== "all") matchStage.type = type;
   if (category && category !== "all") matchStage.category = category;
 
-  const transactions = await Transaction.find(matchStage)
-    .populate("recordedBy", "name")
-    .populate("referenceId", "name rollNumber studentClass className")
-    .sort({ date: -1 })
-    .lean();
+  const isDonation = category === "Atiya" || category === "Kafalat" || category === "Zakat" || category === "Sadqa" || category === "Isale Sawab";
 
-  let totalIncome = 0;
-  let totalExpense = 0;
-  transactions.forEach(t => {
-    if (t.type === "income") totalIncome += t.amount;
-    if (t.type === "expense") totalExpense += t.amount;
-  });
+  const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+  const parsedLimit = limit ? parseInt(limit, 10) : null;
+  const skip = (parsedPage - 1) * (parsedLimit || 0);
 
-  let donorSummary = [];
-  if (category === "Atiya" || category === "Kafalat" || category === "Zakat" || category === "Sadqa" || category === "Isale Sawab") {
-      const donorGroups = {};
-      transactions.forEach(t => {
-           const donorName = t.referenceId ? (t.referenceId.name || t.referenceId.fullName) : t.description;
-           if (!donorGroups[donorName]) donorGroups[donorName] = 0;
-           donorGroups[donorName] += t.amount;
-      });
-      donorSummary = Object.keys(donorGroups).map(name => ({ donor: name, totalDonated: donorGroups[name] })).sort((a,b) => b.totalDonated - a.totalDonated);
+  const facetPipeline = {
+    totals: [
+      {
+        $group: {
+          _id: null,
+          totalIncome: { $sum: { $cond: [{ $eq: ["$type", "income"] }, "$amount", 0] } },
+          totalExpense: { $sum: { $cond: [{ $eq: ["$type", "expense"] }, "$amount", 0] } }
+        }
+      }
+    ],
+    transactions: [
+      { $sort: { date: -1 } }
+    ]
+  };
+
+  if (parsedLimit) {
+    facetPipeline.transactions.push({ $skip: skip });
+    facetPipeline.transactions.push({ $limit: parsedLimit });
   }
 
+  if (isDonation) {
+    facetPipeline.donorSummary = [
+      {
+        $lookup: {
+          from: "students",
+          localField: "referenceId",
+          foreignField: "_id",
+          as: "studentRef"
+        }
+      },
+      { $unwind: { path: "$studentRef", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: { $ifNull: ["$studentRef.name", "$description"] },
+          totalDonated: { $sum: "$amount" }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          donor: "$_id",
+          totalDonated: 1
+        }
+      },
+      { $sort: { totalDonated: -1 } }
+    ];
+  }
+
+  const result = await Transaction.aggregate([
+    { $match: matchStage },
+    { $facet: facetPipeline }
+  ]);
+
+  const facetResult = result[0];
+  const totals = facetResult.totals.length > 0 ? facetResult.totals[0] : { totalIncome: 0, totalExpense: 0 };
+  const balance = totals.totalIncome - totals.totalExpense;
+
+  // Populate references for the returned transactions
+  const populatedTransactions = await Transaction.populate(facetResult.transactions, [
+    { path: "recordedBy", select: "name" },
+    { path: "referenceId", select: "name rollNumber studentClass className" }
+  ]);
+
   return {
-    transactions,
-    totals: { totalIncome, totalExpense, balance: totalIncome - totalExpense },
-    donorSummary: donorSummary.length > 0 ? donorSummary : undefined
+    transactions: populatedTransactions,
+    totals: { totalIncome: totals.totalIncome, totalExpense: totals.totalExpense, balance },
+    donorSummary: isDonation && facetResult.donorSummary.length > 0 ? facetResult.donorSummary : undefined
   };
 };
 
@@ -205,15 +250,21 @@ const getDetailedFinanceReport = async (req, res) => {
 
 
 // Helper for Student List Report Data
-const fetchStudentListData = async (query) => {
-  const { class: className, classId, status } = query;
+const fetchStudentListData = async (req) => {
+  const { class: className, classId, status } = req.query;
   
   const matchStage = {};
   if (classId) {
     matchStage.classId = new (require("mongoose")).Types.ObjectId(classId);
   } else if (className && className !== "all") {
     matchStage.$or = [{ studentClass: className }, { className: className }];
+  } else if (req.user && req.user.role === "teacher") {
+    if (!req.teacherAssignedClassIds || req.teacherAssignedClassIds.length === 0) {
+      return []; // Return empty result if teacher has no assigned classes
+    }
+    matchStage.classId = { $in: req.teacherAssignedClassIds };
   }
+
   if (status && status !== "all") matchStage.status = status;
   else matchStage.status = "active"; // default to active
 
@@ -226,7 +277,7 @@ const fetchStudentListData = async (query) => {
 
 const getStudentListReport = async (req, res) => {
   try {
-    const data = await fetchStudentListData(req.query);
+    const data = await fetchStudentListData(req);
     return sendSuccess(res, 200, "Student list fetched", data);
   } catch (error) {
     return sendError(res, 500, "Failed to fetch student list", error);
@@ -235,7 +286,7 @@ const getStudentListReport = async (req, res) => {
 
 const exportStudentListExcel = async (req, res) => {
   try {
-    const students = await fetchStudentListData(req.query);
+    const students = await fetchStudentListData(req);
 
     const columns = [
       { header: "Roll No", key: "rollNumber", width: 15 },

@@ -36,7 +36,7 @@ export default function Curriculum() {
         fetchData();
     }, []);
 
-    const departments = ["diniyat", "hifz", "alimiyat", "qirat", "contemporary"];
+    const departments = ["diniyat", "hifz", "alimiyat", "qirat", "contemporary", "school"];
     
     // Group curricula by department
     const curriculumsByDept = departments.reduce((acc, dept) => {

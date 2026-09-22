@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -26,6 +26,15 @@ export default function TeacherDashboard() {
   };
   
   const { loading, data } = useTeacherDashboardData(user);
+  const [selectedClassId, setSelectedClassId] = useState(null);
+
+  useEffect(() => {
+    if (data?.assignedClasses?.length > 0) {
+      if (!selectedClassId || !data.assignedClasses.some(c => c._id === selectedClassId)) {
+        setSelectedClassId(data.assignedClasses[0]._id);
+      }
+    }
+  }, [data?.assignedClasses, selectedClassId]);
 
   if (loading) {
     return (
@@ -46,6 +55,8 @@ export default function TeacherDashboard() {
     );
   }
 
+  const selectedClass = data.assignedClasses?.find(c => c._id === selectedClassId) || null;
+
   return (
     <div className={`space-y-6 ${isRtl ? "rtl" : "ltr"}`} dir={isRtl ? "rtl" : "ltr"}>
       {/* Header */}
@@ -59,8 +70,8 @@ export default function TeacherDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-           {data.canAccess("/attendance") && (
-             <Link href="/attendance">
+           {data.canAccess("/attendance") && selectedClassId && (
+             <Link href={`/attendance?classId=${selectedClassId}`}>
                <Button className="bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-all duration-200">
                  <ClipboardList className={`h-4 w-4 ${isRtl ? 'ml-2' : 'mr-2'}`} />
                  {tx("dashboard.markAttendance", "Mark Attendance")}
@@ -140,21 +151,27 @@ export default function TeacherDashboard() {
                 </div>
              ) : (
                 <div className="divide-y divide-emerald-50">
-                  {data.assignedClasses.map((cls) => (
-                    <div key={cls._id} className="p-4 hover:bg-emerald-50/30 transition-colors flex justify-between items-center">
+                  {data.assignedClasses.map((cls) => {
+                    const isSelected = cls._id === selectedClassId;
+                    return (
+                    <div 
+                      key={cls._id} 
+                      onClick={() => setSelectedClassId(cls._id)}
+                      className={`p-4 transition-colors flex justify-between items-center cursor-pointer ${isSelected ? "bg-emerald-100/50 border-l-4 border-emerald-500" : "hover:bg-emerald-50/30 border-l-4 border-transparent"}`}
+                    >
                       <div>
-                        <h3 className="font-medium text-gray-900">{cls.fullName}</h3>
+                        <h3 className={`font-medium ${isSelected ? "text-emerald-900" : "text-gray-900"}`}>{cls.fullName}</h3>
                         {cls.subjects.length > 0 && (
                            <p className="text-sm text-gray-500 mt-1">{cls.subjects.join(" • ")}</p>
                         )}
                       </div>
                       <div className="text-right">
-                        <span className="inline-flex items-center justify-center bg-emerald-100 text-emerald-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                        <span className={`inline-flex items-center justify-center text-xs font-medium px-2.5 py-1 rounded-full ${isSelected ? "bg-emerald-200 text-emerald-800" : "bg-emerald-100 text-emerald-700"}`}>
                            {cls.studentCount} {tx("dashboard.students", "Students")}
                         </span>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
              )}
           </CardContent>
@@ -173,44 +190,42 @@ export default function TeacherDashboard() {
                 <div className="p-6 text-center text-muted-foreground">
                   {tx("dashboard.noAssignedClasses", "No classes assigned yet.")}
                 </div>
-             ) : (
-                <div className="divide-y divide-emerald-50">
-                  {data.assignedClasses.map((cls) => (
-                    <div key={cls._id} className="p-4 hover:bg-emerald-50/30 transition-colors">
-                      <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-medium text-gray-900">{cls.fullName}</h3>
-                        {cls.isPending ? (
-                           <span className="inline-flex items-center text-amber-600 text-xs font-medium">
-                             <AlertTriangle className={`h-3 w-3 ${isRtl ? 'ml-1' : 'mr-1'}`} />
-                             Pending
-                           </span>
-                        ) : (
-                           <span className="inline-flex items-center text-emerald-600 text-xs font-medium">
-                             <UserCheck className={`h-3 w-3 ${isRtl ? 'ml-1' : 'mr-1'}`} />
-                             Marked
-                           </span>
-                        )}
-                      </div>
-                      
-                      {!cls.isPending && (
-                        <div className="grid grid-cols-3 gap-2 mt-3">
-                          <div className="bg-emerald-50 rounded p-2 text-center">
-                            <div className="text-xs text-emerald-600 font-medium">P / L</div>
-                            <div className="font-bold text-gray-900">{cls.present}</div>
-                          </div>
-                          <div className="bg-red-50 rounded p-2 text-center">
-                            <div className="text-xs text-red-600 font-medium">A</div>
-                            <div className="font-bold text-gray-900">{cls.absent}</div>
-                          </div>
-                          <div className="bg-gray-50 rounded p-2 text-center">
-                            <div className="text-xs text-gray-600 font-medium">Total</div>
-                            <div className="font-bold text-gray-900">{cls.studentCount}</div>
-                          </div>
-                        </div>
-                      )}
+             ) : selectedClass ? (
+                <div className="p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-medium text-lg text-gray-900">{selectedClass.fullName}</h3>
+                    {selectedClass.isPending ? (
+                       <span className="inline-flex items-center text-amber-600 text-sm font-medium bg-amber-50 px-3 py-1 rounded-full">
+                         <AlertTriangle className={`h-4 w-4 ${isRtl ? 'ml-1.5' : 'mr-1.5'}`} />
+                         Pending
+                       </span>
+                    ) : (
+                       <span className="inline-flex items-center text-emerald-600 text-sm font-medium bg-emerald-50 px-3 py-1 rounded-full">
+                         <UserCheck className={`h-4 w-4 ${isRtl ? 'ml-1.5' : 'mr-1.5'}`} />
+                         Marked
+                       </span>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4 mt-6">
+                    <div className="bg-emerald-50 rounded-lg p-4 text-center border border-emerald-100">
+                      <div className="text-sm text-emerald-700 font-medium mb-1">P / L</div>
+                      <div className="text-3xl font-bold text-emerald-900">{selectedClass.present}</div>
                     </div>
-                  ))}
+                    <div className="bg-red-50 rounded-lg p-4 text-center border border-red-100">
+                      <div className="text-sm text-red-700 font-medium mb-1">Absent</div>
+                      <div className="text-3xl font-bold text-red-900">{selectedClass.absent}</div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 text-center border border-gray-200">
+                      <div className="text-sm text-gray-600 font-medium mb-1">Total</div>
+                      <div className="text-3xl font-bold text-gray-900">{selectedClass.studentCount}</div>
+                    </div>
+                  </div>
                 </div>
+             ) : (
+                 <div className="p-6 text-center text-muted-foreground">
+                   Select a class to view attendance.
+                 </div>
              )}
           </CardContent>
         </Card>
@@ -219,3 +234,4 @@ export default function TeacherDashboard() {
     </div>
   );
 }
+

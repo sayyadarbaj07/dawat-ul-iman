@@ -153,9 +153,9 @@ exports.generateStudentIdCard = async (req, res) => {
     const fontRegular = isUrdu ? "UrduFont" : PDF_FONT_PATHS.english;
     const fontBold = isUrdu ? "UrduFont" : PDF_FONT_PATHS.englishBold;
 
-    if (isUrdu && fs.existsSync(PDF_FONT_PATHS.urdu)) {
+    if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
       doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
-    } else if (isUrdu) {
+    } else {
       doc.registerFont("UrduFont", "Helvetica");
     }
 
@@ -251,12 +251,25 @@ exports.generateStudentIdCard = async (req, res) => {
           urduPdfHelper.drawTextRTL(doc, toUrduDigits(admNoStr), 230 - 80, currentY);
         }
       } else {
-      doc.fontSize(12).font(fontBold).text(nameStr, labelX, currentY, { width: 150 });
+      const hasUrduName = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(nameStr);
+      doc.fontSize(12).font(hasUrduName ? "UrduFont" : fontBold);
+      if (hasUrduName) {
+        urduPdfHelper.drawTextRTL(doc, nameStr, labelX, currentY, { width: 150, align: 'left', font: "UrduFont" });
+      } else {
+        doc.text(nameStr, labelX, currentY, { width: 150 });
+      }
       currentY += 18;
       
       doc.fontSize(9).font(fontRegular);
       doc.text("Class:", labelX, currentY);
-      doc.font(fontBold).text(classNameStr, labelX + 35, currentY, { width: 110 });
+      
+      const hasUrduClass = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(classNameStr);
+      doc.font(hasUrduClass ? "UrduFont" : fontBold);
+      if (hasUrduClass) {
+        urduPdfHelper.drawTextRTL(doc, classNameStr, labelX + 35, currentY, { width: 110, align: 'left', font: "UrduFont" });
+      } else {
+        doc.text(classNameStr, labelX + 35, currentY, { width: 110 });
+      }
       currentY += yStep;
 
       if (rollNoStr) {
@@ -1284,7 +1297,7 @@ exports.generateFinanceSummary = async (req, res) => {
 
             // Description (RTL)
             doc.font(fontRegular);
-            urduPdfHelper.drawTextRTL(doc, desc, currX, y, { width: colDescW });
+            urduPdfHelper.drawTextRTL(doc, desc, currX, y, { width: colDescW, align: "center" });
             currX -= colDescW;
 
             // Category (RTL)
@@ -1376,9 +1389,9 @@ exports.generateFinanceSummary = async (req, res) => {
             
             doc.font(descFont);
             if (hasUrdu) {
-                urduPdfHelper.drawTextRTL(doc, desc, currX, y, { width: colDescW });
+                urduPdfHelper.drawTextRTL(doc, desc, currX, y, { width: colDescW, align: "center" });
             } else {
-                doc.text(desc, currX, y, { width: colDescW });
+                doc.text(desc, currX, y, { width: colDescW, align: "center" });
             }
             currX += colDescW;
 

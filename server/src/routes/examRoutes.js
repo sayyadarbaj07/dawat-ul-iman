@@ -9,6 +9,12 @@ router.route("/")
   .get(examController.getAllExams)
   .post(authorize("admin", "teacher"), examController.createExam);
 
+router.route("/unresolved")
+  .get(authorize("admin"), examController.getUnresolvedExams);
+
+router.route("/:examId/map-class")
+  .post(authorize("admin"), examController.mapLegacyExamClass);
+
 router.route("/:id")
   .put(authorize("admin", "teacher"), examController.updateExam)
   .delete(authorize("admin", "teacher"), examController.deleteExam);

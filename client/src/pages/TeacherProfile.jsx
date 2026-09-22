@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/ui/BackButton";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
-import { teacherApi } from "@/lib/api";
+import { teacherApi, classApi } from "@/lib/api";
 import { TeacherDutiesTab } from "@/components/teacher/TeacherDutiesTab";
 import { TeacherQualificationTab } from "@/components/teacher/TeacherQualificationTab";
 import { TeacherTeachingTab } from "@/components/teacher/TeacherTeachingTab";
@@ -19,7 +19,7 @@ import { TeacherPersonalInfoTab } from "@/components/teacher/TeacherPersonalInfo
 import { TeacherTimetableTab } from "@/components/teacher/TeacherTimetableTab";
 import { TeacherDocumentsTab } from "@/components/teacher/TeacherDocumentsTab";
 import { TeacherTimelineTab } from "@/components/teacher/TeacherTimelineTab";
-import { FileText, Phone, Mail, Calendar, BookOpen } from "lucide-react";
+import { FileText, Phone, Mail, Calendar, BookOpen, Briefcase, User, Users } from "lucide-react";
 export default function TeacherProfile() {
   const { teacherId } = useParams();
   const [, setLocation] = useLocation();
@@ -29,6 +29,7 @@ export default function TeacherProfile() {
   const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [apiClasses, setApiClasses] = useState([]);
 
   useEffect(() => {
     const fetchTeacher = async () => {
@@ -54,6 +55,18 @@ export default function TeacherProfile() {
     };
     if (teacherId) fetchTeacher();
   }, [teacherId]);
+
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const res = await classApi.getClasses();
+        setApiClasses(res.data || []);
+      } catch (err) {
+        console.error("Failed to fetch classes for profile:", err);
+      }
+    };
+    fetchClasses();
+  }, []);
 
   if (loading) {
     return <div className="p-8 text-center">{tr("common", "loading") || "Loading..."}</div>;
@@ -84,6 +97,29 @@ export default function TeacherProfile() {
     </Card>
   );
 
+  const getStatusBadge = (status) => {
+    if (!status) return null;
+    const statusMap = {
+      active: { label: tr("teachers", "active") || "Active", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+      on_leave: { label: tr("teachers", "onLeave") || "On Leave", color: "bg-amber-100 text-amber-700 border-amber-200" },
+      resigned: { label: tr("teachers", "resigned") || "Resigned", color: "bg-red-100 text-red-700 border-red-200" },
+      inactive: { label: tr("teachers", "inactive") || "Inactive", color: "bg-slate-100 text-slate-700 border-slate-200" }
+    };
+    const s = statusMap[status] || statusMap.inactive;
+    return <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${s.color}`}>{s.label}</span>;
+  };
+
+  const getClassName = (id) => {
+    const cls = apiClasses.find((c) => c._id === id || c.id === id);
+    return cls ? cls.fullName : id.slice(-6).toUpperCase();
+  };
+
+  const canonicalClasses = teacher?.assignedClassIds?.length > 0
+    ? teacher.assignedClassIds.map(id => getClassName(id)).join(", ")
+    : teacher?.assignedClasses?.length > 0
+      ? teacher.assignedClasses.join(", ")
+      : teacher?.classesAssigned || tr("teacherProfile", "notAssigned") || "Not Assigned";
+
   return (
     <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
       <PageHeader 
@@ -106,19 +142,55 @@ export default function TeacherProfile() {
             )}
             
             <div className="flex-1 space-y-1 mt-4 md:mt-0 pb-1">
-              <h1 className="text-2xl font-bold">{teacher.name}</h1>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <h1 className="text-2xl font-bold">{teacher.name}</h1>
+                <div>{getStatusBadge(teacher.status)}</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground mt-2">
                 <span className="flex items-center gap-1 font-mono bg-muted px-2 py-0.5 rounded-md">
                   ID: {(teacher._id || teacher.id).slice(-6).toUpperCase()}
                 </span>
+                
+                {teacher.designation && (
+                  <span className="flex items-center gap-1">
+                    <User className="w-3.5 h-3.5" />
+                    {teacher.designation}
+                  </span>
+                )}
+                
+                {teacher.department && (
+                  <span className="flex items-center gap-1">
+                    <Briefcase className="w-3.5 h-3.5" />
+                    {tr("departments", teacher.department) || teacher.department}
+                  </span>
+                )}
+
                 <span className="flex items-center gap-1">
-                  <BookOpen className="w-3.5 h-3.5" />
-                  {teacher.subject}
+                  <Users className="w-3.5 h-3.5" />
+                  <span dir="auto">{canonicalClasses}</span>
                 </span>
-                <span className="flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5" />
-                  <span dir="ltr">{teacher.mobile}</span>
-                </span>
+
+                {teacher.subject && (
+                  <span className="flex items-center gap-1">
+                    <BookOpen className="w-3.5 h-3.5" />
+                    {teacher.subject}
+                  </span>
+                )}
+                
+                {teacher.mobile && (
+                  <span className="flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5" />
+                    <span dir="ltr">{teacher.mobile}</span>
+                  </span>
+                )}
+                
+                {teacher.email && (
+                  <span className="flex items-center gap-1">
+                    <Mail className="w-3.5 h-3.5" />
+                    <span dir="ltr">{teacher.email}</span>
+                  </span>
+                )}
+                
                 {teacher.joiningDate && (
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />

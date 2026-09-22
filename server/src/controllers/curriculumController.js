@@ -17,9 +17,33 @@ const sendError = (res, statusCode, message, error = null) => {
 exports.getAllCurriculums = async (req, res) => {
   try {
     const filter = {};
-    if (req.query.classId) {
-      filter.classId = req.query.classId;
+
+    if (req.user && req.user.role === "teacher") {
+      const Teacher = require("../models/teacherModel");
+      const teacher = await Teacher.findOne({ userId: req.user._id });
+      if (!teacher) {
+        return sendError(res, 403, "Teacher profile not found");
+      }
+
+      const assignedIds = teacher.assignedClassIds ? teacher.assignedClassIds.map(id => id.toString()) : [];
+
+      if (req.query.classId) {
+        if (!assignedIds.includes(req.query.classId.toString())) {
+          return sendError(res, 403, "Forbidden: Not authorized to view curriculum for this class");
+        }
+        filter.classId = req.query.classId;
+      } else {
+        if (assignedIds.length === 0) {
+          return sendSuccess(res, 200, "Curriculums fetched successfully", []);
+        }
+        filter.classId = { $in: teacher.assignedClassIds };
+      }
+    } else {
+      if (req.query.classId) {
+        filter.classId = req.query.classId;
+      }
     }
+
     const curriculums = await Curriculum.find(filter)
       .populate('classId', 'fullName department name section')
       .populate('teacherId', 'name')
@@ -176,19 +200,19 @@ exports.updateCurriculum = async (req, res) => {
 
 exports.deleteCurriculum = async (req, res) => {
   try {
-    // Instead of hard deleting, we deactivate
-    const curriculum = await Curriculum.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    // Permanent Delete as requested by client
+    const curriculum = await Curriculum.findByIdAndDelete(req.params.id);
     if (!curriculum) return sendError(res, 404, "Curriculum not found");
 
     ActivityNotificationService.dispatchActivityEvent({
       user: req.user,
-      action: "CURRICULUM_DEACTIVATED",
-      description: `Deactivated curriculum: ${curriculum.subject}`,
+      action: "CURRICULUM_DELETED",
+      description: `Permanently deleted curriculum: ${curriculum.subject}`,
       moduleName: "Curriculum",
     });
 
-    return sendSuccess(res, 200, "Curriculum deactivated successfully");
+    return sendSuccess(res, 200, "Curriculum permanently deleted successfully");
   } catch (error) {
-    return sendError(res, 500, "Failed to deactivate curriculum", error);
+    return sendError(res, 500, "Failed to delete curriculum", error);
   }
 };

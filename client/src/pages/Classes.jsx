@@ -23,6 +23,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -43,6 +53,7 @@ export default function Classes() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState(null);
+  const [classToDelete, setClassToDelete] = useState(null);
 
   // Syllabus Modal State
   const [isSyllabusOpen, setIsSyllabusOpen] = useState(false);
@@ -152,17 +163,23 @@ export default function Classes() {
           }
           return oldData;
         });
+      setClassToDelete(null);
       toast({
         title: "Success",
         description: res.message || "Class deleted successfully",
       });
     },
     onError: (error) => {
+      let description = error.response?.data?.message || error.message || "Failed to delete class";
+      if (error.response?.data?.code === "LEGACY_DEPENDENCY_UNRESOLVED") {
+        description = "Deletion is blocked because historical data may still depend on this class. Resolve legacy class mappings before deleting.";
+      }
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.response?.data?.message || error.message || "Failed to delete class",
+        description,
       });
+      setClassToDelete(null);
     },
   });
 
@@ -207,8 +224,12 @@ export default function Classes() {
   };
 
   const handleDelete = (cls) => {
-    if (window.confirm("PERMANENT DELETE\n\nAre you sure you want to permanently delete this class? This will also delete related disposable records (e.g. attendance, exams) but preserve institutional financial history. This cannot be undone.")) {
-      deleteMutation.mutate(cls._id);
+    setClassToDelete(cls);
+  };
+
+  const confirmDelete = () => {
+    if (classToDelete) {
+      deleteMutation.mutate(classToDelete._id);
     }
   };
 
@@ -407,6 +428,31 @@ export default function Classes() {
           classData={selectedClassForSyllabus}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!classToDelete} onOpenChange={(open) => !open && setClassToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Class</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this class and its related class data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDelete();
+              }}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

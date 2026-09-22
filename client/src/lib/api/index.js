@@ -23,6 +23,8 @@ export { studentDocumentsApi } from "./studentDocuments";
 
 
 export { default as hostelApi } from './hostel';
+export { hostelAttendanceApi } from './hostelAttendanceApi';
+export { hostelSupervisorApi } from './hostelSupervisorApi';
 export { studentTimelineApi } from './studentTimeline';
 export { teacherDutiesApi } from './teacherDuties';
 export { teacherDocumentsApi } from './teacherDocuments';

@@ -9,7 +9,7 @@ const curriculumSchema = new mongoose.Schema(
     department: {
       type: String,
       required: true,
-      enum: ["diniyat", "hifz", "alimiyat", "qirat", "contemporary", "arabic"],
+      enum: ["diniyat", "hifz", "alimiyat", "qirat", "contemporary", "arabic", "school"],
     },
     classId: {
       type: mongoose.Schema.Types.ObjectId,

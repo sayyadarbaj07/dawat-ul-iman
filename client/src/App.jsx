@@ -39,6 +39,7 @@ import ClassAttendanceOverview from "@/pages/ClassAttendanceOverview";
 import ClassAttendanceDetail from "@/pages/ClassAttendanceDetail";
 import DataResolution from "@/pages/DataResolution";
 import Payroll from "@/pages/Payroll";
+import ExamMappingPage from "@/pages/ExamMappingPage";
 
 import NotFound from "@/pages/not-found";
 const queryClient = new QueryClient();
@@ -106,6 +107,7 @@ function Router() {
             <Route path="/class-attendance/:classId" component={ClassAttendanceDetail} />
             <Route path="/data-resolution" component={DataResolution} />
             <Route path="/payroll" component={Payroll} />
+            <Route path="/admin/exam-mapping" component={ExamMappingPage} />
             <Route component={NotFound} />
           </Switch>
         </Layout>

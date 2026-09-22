@@ -1,7 +1,9 @@
 import React from "react";
 import { format } from "date-fns";
+import { useLanguage } from "@/context/LanguageContext";
 
 export function EventItem({ event, onClick, isMonthView = false }) {
+  const { tr, language } = useLanguage();
   const getColors = (type) => {
     switch (type) {
       case "meeting": return "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 hover:border-primary/30";
@@ -42,7 +44,7 @@ export function EventItem({ event, onClick, isMonthView = false }) {
       </div>
       <div className="flex flex-col sm:items-end mt-2 sm:mt-0">
         <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/50 border border-black/5 capitalize">
-          {event.sourceType || event.type}
+          {tr("calendar", event.sourceType || event.type) || (event.sourceType || event.type)}
         </span>
         {event.className && (
           <span className="text-[10px] font-medium opacity-70 mt-1 truncate max-w-[120px]">

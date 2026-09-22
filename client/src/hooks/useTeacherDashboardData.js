@@ -52,16 +52,28 @@ export function useTeacherDashboardData(user) {
         let totalStudents = 0;
         let pendingAttendanceCount = 0;
 
+        // Use a Set to track unique students across all assigned classes
+        const uniqueStudentIds = new Set();
+        
         // Process Classes and Attendance
         if (teacher && teacher.assignedClassIds) {
           teacher.assignedClassIds.forEach((classId) => {
-            const classDoc = classes.find(c => c._id === classId);
-            if (!classDoc) return;
+            const classDoc = classes.find(c => String(c._id) === String(classId));
+            const className = classDoc ? classDoc.fullName : `Class ${classId.toString().substring(0,6)}...`;
 
-            const classStudents = students.filter(s => s.classId === classId && s.status !== "inactive");
-            totalStudents += classStudents.length;
+            const classStudents = students.filter(s => {
+              const studentClassId = s.classId && typeof s.classId === "object" ? s.classId._id : s.classId;
+              return String(studentClassId) === String(classId) && s.status !== "inactive";
+            });
+            
+            classStudents.forEach(s => {
+              if (s._id) uniqueStudentIds.add(String(s._id));
+            });
 
-            const classAttendance = attendance.filter(a => a.classId === classId);
+            const classAttendance = attendance.filter(a => {
+               const attClassId = a.classId && typeof a.classId === "object" ? a.classId._id : a.classId;
+               return String(attClassId) === String(classId);
+            });
             const present = classAttendance.filter(a => a.status === "Present" || a.status === "Late").length;
             const absent = classAttendance.filter(a => a.status === "Absent").length;
             const late = classAttendance.filter(a => a.status === "Late").length;
@@ -73,12 +85,12 @@ export function useTeacherDashboardData(user) {
 
             // Resolve teaching assignments for this class
             const assignments = teacher.teachingAssignments
-              ?.filter(a => a.classId === classId)
+              ?.filter(a => String(a.classId) === String(classId))
               .map(a => a.subjectId) || [];
 
             assignedClasses.push({
               _id: classId,
-              fullName: classDoc.fullName,
+              fullName: className,
               studentCount: classStudents.length,
               present,
               absent,
@@ -88,6 +100,7 @@ export function useTeacherDashboardData(user) {
               subjects: assignments
             });
           });
+          totalStudents = uniqueStudentIds.size;
         }
 
         const todayStart = startOfDay(new Date());

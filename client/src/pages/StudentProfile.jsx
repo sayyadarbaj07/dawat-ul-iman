@@ -128,9 +128,9 @@ export default function StudentProfile() {
     );
   }
 
-  // Derive class/dept from classId or fallback
-  const className = student.classId?.fullName || student.className || "Unknown Class";
-  const department = student.classId?.department || "Unknown Department";
+  // Derive class/dept from canonical classId
+  const className = student.classId?.fullName || "Not Assigned";
+  const department = student.classId?.department ? (tr("departments", student.classId.department) || student.classId.department) : "Not Assigned";
 
   const renderValue = (value) => (value ? value : "—");
 
@@ -206,7 +206,7 @@ export default function StudentProfile() {
               <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Department</p>
-                  <p className="font-medium capitalize">{department}</p>
+                  <p className="font-medium">{department}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Class</p>

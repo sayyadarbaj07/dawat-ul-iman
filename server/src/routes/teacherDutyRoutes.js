@@ -10,11 +10,11 @@ const {
 
 const router = express.Router();
 
-router.get("/teachers/:teacherId/duties", protect, authorize("admin", "teacher"), getDuties);
-router.post("/teachers/:teacherId/duties", protect, authorize("admin"), createDuty);
+router.get("/teachers/:teacherId/duties", protect, authorize("admin", "teacher", "accountant"), getDuties);
+router.post("/teachers/:teacherId/duties", protect, authorize("admin", "accountant"), createDuty);
 
-router.put("/teacher-duties/:id", protect, authorize("admin"), updateDuty);
-router.patch("/teacher-duties/:id/status", protect, authorize("admin"), updateStatus);
-router.delete("/teacher-duties/:id", protect, authorize("admin"), deleteDuty);
+router.put("/teacher-duties/:id", protect, authorize("admin", "accountant"), updateDuty);
+router.patch("/teacher-duties/:id/status", protect, authorize("admin", "accountant"), updateStatus);
+router.delete("/teacher-duties/:id", protect, authorize("admin", "accountant"), deleteDuty);
 
 module.exports = router;

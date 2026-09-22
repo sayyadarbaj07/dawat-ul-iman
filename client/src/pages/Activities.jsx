@@ -51,11 +51,11 @@ export default function Activities() {
     try {
       const [achRes, eventRes] = await Promise.allSettled([
         achievementApi.list({ limit: 10 }),
-        eventApi.listEvents({ type: "bazm", upcoming: "true", limit: 1 })
+        eventApi.list({ type: "bazm", upcoming: "true", limit: 1 })
       ]);
 
-      if (achRes.status === "fulfilled" && achRes.value?.data?.data?.achievements) {
-        setAchievements(achRes.value.data.data.achievements);
+      if (achRes.status === "fulfilled" && achRes.value?.data?.achievements) {
+        setAchievements(achRes.value.data.achievements);
       } else {
         setAchievements([]);
       }
@@ -76,7 +76,7 @@ export default function Activities() {
     if (!isAdmin) return;
     try {
       const [cRes, sRes] = await Promise.allSettled([classApi.getClasses(), studentApi.list()]);
-      if (cRes.status === "fulfilled") setClasses(cRes.value?.data?.data || []);
+      if (cRes.status === "fulfilled") setClasses(cRes.value?.data || []);
       if (sRes.status === "fulfilled") setStudents(sRes.value?.data?.data || []);
     } catch (e) {}
   };
@@ -88,7 +88,7 @@ export default function Activities() {
 
   const handleClassChange = (classId) => {
     setFormData({ ...formData, classId, studentId: "" });
-    setFilteredStudents(students.filter(s => s.classId === classId));
+    setFilteredStudents(students.filter(s => String(s.classId?._id || s.classId) === String(classId)));
   };
 
   const openAddDialog = () => {

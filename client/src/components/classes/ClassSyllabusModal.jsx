@@ -30,7 +30,7 @@ export default function ClassSyllabusModal({ open, onOpenChange, classData }) {
     academicYear: "2026-27",
     subject: "",
     book: "",
-    teacherId: "",
+    teacherId: "unassigned",
     totalLessons: 0,
     annualTarget: 0,
     firstHalfTarget: 0,
@@ -64,7 +64,7 @@ export default function ClassSyllabusModal({ open, onOpenChange, classData }) {
 
   const mutation = useMutation({
     mutationFn: (data) => {
-      const payload = { ...data, teacherId: data.teacherId === "unassigned" ? null : data.teacherId };
+      const payload = { ...data, teacherId: (!data.teacherId || data.teacherId === "unassigned") ? null : data.teacherId };
       return editingCurriculum
         ? curriculumApi.update(editingCurriculum._id, payload)
         : curriculumApi.create({ ...payload, classId: classData._id, department: classData.department });
@@ -79,11 +79,11 @@ export default function ClassSyllabusModal({ open, onOpenChange, classData }) {
     },
   });
 
-  const deactivateMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: (id) => curriculumApi.remove(id),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["curriculums", classData?._id] });
-      toast({ title: t("deactivated") || "Deactivated", description: res.message });
+      toast({ title: tr("syllabus", "deleted") || "Deleted", description: res.message });
     },
   });
 
@@ -100,7 +100,7 @@ export default function ClassSyllabusModal({ open, onOpenChange, classData }) {
       academicYear: curr.academicYear || "",
       subject: curr.subject || "",
       book: curr.book || "",
-      teacherId: curr.teacherId?._id || curr.teacherId || "",
+      teacherId: curr.teacherId?._id || curr.teacherId || "unassigned",
       totalLessons: curr.totalLessons || 0,
       annualTarget: curr.annualTarget || 0,
       firstHalfTarget: curr.firstHalfTarget || 0,
@@ -167,7 +167,11 @@ export default function ClassSyllabusModal({ open, onOpenChange, classData }) {
                       <Button variant="outline" size="sm" onClick={() => handleEdit(curr)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="destructive" size="sm" onClick={() => deactivateMutation.mutate(curr._id)}>
+                      <Button variant="destructive" size="sm" onClick={() => {
+                        if (window.confirm("PERMANENT DELETE\n\nAre you sure you want to permanently delete this syllabus? This cannot be undone.")) {
+                          deleteMutation.mutate(curr._id);
+                        }
+                      }}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -207,6 +211,13 @@ export default function ClassSyllabusModal({ open, onOpenChange, classData }) {
                       <div className="flex space-x-2">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(curr)}>
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => {
+                          if (window.confirm("PERMANENT DELETE\n\nAre you sure you want to permanently delete this syllabus? This cannot be undone.")) {
+                            deleteMutation.mutate(curr._id);
+                          }
+                        }}>
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>

@@ -4,6 +4,8 @@ const Student = require("../models/studentModel");
 const Class = require("../models/classModel");
 const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
 const ActivityNotificationService = require("../services/activityNotificationService");
+const mongoose = require("mongoose");
+const ActivityLog = require("../models/activityLogModel");
 
 const sendSuccess = (res, statusCode, message, data = null) => {
   const payload = { success: true, message };
@@ -19,9 +21,10 @@ const sendError = (res, statusCode, message, error = null) => {
 
 exports.getAllExams = async (req, res) => {
   try {
-    const { academicYear, class: className, examType } = req.query;
+    const { academicYear, class: className, classId, examType } = req.query;
     const filter = {};
     if (academicYear) filter.academicYear = academicYear;
+    if (classId) filter.classId = classId;
     if (className) filter.class = className;
     if (examType) filter.examType = examType;
 
@@ -29,17 +32,17 @@ exports.getAllExams = async (req, res) => {
       const Teacher = require("../models/teacherModel");
       const teacher = await Teacher.findOne({ userId: req.user._id });
       if (teacher && ((teacher.assignedClasses && teacher.assignedClasses.length > 0) || (teacher.assignedClassIds && teacher.assignedClassIds.length > 0))) {
-        if (filter.class) {
+        if (filter.class || filter.classId) {
           // If a specific class was requested, ensure it's in their assigned list
-          const hasAccess = await verifyTeacherClassAccess(req.user, req.query.classId, filter.class);
+          const hasAccess = await verifyTeacherClassAccess(req.user, filter.classId, filter.class);
           if (!hasAccess) {
              return sendSuccess(res, 200, "Exams fetched successfully", []);
           }
         } else {
            // If no specific class is requested, restrict exams to assigned classes or assigned classIds
            filter.$or = [
-              { class: { $in: teacher.assignedClasses } },
-              { classId: { $in: teacher.assignedClassIds } }
+              { classId: { $in: teacher.assignedClassIds } },
+              { class: { $in: teacher.assignedClasses }, classId: { $exists: false } }
            ];
         }
       } else {
@@ -66,6 +69,8 @@ exports.createExam = async (req, res) => {
        }
        // Derive class string automatically, ignoring frontend value
        req.body.class = classDoc.fullName;
+    } else {
+       return sendError(res, 400, "classId is required.");
     }
 
     if (req.user && req.user.role === "teacher") {
@@ -124,12 +129,16 @@ exports.updateExam = async (req, res) => {
     const exam = await Exam.findById(req.params.id);
     if (!exam) return sendError(res, 404, "Exam not found");
 
+    if (req.body.classId && exam.classId && String(req.body.classId) !== String(exam.classId)) {
+        return sendError(res, 400, "classId of a canonical exam is immutable and cannot be changed.");
+    }
+
     if (req.user && req.user.role === "teacher") {
       const Teacher = require("../models/teacherModel");
       const teacher = await Teacher.findOne({ userId: req.user._id });
       
       const hasClassIdAuth = exam.classId && teacher.assignedClassIds && teacher.assignedClassIds.some(id => id.toString() === exam.classId.toString());
-      const hasClassStringAuth = teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
+      const hasClassStringAuth = !exam.classId && teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
       
       if (!teacher || (!hasClassIdAuth && !hasClassStringAuth)) {
         return sendError(res, 403, "You are not authorized to edit this exam");
@@ -255,48 +264,90 @@ exports.getAllExamResults = async (req, res) => {
 };
 
 exports.saveBulkMarks = async (req, res) => {
+  const mongoose = require("mongoose");
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { examId, subject, records } = req.body; // records: [{studentId, marks}]
 
     if (!examId || !subject || !Array.isArray(records)) {
-      return sendError(res, 400, "Invalid payload for bulk marks");
+      throw Object.assign(new Error("Invalid payload for bulk marks"), { status: 400 });
     }
 
-    const exam = await Exam.findById(examId);
-    if (!exam) return sendError(res, 404, "Exam not found");
+    const exam = await Exam.findById(examId).session(session);
+    if (!exam) throw Object.assign(new Error("Exam not found"), { status: 404 });
 
     if (req.user && req.user.role === "teacher") {
       const Teacher = require("../models/teacherModel");
-      const teacher = await Teacher.findOne({ userId: req.user._id });
+      const teacher = await Teacher.findOne({ userId: req.user._id }).session(session);
       
       const hasClassIdAuth = exam.classId && teacher.assignedClassIds && teacher.assignedClassIds.some(id => id.toString() === exam.classId.toString());
-      const hasClassStringAuth = teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
+      const hasClassStringAuth = !exam.classId && teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
       
       if (!teacher || (!hasClassIdAuth && !hasClassStringAuth)) {
-        return sendError(res, 403, "You are not authorized to manage marks for this class");
+        throw Object.assign(new Error("You are not authorized to manage marks for this class"), { status: 403 });
       }
     }
 
-    for (const record of records) {
+    const validRecords = records.filter(r => r && r.studentId);
+    if (validRecords.length === 0 && records.length > 0) {
+      throw Object.assign(new Error("Malformed studentId in records"), { status: 400 });
+    }
+    
+    // Extract unique studentIds
+    const uniqueStudentIds = [...new Set(validRecords.map(r => String(r.studentId)))];
+    
+    // Load all students
+    const Student = require("../models/studentModel");
+    const students = await Student.find({ _id: { $in: uniqueStudentIds } }).session(session);
+    
+    if (students.length !== uniqueStudentIds.length) {
+      throw Object.assign(new Error("One or more students do not exist."), { status: 400 });
+    }
+
+    const studentMap = new Map();
+    students.forEach(s => studentMap.set(String(s._id), s));
+
+    if (exam.classId) {
+      // Canonical Exam Validation
+      for (const stId of uniqueStudentIds) {
+        const student = studentMap.get(stId);
+        const studentClassId = student.classId && typeof student.classId === "object" ? student.classId._id : student.classId;
+        if (!studentClassId || String(studentClassId) !== String(exam.classId)) {
+          throw Object.assign(new Error("One or more students do not belong to this exam's class."), { status: 400 });
+        }
+      }
+    } else {
+      // Legacy Exam Validation
+      for (const stId of uniqueStudentIds) {
+        const student = studentMap.get(stId);
+        if (student.studentClass !== exam.class && student.className !== exam.class) {
+          throw Object.assign(new Error("One or more students do not belong to this exam's class."), { status: 400 });
+        }
+      }
+    }
+
+    for (const record of validRecords) {
       if (record.marks === "" || record.marks === null || record.marks === undefined) {
         // -1 indicates Absent
         await ExamResult.findOneAndUpdate(
           { examId, studentId: record.studentId, subject },
           { marks: -1 },
-          { upsert: true, new: true }
+          { upsert: true, new: true, session }
         );
         continue;
       }
       
       const numMarks = Number(record.marks);
       if (numMarks > exam.maxMarks || numMarks < 0) {
-        return sendError(res, 400, `Marks for student ${record.studentId} are out of bounds (0 - ${exam.maxMarks})`);
+        throw Object.assign(new Error(`Marks for student ${record.studentId} are out of bounds (0 - ${exam.maxMarks})`), { status: 400 });
       }
 
       await ExamResult.findOneAndUpdate(
         { examId, studentId: record.studentId, subject },
         { marks: numMarks },
-        { upsert: true, new: true }
+        { upsert: true, new: true, session }
       );
     }
 
@@ -313,12 +364,18 @@ exports.saveBulkMarks = async (req, res) => {
         relatedEntity: { entityId: exam._id, entityModel: "Exam" }
       },
       notifyAdmins: true,
-      classId: exam.classId
+      classId: exam.classId,
+      session: session
     });
+
+    await session.commitTransaction();
+    session.endSession();
 
     return sendSuccess(res, 200, "Bulk marks saved successfully");
   } catch (error) {
-    return sendError(res, 500, "Failed to save bulk marks", error);
+    await session.abortTransaction();
+    session.endSession();
+    return sendError(res, error.status || 500, error.message || "Failed to save bulk marks", error);
   }
 };
 
@@ -333,7 +390,7 @@ exports.getCalculatedResults = async (req, res) => {
       const teacher = await Teacher.findOne({ userId: req.user._id });
 
       const hasClassIdAuth = exam.classId && teacher.assignedClassIds && teacher.assignedClassIds.some(id => id.toString() === exam.classId.toString());
-      const hasClassStringAuth = teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
+      const hasClassStringAuth = !exam.classId && teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
 
       if (!teacher || (!hasClassIdAuth && !hasClassStringAuth)) {
         return sendError(res, 403, "You are not authorized to view results for this class");
@@ -342,13 +399,17 @@ exports.getCalculatedResults = async (req, res) => {
 
     // Get all students in this exam's class
     // studentClass takes precedence, fallback to className
-    const students = await Student.find({
-      $or: [
-        { classId: exam.classId },
-        { studentClass: exam.class },
-        { className: exam.class }
-      ]
-    }).lean();
+    let students = [];
+    if (exam.classId) {
+      students = await Student.find({ classId: exam.classId }).lean();
+    } else {
+      students = await Student.find({
+        $or: [
+          { studentClass: exam.class },
+          { className: exam.class }
+        ]
+      }).lean();
+    }
 
     // Get all marks for this exam
     const results = await ExamResult.find({ examId }).lean();
@@ -507,3 +568,77 @@ exports.getStudentHistoricalResults = async (req, res) => {
     return sendError(res, 500, "Failed to fetch historical results", error);
   }
 };
+
+exports.getUnresolvedExams = async (req, res) => {
+  try {
+    const exams = await Exam.find({
+      $or: [
+        { classId: { $exists: false } },
+        { classId: null }
+      ]
+    }).lean().sort({ date: -1 });
+
+    return sendSuccess(res, 200, "Unresolved exams fetched successfully", exams);
+  } catch (error) {
+    return sendError(res, 500, "Failed to fetch unresolved exams", error);
+  }
+};
+
+exports.mapLegacyExamClass = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { examId } = req.params;
+    const { classId, confirmation } = req.body;
+
+    if (confirmation !== true) {
+      throw Object.assign(new Error("Confirmation is required"), { status: 400 });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(classId)) {
+      throw Object.assign(new Error("Invalid classId format"), { status: 400 });
+    }
+
+    const exam = await Exam.findById(examId).session(session);
+    if (!exam) {
+      throw Object.assign(new Error("Exam not found"), { status: 404 });
+    }
+
+    if (exam.classId) {
+      throw Object.assign(new Error("Exam is already mapped to a canonical class"), { status: 409 });
+    }
+
+    const classDoc = await Class.findById(classId).session(session);
+    if (!classDoc) {
+      throw Object.assign(new Error("Class not found"), { status: 404 });
+    }
+
+    const oldLegacyClass = exam.class;
+    
+    exam.classId = classDoc._id;
+    exam.class = classDoc.fullName;
+    
+    // Disable validation if needed, but since it's just class and classId it should be fine.
+    await exam.save({ session });
+
+    await ActivityLog.create([{
+      user: req.user._id || req.user.id,
+      username: req.user.username,
+      role: req.user.role,
+      action: "EXAM_CLASS_MAPPED",
+      description: `Legacy exam "${exam.name}" (${examId}) mapped from "${oldLegacyClass}" to canonical class "${classDoc.fullName}" (${classDoc._id})`,
+      module: "Exams"
+    }], { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return sendSuccess(res, 200, "Legacy exam mapped successfully", exam);
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    return sendError(res, error.status || 500, "Failed to map legacy exam", error);
+  }
+};
+

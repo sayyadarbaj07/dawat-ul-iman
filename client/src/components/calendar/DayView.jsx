@@ -1,7 +1,10 @@
 import React from "react";
 import { format, isSameDay } from "date-fns";
+import { useLanguage } from "@/context/LanguageContext";
+import { formatHijriDate } from "./utils";
 
 export function DayView({ currentDate, events, onEventClick }) {
+  const { tr, language } = useLanguage();
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   // 1 hour = 60px height
@@ -40,8 +43,17 @@ export function DayView({ currentDate, events, onEventClick }) {
       <div className="flex border-b border-border/60 bg-muted/10 p-4 items-center gap-4">
         <div className="text-4xl font-black text-foreground">{format(currentDate, "d")}</div>
         <div className="flex flex-col">
-          <div className="text-sm font-bold uppercase text-muted-foreground">{format(currentDate, "EEEE")}</div>
-          <div className="text-sm font-medium text-muted-foreground">{format(currentDate, "MMMM yyyy")}</div>
+          <div className="text-sm font-bold uppercase text-muted-foreground">
+            {language === "ur" ? tr("calendar", format(currentDate, "EEEE")) : format(currentDate, "EEEE")}
+          </div>
+          <div className="text-sm font-medium text-muted-foreground">
+            {language === "ur" 
+              ? `${tr("calendar", format(currentDate, "MMMM"))} ${format(currentDate, "yyyy")}` 
+              : format(currentDate, "MMMM yyyy")}
+          </div>
+          <div className="text-xs font-medium text-muted-foreground/80 mt-0.5">
+            {formatHijriDate(currentDate, language, 'full')}
+          </div>
         </div>
       </div>
 

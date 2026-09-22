@@ -31,10 +31,11 @@ export default function Teachers() {
 
     const [formData, setFormData] = useState({
       name: "",
+      fatherName: "",
+      dateOfBirth: "",
       subject: "",
       mobile: "",
       salary: "",
-      classesAssigned: "",
       assignedClassIds: [],
       teachingAssignments: [],
       username: "",
@@ -42,18 +43,52 @@ export default function Teachers() {
       confirmPassword: "",
       isActive: true,
       joiningDate: "",
+      deactivationDate: "",
       photo: null,
+      address: "",
+      city: "",
+      district: "",
+      state: "",
+      pinCode: "",
+      whatsapp: "",
+      email: "",
+      emergencyContact: "",
+      designation: "",
+      department: "",
+      experience: "",
+      weeklyPeriods: "",
+      isClassTeacher: false,
+      classTeacherOf: "",
+      remarks: "",
     });
 
     const [editFormData, setEditFormData] = useState({
       name: "",
+      fatherName: "",
+      dateOfBirth: "",
       subject: "",
       mobile: "",
       salary: "",
-      classesAssigned: "",
       assignedClassIds: [],
       joiningDate: "",
+      deactivationDate: "",
       photo: null,
+      address: "",
+      city: "",
+      district: "",
+      state: "",
+      pinCode: "",
+      whatsapp: "",
+      email: "",
+      emergencyContact: "",
+      designation: "",
+      department: "",
+      experience: "",
+      weeklyPeriods: "",
+      isClassTeacher: false,
+      classTeacherOf: "",
+      remarks: "",
+      teachingAssignments: [],
     });
 
     // CLASS_OPTIONS removed in favor of dynamic apiClasses
@@ -105,13 +140,31 @@ export default function Teachers() {
         payload.append("subject", formData.subject);
         payload.append("mobile", formData.mobile);
         payload.append("salary", Number(formData.salary));
-        payload.append("classesAssigned", Number(formData.classesAssigned));
+        
         payload.append("teachingAssignments", JSON.stringify(formData.teachingAssignments));
         formData.assignedClassIds.forEach(c => payload.append("assignedClassIds[]", c));
         payload.append("username", formData.username);
         payload.append("password", formData.password);
         payload.append("isActive", formData.isActive);
         payload.append("joiningDate", formData.joiningDate);
+        if (formData.address) payload.append("address", formData.address);
+        if (formData.city) payload.append("city", formData.city);
+        if (formData.district) payload.append("district", formData.district);
+        if (formData.state) payload.append("state", formData.state);
+        if (formData.pinCode) payload.append("pinCode", formData.pinCode);
+        if (formData.whatsapp) payload.append("whatsapp", formData.whatsapp);
+        if (formData.email) payload.append("email", formData.email);
+        if (formData.emergencyContact) payload.append("emergencyContact", formData.emergencyContact);
+        if (formData.fatherName) payload.append("fatherName", formData.fatherName);
+        if (formData.dateOfBirth) payload.append("dateOfBirth", formData.dateOfBirth);
+        if (formData.designation) payload.append("designation", formData.designation);
+        if (formData.department) payload.append("department", formData.department);
+        if (formData.experience) payload.append("experience", Number(formData.experience));
+        if (formData.weeklyPeriods) payload.append("weeklyPeriods", Number(formData.weeklyPeriods));
+        payload.append("isClassTeacher", formData.isClassTeacher);
+        if (formData.classTeacherOf) payload.append("classTeacherOf", formData.classTeacherOf);
+        if (formData.remarks) payload.append("remarks", formData.remarks);
+        if (formData.deactivationDate) payload.append("deactivationDate", formData.deactivationDate);
         if (formData.photo) {
           payload.append("photo", formData.photo);
         }
@@ -119,8 +172,9 @@ export default function Teachers() {
         await teacherApi.createWithFile(payload);
         setIsAddModalOpen(false);
         setFormData({
-          name: "", subject: "", mobile: "", salary: "", classesAssigned: "", assignedClassIds: [],
-          username: "", password: "", confirmPassword: "", isActive: true, joiningDate: "", photo: null
+          name: "", fatherName: "", dateOfBirth: "", subject: "", mobile: "", salary: "", assignedClassIds: [],
+          username: "", password: "", confirmPassword: "", isActive: true, joiningDate: "", deactivationDate: "", photo: null,
+          designation: "", department: "", experience: "", weeklyPeriods: "", isClassTeacher: false, classTeacherOf: "", remarks: ""
         });
         loadTeachers();
       } catch (error) {
@@ -128,19 +182,34 @@ export default function Teachers() {
       }
     };
 
-
-
     const openEditModal = (teacher) => {
       setSelectedTeacher(teacher);
       setEditFormData({
         name: teacher.name || "",
+        fatherName: teacher.fatherName || "",
+        dateOfBirth: teacher.dateOfBirth ? new Date(teacher.dateOfBirth).toISOString().split('T')[0] : "",
         subject: teacher.subject || "",
         mobile: teacher.mobile || "",
         salary: teacher.salary || "",
-        classesAssigned: teacher.classesAssigned || "",
         assignedClassIds: teacher.assignedClassIds || [],
         teachingAssignments: teacher.teachingAssignments || [],
         joiningDate: teacher.joiningDate ? new Date(teacher.joiningDate).toISOString().split('T')[0] : "",
+        deactivationDate: teacher.deactivationDate ? new Date(teacher.deactivationDate).toISOString().split('T')[0] : "",
+        address: teacher.address || "",
+        city: teacher.city || "",
+        district: teacher.district || "",
+        state: teacher.state || "",
+        pinCode: teacher.pinCode || "",
+        whatsapp: teacher.whatsapp || "",
+        email: teacher.email || "",
+        emergencyContact: teacher.emergencyContact || "",
+        designation: teacher.designation || "",
+        department: teacher.department || "",
+        experience: teacher.experience || "",
+        weeklyPeriods: teacher.weeklyPeriods || "",
+        isClassTeacher: teacher.isClassTeacher || false,
+        classTeacherOf: teacher.classTeacherOf || "",
+        remarks: teacher.remarks || "",
       });
       setIsEditModalOpen(true);
     };
@@ -153,9 +222,28 @@ export default function Teachers() {
         payload.append("subject", editFormData.subject);
         payload.append("mobile", editFormData.mobile);
         payload.append("salary", Number(editFormData.salary));
-        payload.append("classesAssigned", Number(editFormData.classesAssigned));
-        payload.append("teachingAssignments", JSON.stringify(editFormData.teachingAssignments));
+        
+        payload.append("teachingAssignments", JSON.stringify(editFormData.teachingAssignments || []));
         payload.append("joiningDate", editFormData.joiningDate);
+        if (editFormData.address !== undefined) payload.append("address", editFormData.address ?? "");
+        if (editFormData.city !== undefined) payload.append("city", editFormData.city ?? "");
+        if (editFormData.district !== undefined) payload.append("district", editFormData.district ?? "");
+        if (editFormData.state !== undefined) payload.append("state", editFormData.state ?? "");
+        if (editFormData.pinCode !== undefined) payload.append("pinCode", editFormData.pinCode ?? "");
+        if (editFormData.whatsapp) payload.append("whatsapp", editFormData.whatsapp);
+        if (editFormData.email) payload.append("email", editFormData.email);
+        if (editFormData.emergencyContact) payload.append("emergencyContact", editFormData.emergencyContact);
+        if (editFormData.fatherName) payload.append("fatherName", editFormData.fatherName);
+        if (editFormData.dateOfBirth) payload.append("dateOfBirth", editFormData.dateOfBirth);
+        if (editFormData.designation) payload.append("designation", editFormData.designation);
+        if (editFormData.department) payload.append("department", editFormData.department);
+        if (editFormData.experience !== "") payload.append("experience", Number(editFormData.experience));
+        if (editFormData.weeklyPeriods !== "") payload.append("weeklyPeriods", Number(editFormData.weeklyPeriods));
+        payload.append("isClassTeacher", editFormData.isClassTeacher);
+        if (editFormData.classTeacherOf) payload.append("classTeacherOf", editFormData.classTeacherOf);
+        if (editFormData.remarks) payload.append("remarks", editFormData.remarks);
+        if (editFormData.deactivationDate) payload.append("deactivationDate", editFormData.deactivationDate);
+
         editFormData.assignedClassIds.forEach(c => payload.append("assignedClassIds[]", c));
         if (editFormData.photo) {
           payload.append("photo", editFormData.photo);
@@ -216,93 +304,172 @@ export default function Teachers() {
               
               <form onSubmit={handleSubmit}>
                 <div className="grid gap-4 py-2">
-                  <div className="font-semibold text-sm border-b pb-1">{tr("teachers", "profileDetails")}</div>
+                  {/* Personal Information */}
+                  <div className="font-semibold text-sm border-b pb-1 text-primary">{tr("teachers", "personalInformation") || "Personal Information"}</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="name">{tr("teachers", "fullName")}</Label>
+                      <Label htmlFor="name">{tr("teachers", "fullName")} *</Label>
                       <Input dir="auto" id="name" required placeholder="Maulana Abdullah" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="subject">{tr("teachers", "primarySubject")}</Label>
-                      <Input dir="auto" id="subject" required placeholder="Fiqh" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})}/>
+                      <Label htmlFor="fatherName">Father Name</Label>
+                      <Input dir="auto" id="fatherName" value={formData.fatherName} onChange={e => setFormData({...formData, fatherName: e.target.value})}/>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="mobile">{tr("teachers", "mobileNumber")}</Label>
+                      <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                      <Input dir="ltr" id="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={e => setFormData({...formData, dateOfBirth: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="mobile">{tr("teachers", "mobileNumber")} *</Label>
                       <Input dir="ltr" id="mobile" required placeholder="03xx-xxxxxxx" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})}/>
                     </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="salary">{tr("teachers", "salary")}</Label>
-                      <Input dir="ltr" id="salary" required type="number" placeholder="25000" value={formData.salary} onChange={e => setFormData({...formData, salary: e.target.value})}/>
+                      <Label htmlFor="whatsapp">WhatsApp</Label>
+                      <Input dir="ltr" id="whatsapp" value={formData.whatsapp} onChange={e => setFormData({...formData, whatsapp: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input dir="ltr" id="email" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="emergencyContact">Emergency Contact</Label>
+                      <Input dir="ltr" id="emergencyContact" value={formData.emergencyContact} onChange={e => setFormData({...formData, emergencyContact: e.target.value})}/>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+
+                  {/* Address Information */}
+                  <div className="font-semibold text-sm border-b pb-1 mt-4 text-primary">Address Details</div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input dir="auto" id="address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})}/>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="joiningDate">{tr("teachers", "joiningDate") || "Joining Date"}</Label>
+                      <Label htmlFor="city">City</Label>
+                      <Input dir="auto" id="city" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="district">District</Label>
+                      <Input dir="auto" id="district" value={formData.district} onChange={e => setFormData({...formData, district: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input dir="auto" id="state" value={formData.state} onChange={e => setFormData({...formData, state: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="pinCode">PIN Code</Label>
+                      <Input dir="ltr" id="pinCode" value={formData.pinCode} onChange={e => setFormData({...formData, pinCode: e.target.value})}/>
+                    </div>
+                  </div>
+
+                  {/* Employment Details */}
+                  <div className="font-semibold text-sm border-b pb-1 mt-4 text-primary">Employment Details</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="designation">Designation</Label>
+                      <Input dir="auto" id="designation" value={formData.designation} onChange={e => setFormData({...formData, designation: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="department">Department</Label>
+                      <Input dir="auto" id="department" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="subject">{tr("teachers", "primarySubject")} *</Label>
+                      <Input dir="auto" id="subject" required value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})}/>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="experience">Experience (Years)</Label>
+                      <Input dir="ltr" id="experience" type="number" min="0" value={formData.experience} onChange={e => setFormData({...formData, experience: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="weeklyPeriods">Weekly Periods</Label>
+                      <Input dir="ltr" id="weeklyPeriods" type="number" min="0" value={formData.weeklyPeriods} onChange={e => setFormData({...formData, weeklyPeriods: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="salary">{tr("teachers", "salary")} *</Label>
+                      <Input dir="ltr" id="salary" required type="number" value={formData.salary} onChange={e => setFormData({...formData, salary: e.target.value})}/>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="joiningDate">{tr("teachers", "joiningDate")} *</Label>
                       <Input dir="ltr" id="joiningDate" type="date" required value={formData.joiningDate} onChange={e => setFormData({...formData, joiningDate: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="classes">{tr("teachers", "classesCount")}</Label>
-                      <Input dir="ltr" id="classes" required type="number" placeholder="4" value={formData.classesAssigned} onChange={e => setFormData({...formData, classesAssigned: e.target.value})}/>
+                      <Label htmlFor="isActive">{tr("teachers", "accountStatus")} *</Label>
+                      <select id="isActive" value={String(formData.isActive)} onChange={e => setFormData({...formData, isActive: e.target.value === "true"})} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
+                        <option value="true">{tr("teachers", "active")}</option>
+                        <option value="false">{tr("teachers", "inactive")}</option>
+                      </select>
                     </div>
                   </div>
-                  <div className="grid gap-2 mt-4">
+
+                  {/* Teaching Assignments */}
+                  <div className="font-semibold text-sm border-b pb-1 mt-4 text-primary">Teaching Assignment</div>
+                  <div className="grid gap-2">
                     <Label>{tr("teachers", "assignClasses")}</Label>
-                    <div className="flex flex-wrap gap-4 mt-1">
+                    <div className="flex flex-wrap gap-4 mt-1 border p-3 rounded-md bg-muted/10">
                       {apiClasses.map((cls) => (
-                        <label key={cls._id} className="flex items-center space-x-2 text-sm">
-                          <input 
-                            type="checkbox" 
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            checked={formData.assignedClassIds.includes(cls._id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setFormData({...formData, assignedClassIds: [...formData.assignedClassIds, cls._id]});
-                              } else {
-                                setFormData({...formData, assignedClassIds: formData.assignedClassIds.filter(c => c !== cls._id)});
-                              }
-                            }}
-                          />
+                        <label key={cls._id} className="flex items-center space-x-2 text-sm cursor-pointer">
+                          <input type="checkbox" className="rounded border-gray-300 text-primary focus:ring-primary" checked={formData.assignedClassIds.includes(cls._id)} onChange={(e) => {
+                            if (e.target.checked) setFormData({...formData, assignedClassIds: [...formData.assignedClassIds, cls._id]});
+                            else setFormData({...formData, assignedClassIds: formData.assignedClassIds.filter(c => c !== cls._id)});
+                          }}/>
                           <span>{cls.fullName}</span>
                         </label>
                       ))}
                     </div>
                   </div>
-                  <div className="grid gap-2 mt-4">
-                    <Label htmlFor="photo">{tr("teachers", "profilePhoto")}</Label>
-                    <Input id="photo" type="file" accept="image/*" onChange={e => setFormData({...formData, photo: e.target.files[0]})} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className="flex items-center space-x-2 mt-4 cursor-pointer">
+                      <input type="checkbox" className="rounded border-gray-300 text-primary" checked={formData.isClassTeacher} onChange={e => setFormData({...formData, isClassTeacher: e.target.checked})}/>
+                      <span className="text-sm font-medium">Is Class Teacher?</span>
+                    </label>
+                    {formData.isClassTeacher && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="classTeacherOf">Class Teacher Of</Label>
+                        <select id="classTeacherOf" value={formData.classTeacherOf} onChange={e => setFormData({...formData, classTeacherOf: e.target.value})} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
+                          <option value="">Select Class</option>
+                          {apiClasses.map(cls => <option key={cls._id} value={cls._id}>{cls.fullName}</option>)}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="font-semibold text-sm border-b pb-1 mt-4">{tr("teachers", "loginCredentials")}</div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="username">{tr("teachers", "usernameEmail")}</Label>
-                    <Input dir="ltr" id="username" required placeholder="teacher@example.com" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})}/>
-                  </div>
+                  {/* Profile & Credentials */}
+                  <div className="font-semibold text-sm border-b pb-1 mt-4 text-primary">Profile & Login Credentials</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="password">{tr("teachers", "password")}</Label>
+                      <Label htmlFor="photo">{tr("teachers", "profilePhoto")}</Label>
+                      <Input id="photo" type="file" accept="image/*" onChange={e => setFormData({...formData, photo: e.target.files[0]})} />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="remarks">Remarks</Label>
+                      <Input dir="auto" id="remarks" value={formData.remarks} onChange={e => setFormData({...formData, remarks: e.target.value})}/>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="username">{tr("teachers", "usernameEmail")} *</Label>
+                      <Input dir="ltr" id="username" required value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="password">{tr("teachers", "password")} *</Label>
                       <Input dir="ltr" id="password" required type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="confirmPassword">{tr("teachers", "confirmPassword")}</Label>
+                      <Label htmlFor="confirmPassword">{tr("teachers", "confirmPassword")} *</Label>
                       <Input dir="ltr" id="confirmPassword" required type="password" value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})}/>
                     </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="isActive">{tr("teachers", "accountStatus")}</Label>
-                    <select
-                      id="isActive"
-                      value={String(formData.isActive)}
-                      onChange={e => setFormData({...formData, isActive: e.target.value === "true"})}
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="true">{tr("teachers", "active")}</option>
-                      <option value="false">{tr("teachers", "inactive")}</option>
-                    </select>
-                  </div>
                 </div>
-                <DialogFooter className="mt-6">
+                <DialogFooter className="mt-6 border-t pt-4">
                   <Button variant="outline" type="button" onClick={() => setIsAddModalOpen(false)}>{tr("teachers", "cancel")}</Button>
                   <Button type="submit">{tr("teachers", "saveTeacher")}</Button>
                 </DialogFooter>
@@ -321,72 +488,161 @@ export default function Teachers() {
               </DialogHeader>
               <form onSubmit={handleEditSubmit}>
                 <div className="grid gap-4 py-2">
+                  {/* Personal Information */}
+                  <div className="font-semibold text-sm border-b pb-1 text-primary">{tr("teachers", "personalInformation") || "Personal Information"}</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="edit-name">{tr("teachers", "fullName")}</Label>
+                      <Label htmlFor="edit-name">{tr("teachers", "fullName")} *</Label>
                       <Input dir="auto" id="edit-name" required value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="edit-subject">{tr("teachers", "primarySubject")}</Label>
-                      <Input dir="auto" id="edit-subject" required value={editFormData.subject} onChange={e => setEditFormData({...editFormData, subject: e.target.value})}/>
+                      <Label htmlFor="edit-fatherName">Father Name</Label>
+                      <Input dir="auto" id="edit-fatherName" value={editFormData.fatherName} onChange={e => setEditFormData({...editFormData, fatherName: e.target.value})}/>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="edit-mobile">{tr("teachers", "mobileNumber")}</Label>
-                      <Input dir="ltr" id="edit-mobile" required value={editFormData.mobile} onChange={e => setEditFormData({...editFormData, mobile: e.target.value})}/>
+                      <Label htmlFor="edit-dateOfBirth">Date of Birth</Label>
+                      <Input dir="ltr" id="edit-dateOfBirth" type="date" value={editFormData.dateOfBirth} onChange={e => setEditFormData({...editFormData, dateOfBirth: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="edit-salary">{tr("teachers", "salary")}</Label>
+                      <Label htmlFor="edit-mobile">{tr("teachers", "mobileNumber")} *</Label>
+                      <Input dir="ltr" id="edit-mobile" required value={editFormData.mobile} onChange={e => setEditFormData({...editFormData, mobile: e.target.value})}/>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-whatsapp">WhatsApp</Label>
+                      <Input dir="ltr" id="edit-whatsapp" value={editFormData.whatsapp} onChange={e => setEditFormData({...editFormData, whatsapp: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-email">Email</Label>
+                      <Input dir="ltr" id="edit-email" type="email" value={editFormData.email} onChange={e => setEditFormData({...editFormData, email: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-emergencyContact">Emergency Contact</Label>
+                      <Input dir="ltr" id="edit-emergencyContact" value={editFormData.emergencyContact} onChange={e => setEditFormData({...editFormData, emergencyContact: e.target.value})}/>
+                    </div>
+                  </div>
+
+                  {/* Address Information */}
+                  <div className="font-semibold text-sm border-b pb-1 mt-4 text-primary">Address Details</div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-address">Address</Label>
+                    <Input dir="auto" id="edit-address" value={editFormData.address} onChange={e => setEditFormData({...editFormData, address: e.target.value})}/>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-city">City</Label>
+                      <Input dir="auto" id="edit-city" value={editFormData.city} onChange={e => setEditFormData({...editFormData, city: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-district">District</Label>
+                      <Input dir="auto" id="edit-district" value={editFormData.district} onChange={e => setEditFormData({...editFormData, district: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-state">State</Label>
+                      <Input dir="auto" id="edit-state" value={editFormData.state} onChange={e => setEditFormData({...editFormData, state: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-pinCode">PIN Code</Label>
+                      <Input dir="ltr" id="edit-pinCode" value={editFormData.pinCode} onChange={e => setEditFormData({...editFormData, pinCode: e.target.value})}/>
+                    </div>
+                  </div>
+
+                  {/* Employment Details */}
+                  <div className="font-semibold text-sm border-b pb-1 mt-4 text-primary">Employment Details</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-designation">Designation</Label>
+                      <Input dir="auto" id="edit-designation" value={editFormData.designation} onChange={e => setEditFormData({...editFormData, designation: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-department">Department</Label>
+                      <Input dir="auto" id="edit-department" value={editFormData.department} onChange={e => setEditFormData({...editFormData, department: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-subject">{tr("teachers", "primarySubject")} *</Label>
+                      <Input dir="auto" id="edit-subject" required value={editFormData.subject} onChange={e => setEditFormData({...editFormData, subject: e.target.value})}/>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-experience">Experience (Years)</Label>
+                      <Input dir="ltr" id="edit-experience" type="number" min="0" value={editFormData.experience} onChange={e => setEditFormData({...editFormData, experience: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-weeklyPeriods">Weekly Periods</Label>
+                      <Input dir="ltr" id="edit-weeklyPeriods" type="number" min="0" value={editFormData.weeklyPeriods} onChange={e => setEditFormData({...editFormData, weeklyPeriods: e.target.value})}/>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-salary">{tr("teachers", "salary")} *</Label>
                       <Input dir="ltr" id="edit-salary" required type="number" value={editFormData.salary} onChange={e => setEditFormData({...editFormData, salary: e.target.value})}/>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="edit-joiningDate">{tr("teachers", "joiningDate") || "Joining Date"}</Label>
+                      <Label htmlFor="edit-joiningDate">{tr("teachers", "joiningDate")} *</Label>
                       <Input dir="ltr" id="edit-joiningDate" type="date" required value={editFormData.joiningDate} onChange={e => setEditFormData({...editFormData, joiningDate: e.target.value})}/>
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="edit-classes">{tr("teachers", "classesCount")}</Label>
-                      <Input dir="ltr" id="edit-classes" required type="number" value={editFormData.classesAssigned} onChange={e => setEditFormData({...editFormData, classesAssigned: e.target.value})}/>
+                      <Label htmlFor="edit-deactivationDate">Deactivation Date</Label>
+                      <Input dir="ltr" id="edit-deactivationDate" type="date" value={editFormData.deactivationDate} onChange={e => setEditFormData({...editFormData, deactivationDate: e.target.value})}/>
                     </div>
                   </div>
-                  <div className="grid gap-2 mt-4">
+
+                  {/* Teaching Assignments */}
+                  <div className="font-semibold text-sm border-b pb-1 mt-4 text-primary">Teaching Assignment</div>
+                  <div className="grid gap-2">
                     <Label>{tr("teachers", "assignClasses")}</Label>
-                    <div className="flex flex-wrap gap-4 mt-1">
+                    <div className="flex flex-wrap gap-4 mt-1 border p-3 rounded-md bg-muted/10">
                       {apiClasses.map((cls) => (
-                        <label key={cls._id} className="flex items-center space-x-2 text-sm">
-                          <input 
-                            type="checkbox" 
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            checked={editFormData.assignedClassIds.includes(cls._id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setEditFormData({...editFormData, assignedClassIds: [...editFormData.assignedClassIds, cls._id]});
-                              } else {
-                                setEditFormData({...editFormData, assignedClassIds: editFormData.assignedClassIds.filter(c => c !== cls._id)});
-                              }
-                            }}
-                          />
+                        <label key={cls._id} className="flex items-center space-x-2 text-sm cursor-pointer">
+                          <input type="checkbox" className="rounded border-gray-300 text-primary focus:ring-primary" checked={editFormData.assignedClassIds.includes(cls._id)} onChange={(e) => {
+                            if (e.target.checked) setEditFormData({...editFormData, assignedClassIds: [...editFormData.assignedClassIds, cls._id]});
+                            else setEditFormData({...editFormData, assignedClassIds: editFormData.assignedClassIds.filter(c => c !== cls._id)});
+                          }}/>
                           <span>{cls.fullName}</span>
                         </label>
                       ))}
                     </div>
                   </div>
-                  <div className="grid gap-2 mt-4">
-                    <Label htmlFor="edit-photo">{tr("teachers", "profilePhotoEdit")}</Label>
-                    <Input id="edit-photo" type="file" accept="image/*" onChange={e => setEditFormData({...editFormData, photo: e.target.files[0]})} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className="flex items-center space-x-2 mt-4 cursor-pointer">
+                      <input type="checkbox" className="rounded border-gray-300 text-primary" checked={editFormData.isClassTeacher} onChange={e => setEditFormData({...editFormData, isClassTeacher: e.target.checked})}/>
+                      <span className="text-sm font-medium">Is Class Teacher?</span>
+                    </label>
+                    {editFormData.isClassTeacher && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-classTeacherOf">Class Teacher Of</Label>
+                        <select id="edit-classTeacherOf" value={editFormData.classTeacherOf} onChange={e => setEditFormData({...editFormData, classTeacherOf: e.target.value})} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
+                          <option value="">Select Class</option>
+                          {apiClasses.map(cls => <option key={cls._id} value={cls._id}>{cls.fullName}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Profile & Remarks */}
+                  <div className="font-semibold text-sm border-b pb-1 mt-4 text-primary">Profile & Remarks</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-photo">{tr("teachers", "profilePhotoEdit")}</Label>
+                      <Input id="edit-photo" type="file" accept="image/*" onChange={e => setEditFormData({...editFormData, photo: e.target.files[0]})} />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-remarks">Remarks</Label>
+                      <Input dir="auto" id="edit-remarks" value={editFormData.remarks} onChange={e => setEditFormData({...editFormData, remarks: e.target.value})}/>
+                    </div>
                   </div>
                 </div>
-                <DialogFooter className="mt-6">
+                <DialogFooter className="mt-6 border-t pt-4">
                   <Button variant="outline" type="button" onClick={() => setIsEditModalOpen(false)}>{tr("teachers", "cancel")}</Button>
                   <Button type="submit">{tr("teachers", "saveTeacher")}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
-
-
 
         <div className="bg-card rounded-lg border shadow-sm">
           <div className="p-4 border-b flex items-center justify-between">
@@ -422,7 +678,7 @@ export default function Teachers() {
                           {teacher.subject}
                         </span>
                       </TableCell>
-                      <TableCell className="text-center">{teacher.classesAssigned}</TableCell>
+                      <TableCell className="text-center">{teacher.assignedClassIds ? teacher.assignedClassIds.length : 0}</TableCell>
                       <TableCell>
                         <div className="flex items-center text-sm">
                           <Phone className="h-3 w-3 me-1 text-muted-foreground"/>
