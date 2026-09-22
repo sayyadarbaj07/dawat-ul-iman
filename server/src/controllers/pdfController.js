@@ -1307,6 +1307,11 @@ exports.generateFinanceSummary = async (req, res) => {
   
         } else {
           // English Render
+          if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
+            doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
+          } else {
+            doc.registerFont("UrduFont", "Helvetica");
+          }
           doc.fontSize(10).font("Helvetica");
           doc.text(`Date Range: ${dateStr}`);
           if (academicYear) doc.text(`Academic Year: ${academicYear}`);
@@ -1366,9 +1371,18 @@ exports.generateFinanceSummary = async (req, res) => {
             doc.text(txDate, currX, y, { width: colDateW });
             currX += colDateW;
             
-            doc.text(desc, currX, y, { width: colDescW });
+            const hasUrdu = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(desc);
+            const descFont = hasUrdu ? "UrduFont" : "Helvetica";
+            
+            doc.font(descFont);
+            if (hasUrdu) {
+                urduPdfHelper.drawTextRTL(doc, desc, currX, y, { width: colDescW });
+            } else {
+                doc.text(desc, currX, y, { width: colDescW });
+            }
             currX += colDescW;
 
+            doc.font("Helvetica");
             doc.text(cat, currX, y, { width: colCatW });
             currX += colCatW;
 
