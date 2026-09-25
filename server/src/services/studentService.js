@@ -61,6 +61,15 @@ class StudentService {
         throw new Error("Failed to assign roll number: " + err.message);
       }
     }
+    if (payload.schoolClassId) {
+      const cls = await Class.findById(payload.schoolClassId);
+      if (!cls || cls.status !== "active" || cls.department !== "school") {
+        const error = new Error("Invalid or inactive school class assigned.");
+        error.name = "ValidationError";
+        throw error;
+      }
+    }
+    
     payload.admissionNumber = await this._getNextAdmissionNumber();
     const student = await Student.create(payload);
     return student;
@@ -144,6 +153,7 @@ class StudentService {
     const total = await Student.countDocuments(filter);
     const students = await Student.find(filter)
       .populate("classId", "fullName department")
+      .populate("schoolClassId", "fullName department")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parsedLimit)
@@ -161,7 +171,7 @@ class StudentService {
   }
 
   async getStudentById(id) {
-    return Student.findById(id).populate("classId", "fullName department");
+    return Student.findById(id).populate("classId", "fullName department").populate("schoolClassId", "fullName department");
   }
 
   async updateStudent(id, payload) {
@@ -175,6 +185,15 @@ class StudentService {
       // Do not dual-write legacy strings when canonical classId is provided
       payload.className = undefined;
       payload.studentClass = undefined;
+    }
+
+    if (payload.schoolClassId) {
+      const cls = await Class.findById(payload.schoolClassId);
+      if (!cls || cls.status !== "active" || cls.department !== "school") {
+        const error = new Error("Invalid or inactive school class assigned.");
+        error.name = "ValidationError";
+        throw error;
+      }
     }
 
     // SECURITY: Prevent tampering with auto-generated identifiers

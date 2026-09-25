@@ -58,6 +58,10 @@ export const pdfApi = {
     const query = new URLSearchParams(params).toString();
     return `${API_BASE}/pdf/class/marksheets?${query}`;
   },
+  getCombinedResultPdf(studentId, params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return `${API_BASE}/pdf/student/${studentId}/combined-result?${query}`;
+  },
   async downloadPdf(url, filename) {
     const token = localStorage.getItem("dawat_token");
     // Ensure URL doesn't duplicate /api if it comes from getStudentIdCard

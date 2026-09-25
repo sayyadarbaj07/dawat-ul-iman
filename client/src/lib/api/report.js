@@ -19,4 +19,8 @@ export const reportApi = {
     const query = new URLSearchParams(filters).toString();
     return request(`/reports/exams/analytics?${query}`);
   },
+  getCombinedResult: (studentId, filters = {}) => {
+    const query = new URLSearchParams(filters).toString();
+    return request(`/reports/student/${studentId}/combined-result${query ? `?${query}` : ''}`);
+  },
 };

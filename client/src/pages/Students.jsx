@@ -58,7 +58,8 @@ export default function Students() {
     nameUrdu: "",
     fatherName: "",
     rollNumber: "",
-    schoolClass: "",
+    schoolClassId: "",
+    schoolSection: "",
     classId: "",
     className: "", // keeping legacy field for backward compatibility
     studentClassCategory: "",
@@ -92,7 +93,8 @@ export default function Students() {
     nameUrdu: "",
     fatherName: "",
     rollNumber: "",
-    schoolClass: "",
+    schoolClassId: "",
+    schoolSection: "",
     classId: "",
     className: "",
     studentClassCategory: "",
@@ -143,6 +145,8 @@ export default function Students() {
   };
 
   const [apiClasses, setApiClasses] = useState([]);
+  const [madrasaClasses, setMadrasaClasses] = useState([]);
+  const [schoolClasses, setSchoolClasses] = useState([]);
 
   useEffect(() => {
     loadStudents("", false);
@@ -150,7 +154,10 @@ export default function Students() {
       try {
         const { classApi } = await import("@/lib/api/classApi");
         const res = await classApi.getClasses();
-        setApiClasses(res.data?.filter(c => c.status === "active") || []);
+        const activeClasses = res.data?.filter(c => c.status === "active") || [];
+        setApiClasses(activeClasses);
+        setSchoolClasses(activeClasses.filter(c => c.department === "school"));
+        setMadrasaClasses(activeClasses.filter(c => c.department !== "school"));
       } catch (err) {
         console.error(err);
       }
@@ -198,7 +205,8 @@ export default function Students() {
       if (formData.nameUrdu) payload.append("nameUrdu", formData.nameUrdu);
       payload.append("fatherName", formData.fatherName);
       payload.append("rollNumber", formData.rollNumber);
-      payload.append("schoolClass", formData.schoolClass);
+      if (formData.schoolClassId) payload.append("schoolClassId", formData.schoolClassId);
+      if (formData.schoolSection) payload.append("schoolSection", formData.schoolSection);
       if (formData.classId) {
         payload.append("classId", formData.classId);
       } else {
@@ -231,7 +239,8 @@ export default function Students() {
         fullName: "",
         fatherName: "",
         rollNumber: "",
-        schoolClass: "",
+        schoolClassId: "",
+        schoolSection: "",
         classId: "",
         className: "",
         studentClassCategory: "",
@@ -281,8 +290,9 @@ export default function Students() {
       nameUrdu: student.nameUrdu || "",
       fatherName: student.fatherName || "",
       rollNumber: student.rollNumber || "",
-      schoolClass: student.schoolClass || "",
-      classId: student.classId || "",
+      schoolClassId: student.schoolClassId?._id || student.schoolClassId || "",
+      schoolSection: student.schoolSection || "",
+      classId: student.classId?._id || student.classId || "",
       className: student.className || "",
       studentClassCategory: parsedCategory || "",
       studentClassSub: parsedSub || "",
@@ -314,7 +324,9 @@ export default function Students() {
       if (editFormData.nameUrdu) payload.append("nameUrdu", editFormData.nameUrdu);
       payload.append("fatherName", editFormData.fatherName);
       payload.append("rollNumber", editFormData.rollNumber);
-      payload.append("schoolClass", editFormData.schoolClass);
+      if (editFormData.schoolClassId) payload.append("schoolClassId", editFormData.schoolClassId);
+      else payload.append("schoolClassId", "");
+      if (editFormData.schoolSection) payload.append("schoolSection", editFormData.schoolSection);
       if (editFormData.classId) {
         payload.append("classId", editFormData.classId);
       } else {
@@ -615,9 +627,18 @@ export default function Students() {
                     <Label htmlFor="section">{tr("students", "section")}</Label>
                     <Input dir="auto" id="section" placeholder="A, B, C..." value={formData.section} onChange={(e) => setFormData({ ...formData, section: e.target.value })} />
                   </div>
-                  <div className="grid gap-2 sm:col-span-2">
-                    <Label htmlFor="schoolClass">School Class (Optional)</Label>
-                    <Input dir="auto" id="schoolClass" placeholder="e.g. 5th Grade, Matric" value={formData.schoolClass} onChange={(e) => setFormData({ ...formData, schoolClass: e.target.value })} />
+                  <div className="grid gap-2">
+                    <Label htmlFor="schoolClassId">{tr("students", "schoolClass")}</Label>
+                    <select id="schoolClassId" value={formData.schoolClassId} onChange={(e) => setFormData({ ...formData, schoolClassId: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                      <option value="">{tr("common", "selectClass")}</option>
+                      {schoolClasses.map(cls => (
+                        <option key={cls._id} value={cls._id}>{cls.fullName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="schoolSection">{tr("students", "schoolSection")}</Label>
+                    <Input dir="auto" id="schoolSection" placeholder="e.g. A, B" value={formData.schoolSection} onChange={(e) => setFormData({ ...formData, schoolSection: e.target.value })} />
                   </div>
                 </div>
               </div>
@@ -752,7 +773,7 @@ export default function Students() {
                     <Label htmlFor="edit-classId">Class (Assigned via API)</Label>
                     <select id="edit-classId" value={editFormData.classId} onChange={(e) => setEditFormData({ ...editFormData, classId: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                       <option value="">{tr("common", "selectClass")}</option>
-                      {apiClasses.map(cls => (
+                      {madrasaClasses.map(cls => (
                         <option key={cls._id} value={cls._id}>{cls.fullName}</option>
                       ))}
                     </select>
@@ -776,9 +797,18 @@ export default function Students() {
                     <Label htmlFor="edit-section">Section</Label>
                     <Input dir="auto" id="edit-section" value={editFormData.section} onChange={(e) => setEditFormData({ ...editFormData, section: e.target.value })} />
                   </div>
-                  <div className="grid gap-2 sm:col-span-2">
-                    <Label htmlFor="edit-schoolClass">School Class (Optional)</Label>
-                    <Input dir="auto" id="edit-schoolClass" value={editFormData.schoolClass} onChange={(e) => setEditFormData({ ...editFormData, schoolClass: e.target.value })} />
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-schoolClassId">{tr("students", "schoolClass")}</Label>
+                    <select id="edit-schoolClassId" value={editFormData.schoolClassId} onChange={(e) => setEditFormData({ ...editFormData, schoolClassId: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                      <option value="">{tr("common", "selectClass")}</option>
+                      {schoolClasses.map(cls => (
+                        <option key={cls._id} value={cls._id}>{cls.fullName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-schoolSection">{tr("students", "schoolSection")}</Label>
+                    <Input dir="auto" id="edit-schoolSection" placeholder="e.g. A, B" value={editFormData.schoolSection} onChange={(e) => setEditFormData({ ...editFormData, schoolSection: e.target.value })} />
                   </div>
                 </div>
               </div>
@@ -876,7 +906,7 @@ export default function Students() {
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "studentName")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "fatherName")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "classLabel")}</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">School Class</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "schoolClass")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "status")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "admission")}</TableHead>
                 <TableHead className="text-end text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -905,7 +935,7 @@ export default function Students() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {student.schoolClass || "—"}
+                      {student.schoolClassId?.fullName || student.schoolClass || "—"}
                     </TableCell>
                     <TableCell>
                       {student.residential ? (

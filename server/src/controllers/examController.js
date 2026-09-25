@@ -314,7 +314,10 @@ exports.saveBulkMarks = async (req, res) => {
       for (const stId of uniqueStudentIds) {
         const student = studentMap.get(stId);
         const studentClassId = student.classId && typeof student.classId === "object" ? student.classId._id : student.classId;
-        if (!studentClassId || String(studentClassId) !== String(exam.classId)) {
+        const studentSchoolClassId = student.schoolClassId && typeof student.schoolClassId === "object" ? student.schoolClassId._id : student.schoolClassId;
+        const matchesClass = studentClassId && String(studentClassId) === String(exam.classId);
+        const matchesSchoolClass = studentSchoolClassId && String(studentSchoolClassId) === String(exam.classId);
+        if (!matchesClass && !matchesSchoolClass) {
           throw Object.assign(new Error("One or more students do not belong to this exam's class."), { status: 400 });
         }
       }
@@ -401,7 +404,12 @@ exports.getCalculatedResults = async (req, res) => {
     // studentClass takes precedence, fallback to className
     let students = [];
     if (exam.classId) {
-      students = await Student.find({ classId: exam.classId }).lean();
+      students = await Student.find({
+        $or: [
+          { classId: exam.classId },
+          { schoolClassId: exam.classId }
+        ]
+      }).lean();
     } else {
       students = await Student.find({
         $or: [

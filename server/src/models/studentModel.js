@@ -25,9 +25,15 @@ const studentSchema = new mongoose.Schema(
       ref: 'Class',
       default: null
     },
+    schoolClassId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Class',
+      default: null
+    },
     schoolClass: { type: String, trim: true, default: "" },
     studentClass: { type: String, trim: true, default: "" },
     section: { type: String, trim: true, default: "" },
+    schoolSection: { type: String, trim: true, default: "" },
     rollNumber: { type: String, trim: true, default: "" },
     admissionNumber: { type: String, trim: true, default: "" },
     dateOfBirth: { type: Date, default: null },
@@ -130,5 +136,7 @@ studentSchema.index({ className: 1, status: 1 });
 
 // NEW: Optimized index for classId lookup (Attendance page)
 studentSchema.index({ classId: 1, status: 1 });
+
+studentSchema.index({ schoolClassId: 1, status: 1 });
 
 module.exports = mongoose.model("Student", studentSchema);

@@ -7,7 +7,8 @@ const {
   exportDetailedFinanceExcel, 
   getStudentListReport,
   exportStudentListExcel,
-  getExamAnalyticsReport
+  getExamAnalyticsReport,
+  getCombinedStudentResult
 } = require("../controllers/reportController");
 const { protect, authorize, checkClassAccess } = require("../middleware/authMiddleware");
 
@@ -21,6 +22,7 @@ router.get("/finance/detailed/excel", authorize("admin", "accountant"), exportDe
 router.get("/students/list", authorize("admin", "teacher"), checkClassAccess, getStudentListReport);
 router.get("/students/list/excel", authorize("admin", "teacher"), checkClassAccess, exportStudentListExcel);
 router.get("/exams/analytics", authorize("admin", "teacher"), checkClassAccess, getExamAnalyticsReport);
+router.get("/student/:studentId/combined-result", authorize("admin", "teacher"), getCombinedStudentResult);
 
 router.get("/diagnostic", async (req, res) => {
   const Transaction = require("../models/transactionModel");

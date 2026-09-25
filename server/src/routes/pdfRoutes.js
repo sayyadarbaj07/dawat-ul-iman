@@ -52,4 +52,8 @@ router.route("/student-list")
 
 // ...
 
+
+router.route("/student/:id/combined-result")
+  .get(authorize("admin", "teacher"), pdfController.generateCombinedResultPDF);
 module.exports = router;
+

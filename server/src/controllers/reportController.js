@@ -445,12 +445,306 @@ const exportDetailedFinanceExcel = async (req, res) => {
 
 
 
+const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
+
+// @desc    Get combined student result for both Madrasa and School tracks
+// @route   GET /api/reports/student/:studentId/combined-result
+// @access  Private (Admin, Teacher with class access)
+const fetchCombinedStudentResult = async (studentId, query, user) => {
+  try {
+    let { academicYear, madrasaExamId, schoolExamId } = query;
+
+    // 1. Fetch Student
+    const student = await Student.findById(studentId).populate("classId schoolClassId").lean();
+    if (!student) {
+      throw new Error("Student not found");
+    }
+
+    if (!academicYear) {
+      // Find the most recent exam for the student to determine the academic year
+      const recentExamResult = await ExamResult.findOne({ studentId })
+        .populate("examId")
+        .sort({ createdAt: -1 })
+        .lean();
+      
+      if (recentExamResult && recentExamResult.examId) {
+        academicYear = recentExamResult.examId.academicYear;
+      } else {
+        // No results at all for this student
+        return {
+          student: {
+            id: student._id,
+            name: student.name || student.fullName,
+            nameUrdu: student.nameUrdu,
+            admissionNumber: student.admissionNumber,
+            madrasaClass: student.classId ? (student.classId.fullName || student.classId.className || student.className) : null,
+            schoolClass: student.schoolClassId ? (student.schoolClassId.fullName || student.schoolClassId.className) : null,
+            schoolSection: student.schoolSection
+          },
+          madrasa: { resultsAvailable: false },
+          school: { resultsAvailable: false },
+          combined: null
+        };
+      }
+    }
+
+    // Normalize class IDs
+    const normalizedMadrasaClassId =
+      student.classId && typeof student.classId === "object" && student.classId._id
+        ? student.classId._id
+        : student.classId;
+
+    const normalizedSchoolClassId =
+      student.schoolClassId && typeof student.schoolClassId === "object" && student.schoolClassId._id
+        ? student.schoolClassId._id
+        : student.schoolClassId;
+
+    // RBAC Check
+    let hasAccess = false;
+    if (user.role === "admin") {
+      hasAccess = true;
+    } else if (user.role === "teacher") {
+      const hasMadrasaAccess = normalizedMadrasaClassId ? await verifyTeacherClassAccess(user, normalizedMadrasaClassId, student.className) : false;
+      const hasSchoolAccess = normalizedSchoolClassId ? await verifyTeacherClassAccess(user, normalizedSchoolClassId) : false;
+      hasAccess = hasMadrasaAccess || hasSchoolAccess;
+    }
+
+    if (!hasAccess) {
+      throw new Error("You are not authorized to view this student's result");
+    }
+
+    // 2. Exam Resolution
+    const madrasaClassId = normalizedMadrasaClassId;
+    const schoolClassId = normalizedSchoolClassId;
+
+    let selectedMadrasaExam = null;
+    let selectedSchoolExam = null;
+
+    const candidateMadrasaExams = madrasaClassId 
+      ? await Exam.find({ classId: madrasaClassId, academicYear }).lean() 
+      : [];
+    
+    const candidateSchoolExams = schoolClassId 
+      ? await Exam.find({ classId: schoolClassId, academicYear }).lean() 
+      : [];
+
+    if (madrasaExamId) {
+      selectedMadrasaExam = candidateMadrasaExams.find(e => String(e._id) === String(madrasaExamId));
+      if (!selectedMadrasaExam) {
+        throw new Error("Provided madrasaExamId does not belong to student's Madrasa class for the specified academic year.");
+      }
+    }
+
+    if (schoolExamId && schoolClassId) {
+      selectedSchoolExam = candidateSchoolExams.find(e => String(e._id) === String(schoolExamId));
+      if (!selectedSchoolExam) {
+        throw new Error("Provided schoolExamId does not belong to student's School class for the specified academic year.");
+      }
+    }
+
+    // Auto-select if there's only one exam, otherwise require selection
+    const needsMadrasaSelection = !selectedMadrasaExam && candidateMadrasaExams.length > 1;
+    const needsSchoolSelection = schoolClassId && !selectedSchoolExam && candidateSchoolExams.length > 1;
+
+    if (needsMadrasaSelection || needsSchoolSelection) {
+      return {
+        requiresExamSelection: true,
+        message: "Multiple exams found for this academic year. Please select specific exams.",
+        madrasaExams: candidateMadrasaExams.map(e => ({ id: e._id, name: e.name, examType: e.examType })),
+        schoolExams: candidateSchoolExams.map(e => ({ id: e._id, name: e.name, examType: e.examType }))
+      };
+    }
+
+    if (!selectedMadrasaExam && candidateMadrasaExams.length === 1) {
+      selectedMadrasaExam = candidateMadrasaExams[0];
+    }
+    if (schoolClassId && !selectedSchoolExam && candidateSchoolExams.length === 1) {
+      selectedSchoolExam = candidateSchoolExams[0];
+    }
+
+    // 3. Fetch Results
+    let madrasaData = null;
+    let schoolData = null;
+    let combined = null;
+
+    let mTotalMax = 0, mTotalObt = 0;
+    let sTotalMax = 0, sTotalObt = 0;
+
+    if (selectedMadrasaExam) {
+      const results = await ExamResult.find({ studentId, examId: selectedMadrasaExam._id }).lean();
+      madrasaData = {
+        resultsAvailable: results.length > 0,
+        class: {
+          id: normalizedMadrasaClassId,
+          name: student.classId && typeof student.classId === "object" ? (student.classId.fullName || student.classId.className || student.className) : student.className,
+          department: student.classId && typeof student.classId === "object" ? student.classId.department : null
+        },
+        exam: {
+          id: selectedMadrasaExam._id,
+          name: selectedMadrasaExam.name,
+          examType: selectedMadrasaExam.examType,
+          academicYear: selectedMadrasaExam.academicYear
+        },
+        subjects: [],
+        totals: {
+          maxMarks: 0,
+          obtainedMarks: 0,
+          percentage: 0,
+          grade: "" // Could compute using same logic as marksheet
+        }
+      };
+      
+      let failFlag = false;
+      for (const res of results) {
+        madrasaData.subjects.push({
+          subject: res.subject,
+          marks: res.marks,
+          maxMarks: selectedMadrasaExam.maxMarks,
+          passingMarks: selectedMadrasaExam.passingMarks
+        });
+        mTotalMax += selectedMadrasaExam.maxMarks || 100;
+        if (res.marks === -1) {
+          // Absent
+          failFlag = true;
+        } else {
+          mTotalObt += res.marks;
+          if (res.marks < selectedMadrasaExam.passingMarks) {
+            failFlag = true;
+          }
+        }
+      }
+      if (results.length > 0) {
+        madrasaData.totals.maxMarks = mTotalMax;
+        madrasaData.totals.obtainedMarks = mTotalObt;
+        madrasaData.totals.percentage = mTotalMax > 0 ? (mTotalObt / mTotalMax) * 100 : 0;
+        madrasaData.totals.grade = failFlag ? "F" : getGradeFromPercentage(madrasaData.totals.percentage);
+      }
+    } else {
+       madrasaData = { resultsAvailable: false, message: "No Madrasa exams found for this year." };
+    }
+
+    if (schoolClassId) {
+      if (selectedSchoolExam) {
+        const results = await ExamResult.find({ studentId, examId: selectedSchoolExam._id }).lean();
+        schoolData = {
+          resultsAvailable: results.length > 0,
+          class: {
+            id: normalizedSchoolClassId,
+            name: student.schoolClassId && typeof student.schoolClassId === "object" ? (student.schoolClassId.fullName || student.schoolClassId.className) : null,
+            section: student.schoolSection
+          },
+          exam: {
+            id: selectedSchoolExam._id,
+            name: selectedSchoolExam.name,
+            examType: selectedSchoolExam.examType,
+            academicYear: selectedSchoolExam.academicYear
+          },
+          subjects: [],
+          totals: {
+            maxMarks: 0,
+            obtainedMarks: 0,
+            percentage: 0,
+            grade: ""
+          }
+        };
+
+        let failFlag = false;
+        for (const res of results) {
+          schoolData.subjects.push({
+            subject: res.subject,
+            marks: res.marks,
+            maxMarks: selectedSchoolExam.maxMarks,
+            passingMarks: selectedSchoolExam.passingMarks
+          });
+          sTotalMax += selectedSchoolExam.maxMarks || 100;
+          if (res.marks === -1) {
+            failFlag = true;
+          } else {
+            sTotalObt += res.marks;
+            if (res.marks < selectedSchoolExam.passingMarks) {
+              failFlag = true;
+            }
+          }
+        }
+        if (results.length > 0) {
+          schoolData.totals.maxMarks = sTotalMax;
+          schoolData.totals.obtainedMarks = sTotalObt;
+          schoolData.totals.percentage = sTotalMax > 0 ? (sTotalObt / sTotalMax) * 100 : 0;
+          schoolData.totals.grade = failFlag ? "F" : getGradeFromPercentage(schoolData.totals.percentage);
+        }
+      } else {
+        schoolData = { resultsAvailable: false, message: "No School exams found for this year." };
+      }
+    }
+
+    // 4. Combined Totals
+    if (madrasaData?.resultsAvailable && schoolData?.resultsAvailable) {
+      const combinedMax = mTotalMax + sTotalMax;
+      const combinedObt = mTotalObt + sTotalObt;
+      const combinedPct = combinedMax > 0 ? (combinedObt / combinedMax) * 100 : 0;
+      combined = {
+        maxMarks: combinedMax,
+        obtainedMarks: combinedObt,
+        percentage: combinedPct,
+        grade: madrasaData.totals.grade === "F" || schoolData.totals.grade === "F" ? "F" : getGradeFromPercentage(combinedPct)
+      };
+    }
+
+    // Student Info
+    const studentInfo = {
+      id: student._id,
+      name: student.name || student.fullName,
+      nameUrdu: student.nameUrdu,
+      admissionNumber: student.admissionNumber,
+      madrasaClass: student.classId ? (student.classId.fullName || student.classId.className || student.className) : null,
+      schoolClass: student.schoolClassId ? (student.schoolClassId.fullName || student.schoolClassId.className) : null,
+      schoolSection: student.schoolSection
+    };
+
+    return {
+      student: studentInfo,
+      madrasa: madrasaData,
+      school: schoolData,
+      combined: combined
+    };
+
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getCombinedStudentResult = async (req, res) => {
+  try {
+    const data = await fetchCombinedStudentResult(req.params.studentId, req.query, req.user);
+    if (data.requiresExamSelection) {
+      return res.status(200).json({ success: true, ...data });
+    }
+    return sendSuccess(res, 200, "Combined result fetched", data);
+  } catch (err) {
+    const statusCode = err.message === "You are not authorized to view this student's result" ? 403 : (err.message.includes("not found") ? 404 : 400);
+    return sendError(res, statusCode, err.message);
+  }
+};
+
+const getGradeFromPercentage = (percentage) => {
+  if (percentage >= 80) return "A+";
+  if (percentage >= 70) return "A";
+  if (percentage >= 60) return "B";
+  if (percentage >= 50) return "C";
+  if (percentage >= 40) return "D";
+  if (percentage >= 33) return "E";
+  return "F";
+};
+
+
 module.exports = {
+  fetchCombinedStudentResult,
   getSummary,
   getWeakStudentsReport,
   getDetailedFinanceReport,
   exportDetailedFinanceExcel,
   getStudentListReport,
   exportStudentListExcel,
-  getExamAnalyticsReport
+  getExamAnalyticsReport,
+  getCombinedStudentResult
 };

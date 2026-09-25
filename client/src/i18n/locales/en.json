@@ -295,7 +295,14 @@
     "studentDeleted": "Student deleted successfully",
     "failedToSave": "Failed to save student",
     "failedToUpdate": "Failed to update student",
-    "failedToDelete": "Failed to delete student"
+    "failedToDelete": "Failed to delete student",
+    "deeniEducation": "Deeni Education",
+    "madrasaEducation": "Madrasa Education",
+    "asriEducation": "Asri Education",
+    "schoolEducation": "School Education",
+    "schoolClass": "School Class",
+    "schoolSection": "School Section",
+    "notAssigned": "Not Assigned"
   },
   "dataResolution": {
     "pageTitle": "Data Resolution",
@@ -1177,5 +1184,28 @@
   },
   "days": {
     "daily": "Daily"
+  },
+  "combinedResult": {
+    "title": "COMBINED RESULT",
+    "studentInformation": "Student Information",
+    "deeniEducation": "PART (A) — DEENI EDUCATION",
+    "asriEducation": "PART (B) — ASRI EDUCATION",
+    "class": "Class",
+    "schoolClass": "School Class",
+    "section": "Section",
+    "subject": "Subject",
+    "maximumMarks": "Max Marks",
+    "obtainedMarks": "Obtained",
+    "remarks": "Remarks",
+    "total": "Total",
+    "percentage": "Percentage",
+    "grade": "Grade",
+    "combinedResult": "COMBINED RESULT",
+    "download": "Download Combined Result",
+    "schoolResultNotAvailable": "School result not available",
+    "resultNotAvailable": "Result not available",
+    "loading": "Loading...",
+    "error": "Error loading combined result",
+    "admissionNo": "Admission No"
   }
 }

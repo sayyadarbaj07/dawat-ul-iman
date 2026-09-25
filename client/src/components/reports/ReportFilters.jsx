@@ -124,7 +124,7 @@ export function ReportFilters({
         {config.showClass && (
             <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-gray-500">Class</Label>
-                <Select value={filters.class} onValueChange={(val) => handleChange("class", val)}>
+                <Select value={filters.class || undefined} onValueChange={(val) => handleChange("class", val)}>
                     <SelectTrigger>
                         <SelectValue placeholder="Select Class" />
                     </SelectTrigger>
@@ -142,7 +142,7 @@ export function ReportFilters({
         {config.showExamType && (
             <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-gray-500">Exam Type</Label>
-                <Select value={filters.examType} onValueChange={(val) => handleChange("examType", val)}>
+                <Select value={filters.examType || undefined} onValueChange={(val) => handleChange("examType", val)}>
                     <SelectTrigger>
                         <SelectValue placeholder="Select Exam Type" />
                     </SelectTrigger>
@@ -159,7 +159,7 @@ export function ReportFilters({
             <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-gray-500">Exam</Label>
                 <Select 
-                    value={filters.examId || ""} 
+                    value={filters.examId || undefined} 
                     onValueChange={(val) => handleChange("examId", val)}
                     disabled={!filters.class || filters.class === "all" || loadingExams}
                 >
@@ -221,7 +221,7 @@ export function ReportFilters({
             <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-gray-500">Student</Label>
                 <Select 
-                    value={filters.studentId || ""} 
+                    value={filters.studentId || undefined} 
                     onValueChange={(val) => handleChange("studentId", val)}
                     disabled={!filters.class || filters.class === "all" || loadingStudents}
                 >

@@ -43,38 +43,28 @@ export default function Reports() {
     { id: "finance", label: tr("reports", "catFinance"), icon: Landmark },
   ].filter(cat => {
     if (user?.role === "accountant") return cat.id === "finance";
+    if (user?.role === "teacher") return cat.id !== "finance";
     return true;
   });
 
   const ALL_REPORTS = [
     // Student Reports
-    { id: "student_performance", category: "students", title: tr("reports", "studentPerformance"), desc: tr("reports", "studentPerformanceDesc"), icon: BookOpen, config: { showClass: true, showStudent: true, showExamType: true } },
     { id: "student_marksheet", category: "students", title: tr("reports", "studentMarksheet"), desc: tr("reports", "studentMarksheetDesc"), icon: FileSpreadsheet, config: { showClass: true, showStudent: true, showExamType: true } },
     { id: "student_list", category: "students", title: tr("reports", "studentListReport"), desc: tr("reports", "studentListReportDesc"), icon: Users, config: { showClass: true } },
     { id: "weak_students", category: "students", title: tr("reports", "weakStudentsReport"), desc: tr("reports", "weakStudentsReportDesc"), icon: TrendingDown, config: { showClass: true } },
     { id: "student_attendance", category: "students", title: tr("reports", "studentAttendanceReport"), desc: tr("reports", "studentAttendanceReportDesc"), icon: CalendarCheck, config: { showClass: true, showStudent: true, showDateRange: true } },
     // Result Reports
-    { id: "monthly_result", category: "results", title: tr("reports", "monthlyResult"), desc: tr("reports", "monthlyResultDesc"), icon: FileSpreadsheet, config: { showClass: true } },
-    { id: "half_yearly_result", category: "results", title: tr("reports", "halfYearlyResult"), desc: tr("reports", "halfYearlyResultDesc"), icon: Award, config: { showClass: true } },
-    { id: "annual_result", category: "results", title: tr("reports", "annualResult"), desc: tr("reports", "annualResultDesc"), icon: GraduationCap, config: { showClass: true } },
     { id: "class_result", category: "results", title: tr("reports", "classResult"), desc: tr("reports", "classResultDesc"), icon: Users, config: { showClass: true, showExamType: true } },
     { id: "class_marksheets", category: "results", title: "Class Marksheets", desc: "Generate marksheets for all students in a class", icon: BookOpen, config: { showClass: true, showExamType: true } },
     { id: "yearly_result", category: "results", title: "Yearly Result", desc: "Generate yearly result for a specific student", icon: Award, config: { showClass: true, showStudent: true } },
     { id: "academic_history", category: "results", title: "Academic History", desc: "Generate academic history for a specific student", icon: BookOpen, config: { showClass: true, showStudent: true } },
     // Attendance Reports
-    { id: "daily_attendance", category: "attendance", title: tr("reports", "dailyAttendance"), desc: tr("reports", "dailyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showDateRange: true } },
-    { id: "weekly_attendance", category: "attendance", title: tr("reports", "weeklyAttendance"), desc: tr("reports", "weeklyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showDateRange: true } },
-    { id: "monthly_attendance", category: "attendance", title: tr("reports", "monthlyAttendance"), desc: tr("reports", "monthlyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showMonth: true, showYear: true } },
-    { id: "yearly_attendance", category: "attendance", title: tr("reports", "yearlyAttendance"), desc: tr("reports", "yearlyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showYear: true } },
+    { id: "class_attendance", category: "attendance", title: tr("reports", "dailyAttendance"), desc: tr("reports", "dailyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showDateRange: true } },
     // Finance Reports
-    { id: "daily_finance", category: "finance", title: tr("reports", "dailyFinance"), desc: tr("reports", "dailyFinanceDesc"), icon: Wallet, config: { showDateRange: true } },
-    { id: "weekly_finance", category: "finance", title: tr("reports", "weeklyFinance"), desc: tr("reports", "weeklyFinanceDesc"), icon: Landmark, config: { showDateRange: true } },
-    { id: "monthly_finance", category: "finance", title: tr("reports", "monthlyFinance"), desc: tr("reports", "monthlyFinanceDesc"), icon: Landmark, config: { showDateRange: true } },
-    { id: "yearly_finance", category: "finance", title: tr("reports", "yearlyFinance"), desc: tr("reports", "yearlyFinanceDesc"), icon: Landmark, config: { showDateRange: true } },
+    { id: "finance_summary", category: "finance", title: tr("reports", "dailyFinance"), desc: tr("reports", "dailyFinanceDesc"), icon: Wallet, config: { showDateRange: true } },
     { id: "income_report", category: "finance", title: tr("reports", "incomeReport"), desc: tr("reports", "incomeReportDesc"), icon: TrendingDown, config: { showDateRange: true, showCategory: true } },
     { id: "expense_report", category: "finance", title: tr("reports", "expenseReport"), desc: tr("reports", "expenseReportDesc"), icon: Receipt, config: { showDateRange: true, showCategory: true } },
     { id: "donor_report", category: "finance", title: tr("reports", "donorReport"), desc: tr("reports", "donorReportDesc"), icon: HeartHandshake, config: { showDateRange: true } },
-    { id: "receipt_history", category: "finance", title: tr("reports", "receiptHistory"), desc: tr("reports", "receiptHistoryDesc"), icon: Receipt, config: { showDateRange: true } },
   ];
 
   
@@ -84,7 +74,7 @@ export default function Reports() {
   const [isLoading, setIsLoading] = useState(false);
   
   const [filters, setFilters] = useState({
-      class: user?.role === "admin" ? "all" : "",
+      class: "all",
       examType: "monthly",
       startDate: "",
       endDate: "",
@@ -133,6 +123,7 @@ export default function Reports() {
         });
     } else {
         setAssignedClasses(ALL_DYNAMIC_CLASSES);
+        setFilters(prev => ({ ...prev, class: "all" }));
     }
   };
 
@@ -222,7 +213,7 @@ export default function Reports() {
       }
 
       // Validation for exam reports
-      if (selectedReport?.config?.showExamType && !examType && !examId && selectedReport.id !== "monthly_result" && selectedReport.id !== "half_yearly_result" && selectedReport.id !== "annual_result") {
+      if (selectedReport?.config?.showExamType && !examType && !examId) {
           toast({ title: "Missing Filter", description: "Please select an Exam Type or Exam.", variant: "destructive" });
           return;
       }
@@ -231,7 +222,7 @@ export default function Reports() {
       if (selectedReport?.id === "weak_students") {
           downloadPdf(pdfApi.getWeakStudentsReport({ ...filters, language }), `Weak_Students_Report_${language}.pdf`);
       } 
-      else if (selectedReport?.id === "student_performance" || selectedReport?.id === "student_marksheet") {
+      else if (selectedReport?.id === "student_marksheet") {
           downloadPdf(pdfApi.getStudentReportCard(studentId, examId || examType, language), `Marksheet_${studentId}_${language}.pdf`);
       }
       else if (selectedReport?.id === "yearly_result") {
@@ -243,34 +234,14 @@ export default function Reports() {
       else if (selectedReport?.id === "class_result") {
           downloadPdf(pdfApi.getClassResult(classId, examId, examType, language), `Class_Result_${classId}_${language}.pdf`);
       }
-      else if (selectedReport?.id === "monthly_result") {
-          downloadPdf(pdfApi.getClassResult(classId, examId, "monthly", language), `Monthly_Result_${classId}_${language}.pdf`);
-      }
-      else if (selectedReport?.id === "half_yearly_result") {
-          downloadPdf(pdfApi.getClassResult(classId, examId, "half-yearly", language), `Half_Yearly_Result_${classId}_${language}.pdf`);
-      }
-      else if (selectedReport?.id === "annual_result") {
-          downloadPdf(pdfApi.getClassResult(classId, examId, "annual", language), `Annual_Result_${classId}_${language}.pdf`);
-      }
       else if (selectedReport?.id === "class_marksheets") {
           downloadPdf(pdfApi.getClassMarksheets(classId, examId, examType, language), `Class_Marksheets_${classId}_${language}.pdf`);
       }
       else if (selectedReport?.id === "student_attendance") {
           downloadPdf(pdfApi.getStudentAttendanceReport(studentId, { ...filters, language }), `Student_Attendance_${studentId}_${language}.pdf`);
       } 
-      else if (selectedReport?.id === "daily_attendance") {
-          // Send today's date if not set
-          const today = new Date().toISOString().split('T')[0];
-          downloadPdf(pdfApi.getClassAttendanceReport({ classId, startDate: startDate || today, endDate: endDate || today, language }), `Daily_Attendance_${language}.pdf`);
-      }
-      else if (selectedReport?.id === "weekly_attendance") {
-          downloadPdf(pdfApi.getClassAttendanceReport({ classId, startDate, endDate, language }), `Weekly_Attendance_${language}.pdf`);
-      }
-      else if (selectedReport?.id === "monthly_attendance") {
-          downloadPdf(pdfApi.getClassAttendanceReport({ classId, month, year, language }), `Monthly_Attendance_${language}.pdf`);
-      }
-      else if (selectedReport?.id === "yearly_attendance") {
-          downloadPdf(pdfApi.getClassAttendanceReport({ classId, year, language }), `Yearly_Attendance_${language}.pdf`);
+      else if (selectedReport?.id === "class_attendance") {
+          downloadPdf(pdfApi.getClassAttendanceReport({ classId, startDate, endDate, language }), `Class_Attendance_${language}.pdf`);
       }
       else if (selectedReport?.category === "finance") {
           // Build finance params explicitly — never serialize undefined/null as query strings

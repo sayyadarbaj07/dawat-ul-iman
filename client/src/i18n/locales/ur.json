@@ -295,7 +295,14 @@
     "studentDeleted": "طالب علم کا ریکارڈ کامیابی سے حذف ہو گیا",
     "failedToSave": "طالب علم محفوظ کرنے میں ناکامی",
     "failedToUpdate": "طالب علم اپ ڈیٹ کرنے میں ناکامی",
-    "failedToDelete": "طالب علم حذف کرنے میں ناکامی"
+    "failedToDelete": "طالب علم حذف کرنے میں ناکامی",
+    "deeniEducation": "دینی تعلیم",
+    "madrasaEducation": "مدرسہ تعلیم",
+    "asriEducation": "عصری تعلیم",
+    "schoolEducation": "اسکول کی تعلیم",
+    "schoolClass": "اسکول کی جماعت",
+    "schoolSection": "اسکول کا سیکشن",
+    "notAssigned": "تفویض نہیں کیا گیا"
   },
   "dataResolution": {
     "pageTitle": "ڈیٹا ریزولوشن",
@@ -1165,5 +1172,28 @@
   },
   "days": {
     "daily": "روزانہ"
+  },
+  "combinedResult": {
+    "title": "مجموعی نتیجہ",
+    "studentInformation": "طالب علم کی معلومات",
+    "deeniEducation": "حصہ (الف) — دینی تعلیم",
+    "asriEducation": "حصہ (ب) — عصری تعلیم",
+    "class": "درجہ",
+    "schoolClass": "اسکول کلاس",
+    "section": "سیکشن",
+    "subject": "مضمون",
+    "maximumMarks": "کل نمبر",
+    "obtainedMarks": "حاصل کردہ",
+    "remarks": "کیفیت",
+    "total": "میزان",
+    "percentage": "فیصد",
+    "grade": "گریڈ",
+    "combinedResult": "مجموعی نتیجہ",
+    "download": "مجموعی نتیجہ ڈاؤن لوڈ کریں",
+    "schoolResultNotAvailable": "اسکول کا نتیجہ دستیاب نہیں ہے",
+    "resultNotAvailable": "نتیجہ دستیاب نہیں ہے",
+    "loading": "لوڈ ہو رہا ہے...",
+    "error": "نتیجہ لوڈ کرنے میں خرابی",
+    "admissionNo": "داخلہ نمبر"
   }
 }

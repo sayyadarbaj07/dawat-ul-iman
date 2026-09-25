@@ -40,6 +40,9 @@ exports.createStudent = async (req, res) => {
     if (req.file) {
       payload.photo = `/uploads/profiles/${req.file.filename}`;
     }
+    if (payload.schoolClassId === "") {
+      payload.schoolClassId = null;
+    }
     const student = await studentService.createStudent(payload);
     
     // Dispatch Activity & Notification
@@ -172,6 +175,10 @@ exports.updateStudent = async (req, res) => {
           console.error("Failed to delete old photo:", err);
         }
       }
+    }
+
+    if (payload.schoolClassId === "") {
+      payload.schoolClassId = null;
     }
 
     const student = await studentService.updateStudent(req.params.id, payload);

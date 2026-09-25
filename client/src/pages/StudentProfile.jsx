@@ -16,6 +16,7 @@ import { StudentDocumentManager } from "@/components/students/StudentDocumentMan
 import { StudentHostelManager } from "@/components/students/StudentHostelManager";
 import { StudentTimeline } from "@/components/students/StudentTimeline";
 import { StudentCurriculumTab } from '@/components/student/StudentCurriculumTab';
+import { StudentCombinedResult } from '@/components/students/StudentCombinedResult';
 import { useAuth } from "@/context/AuthContext";
 
 export default function StudentProfile() {
@@ -203,22 +204,44 @@ export default function StudentProfile() {
               <CardHeader>
                 <CardTitle>Basic Information</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Department</p>
-                  <p className="font-medium">{department}</p>
+              <CardContent className="grid grid-cols-1 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground border-b pb-1 mb-2 font-semibold text-primary">{tr("students", "madrasaEducation") || "Madrasa Education"}</p>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Department</p>
+                        <p className="text-sm font-medium">{department}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Class</p>
+                        <p className="text-sm font-medium">{className}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground border-b pb-1 mb-2 font-semibold text-primary">{tr("students", "schoolEducation") || "School Education"}</p>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">{tr("students", "schoolClass") || "School Class"}</p>
+                        <p className="text-sm font-medium">{student.schoolClassId?.fullName || student.schoolClass || tr("students", "notAssigned") || "Not Assigned"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">{tr("students", "schoolSection") || "School Section"}</p>
+                        <p className="text-sm font-medium">{student.schoolSection || "—"}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Class</p>
-                  <p className="font-medium">{className}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Admission Number</p>
-                  <p className="font-medium" dir="ltr">{renderValue(student.admissionNumber)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Residential Status</p>
-                  <p className="font-medium">{student.residential ? tr("students", "residential") : tr("students", "dayScholar")}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Admission Number</p>
+                    <p className="font-medium" dir="ltr">{renderValue(student.admissionNumber)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Residential Status</p>
+                    <p className="font-medium">{student.residential ? tr("students", "residential") : tr("students", "dayScholar")}</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -447,6 +470,8 @@ export default function StudentProfile() {
               )}
             </CardContent>
           </Card>
+          
+          <StudentCombinedResult studentId={studentId} />
         </TabsContent>
 
         {/* 5.5 CURRICULUM TAB */}

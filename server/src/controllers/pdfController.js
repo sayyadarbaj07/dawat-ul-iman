@@ -2784,3 +2784,221 @@ exports.generateTeacherIdCard = async (req, res) => {
   }
 };
 
+
+exports.generateCombinedResultPDF = async (req, res) => {
+  try {
+    const { fetchCombinedStudentResult } = require('./reportController');
+    const language = resolvePdfLanguage(req.query.language);
+    const isUrdu = language === 'ur';
+    
+    // Fetch data using the newly isolated Phase 4A logic
+    let combinedData;
+    try {
+      combinedData = await fetchCombinedStudentResult(req.params.id, req.query, req.user);
+    } catch (e) {
+      if (e.message.includes('authorized')) return res.status(403).json({ message: e.message });
+      if (e.message.includes('not found')) return res.status(404).json({ message: e.message });
+      return res.status(400).json({ message: e.message });
+    }
+
+    if (combinedData.requiresExamSelection) {
+      return res.status(400).json(combinedData);
+    }
+
+    const { student, madrasa, school, combined } = combinedData;
+
+    const LABELS = {
+      en: {
+        title: "STUDENT RESULT",
+        studentInfo: "Student Information",
+        partA: "PART (A) — DEENI EDUCATION",
+        partB: "PART (B) — ASRI EDUCATION",
+        class: "Class",
+        section: "Section",
+        subject: "Subject",
+        max: "Max",
+        obtained: "Obtained",
+        remarks: "Remarks",
+        total: "Total",
+        percentage: "Percentage",
+        grade: "Grade",
+        combined: "COMBINED RESULT",
+        totalMarks: "Total Marks",
+        admissionNo: "Admission No",
+        name: "Name",
+        absent: "Absent",
+        pass: "Pass",
+        fail: "Fail"
+      },
+      ur: {
+        title: "طالب علم کا نتیجہ",
+        studentInfo: "طالب علم کی معلومات",
+        partA: "حصہ (الف) — دینی تعلیم",
+        partB: "حصہ (ب) — عصری تعلیم",
+        class: "درجہ",
+        section: "سیکشن",
+        subject: "مضمون",
+        max: "کل نمبر",
+        obtained: "حاصل کردہ",
+        remarks: "کیفیت",
+        total: "میزان",
+        percentage: "فیصد",
+        grade: "گریڈ",
+        combined: "مجموعی نتیجہ",
+        totalMarks: "کل نمبر",
+        admissionNo: "داخلہ نمبر",
+        name: "نام",
+        absent: "غیر حاضر",
+        pass: "پاس",
+        fail: "فیل"
+      }
+    };
+    
+    const l = LABELS[isUrdu ? 'ur' : 'en'];
+    const isUrduTextStr = (str) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(str);
+
+    generatePDF(res, "Combined Result", (doc) => {
+      if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
+        doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
+      }
+      
+      const drawText = (text, x, y, options = {}) => {
+        const textStr = String(text || '');
+        if (isUrduTextStr(textStr)) {
+          urduPdfHelper.drawTextRTL(doc, textStr, x, y, { font: "UrduFont", fontSize: options.fontSize || 10, ...options });
+        } else {
+          doc.font(options.font || "Helvetica").fontSize(options.fontSize || 10).text(textStr, x, y, options);
+        }
+      };
+
+      let y = 100;
+      const leftMargin = 50;
+
+      // Title
+      drawText(l.title, 0, doc.y, { font: "Helvetica-Bold", fontSize: 16, align: "center", width: doc.page.width });
+      doc.moveDown(2);
+
+      // Student Info
+      drawText(l.studentInfo, leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 12 });
+      doc.moveDown(0.2);
+      doc.font("Helvetica").fontSize(10).text("────────────────────────────", leftMargin, doc.y);
+      doc.moveDown(0.5);
+      
+      let studentName = student.name;
+      if (isUrdu && student.nameUrdu) {
+        studentName = student.nameUrdu;
+      }
+      
+      drawText(l.name + ":", leftMargin, doc.y, { font: "Helvetica-Bold" });
+      drawText(studentName, leftMargin + 80, doc.y);
+      doc.moveDown(1);
+      drawText(l.admissionNo + ":", leftMargin, doc.y, { font: "Helvetica-Bold" });
+      drawText(student.admissionNumber || "N/A", leftMargin + 80, doc.y);
+      doc.moveDown(1.5);
+
+      // PART (A)
+      if (madrasa && madrasa.resultsAvailable) {
+        drawText(l.partA, leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 12 });
+        doc.moveDown(1);
+        
+        drawText(l.class + ":", leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 10 });
+        drawText(madrasa.class.name, leftMargin + 50, doc.y);
+        doc.moveDown(1);
+        
+        let startY = doc.y;
+        drawText(l.subject, leftMargin, startY, { font: "Helvetica-Bold" });
+        drawText(l.max, leftMargin + 200, startY, { font: "Helvetica-Bold" });
+        drawText(l.obtained, leftMargin + 270, startY, { font: "Helvetica-Bold" });
+        drawText(l.remarks, leftMargin + 350, startY, { font: "Helvetica-Bold" });
+        doc.moveDown(1);
+        
+        madrasa.subjects.forEach(sub => {
+          let y = doc.y;
+          drawText(sub.subject, leftMargin, y);
+          drawText(sub.maxMarks.toString(), leftMargin + 200, y);
+          drawText(sub.marks === -1 ? l.absent : sub.marks.toString(), leftMargin + 270, y);
+          drawText(sub.marks >= sub.passingMarks ? l.pass : l.fail, leftMargin + 350, y);
+          doc.moveDown(1.5);
+        });
+
+        doc.moveDown(0.5);
+        drawText(l.total, leftMargin, doc.y, { font: "Helvetica-Bold" });
+        drawText(madrasa.totals.maxMarks.toString(), leftMargin + 200, doc.y);
+        drawText(madrasa.totals.obtainedMarks.toString(), leftMargin + 270, doc.y);
+        doc.moveDown(1);
+        
+        drawText(l.percentage, leftMargin, doc.y, { font: "Helvetica-Bold" });
+        drawText(madrasa.totals.percentage.toFixed(2) + "%", leftMargin + 270, doc.y);
+        doc.moveDown(2);
+      }
+
+      // PART (B)
+      if (school && school.resultsAvailable) {
+        drawText(l.partB, leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 12 });
+        doc.moveDown(1);
+        
+        drawText(l.class + ":", leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 10 });
+        drawText(school.class.name, leftMargin + 50, doc.y);
+        
+        if (school.class.section) {
+          doc.moveDown(1);
+          drawText(l.section + ":", leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 10 });
+          drawText(school.class.section, leftMargin + 50, doc.y);
+        }
+        doc.moveDown(1);
+        
+        let startY = doc.y;
+        drawText(l.subject, leftMargin, startY, { font: "Helvetica-Bold" });
+        drawText(l.max, leftMargin + 200, startY, { font: "Helvetica-Bold" });
+        drawText(l.obtained, leftMargin + 270, startY, { font: "Helvetica-Bold" });
+        drawText(l.remarks, leftMargin + 350, startY, { font: "Helvetica-Bold" });
+        doc.moveDown(1);
+        
+        school.subjects.forEach(sub => {
+          let y = doc.y;
+          drawText(sub.subject, leftMargin, y);
+          drawText(sub.maxMarks.toString(), leftMargin + 200, y);
+          drawText(sub.marks === -1 ? l.absent : sub.marks.toString(), leftMargin + 270, y);
+          drawText(sub.marks >= sub.passingMarks ? l.pass : l.fail, leftMargin + 350, y);
+          doc.moveDown(1.5);
+        });
+
+        doc.moveDown(0.5);
+        drawText(l.total, leftMargin, doc.y, { font: "Helvetica-Bold" });
+        drawText(school.totals.maxMarks.toString(), leftMargin + 200, doc.y); 
+        drawText(school.totals.obtainedMarks.toString(), leftMargin + 270, doc.y);
+        doc.moveDown(1);
+        
+        drawText(l.percentage, leftMargin, doc.y, { font: "Helvetica-Bold" });
+        drawText(school.totals.percentage.toFixed(2) + "%", leftMargin + 270, doc.y);
+        doc.moveDown(2);
+      }
+
+      // COMBINED
+      if (combined) {
+        doc.font("Helvetica").fontSize(10).text("────────────────────────────", leftMargin, doc.y);
+        doc.moveDown(0.5);
+        drawText(l.combined, leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 12 });
+        doc.moveDown(1);
+        
+        drawText(l.totalMarks + ":", leftMargin, doc.y, { font: "Helvetica-Bold" });
+        drawText(`${combined.obtainedMarks} / ${combined.maxMarks}`, leftMargin + 150, doc.y);
+        doc.moveDown(1);
+        
+        drawText(l.percentage + ":", leftMargin, doc.y, { font: "Helvetica-Bold" });
+        drawText(`${combined.percentage.toFixed(3)}%`, leftMargin + 150, doc.y);
+        doc.moveDown(1);
+        
+        drawText(l.grade + ":", leftMargin, doc.y, { font: "Helvetica-Bold" });
+        drawText(`${combined.grade}`, leftMargin + 150, doc.y);
+        doc.moveDown(1);
+        
+        doc.font("Helvetica").text("────────────────────────────", leftMargin, doc.y);
+      }
+
+    });
+  } catch (error) {
+    console.error("Combined Result PDF generation failed:", error);
+    res.status(500).json({ message: "Failed to generate combined result pdf", error: error.message });
+  }
+};

@@ -91,8 +91,9 @@ exports.getCurriculumsByStudent = async (req, res) => {
       return sendError(res, 403, "Forbidden");
     }
 
-    // Fetch curriculum for the student's class
-    const curriculums = await Curriculum.find({ classId: student.classId, isActive: true })
+    // Fetch curriculum for the student's class (Madrasa + School)
+    const classIdsToMatch = [student.classId, student.schoolClassId].filter(Boolean);
+    const curriculums = await Curriculum.find({ classId: { $in: classIdsToMatch }, isActive: true })
       .populate('teacherId', 'name')
       .sort({ createdAt: -1 })
       .lean();
