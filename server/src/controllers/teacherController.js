@@ -116,6 +116,23 @@ exports.createTeacher = async (req, res) => {
     teacherData.assignedClassIds = Array.from(finalClassIds);
     delete teacherData.assignedClasses;
 
+    // 3. Process Class Teacher conflict
+    if (teacherData.isClassTeacher === true || teacherData.isClassTeacher === "true") {
+      if (!teacherData.classTeacherOf) {
+         return sendError(res, 400, "Class Teacher Of must be provided when isClassTeacher is true");
+      }
+      if (!mongoose.Types.ObjectId.isValid(teacherData.classTeacherOf)) {
+         return sendError(res, 400, `Invalid class ID format: ${teacherData.classTeacherOf}`);
+      }
+      const existingCT = await Teacher.findOne({ classTeacherOf: teacherData.classTeacherOf });
+      if (existingCT) {
+         const cls = await Class.findById(teacherData.classTeacherOf);
+         return sendError(res, 409, `Conflict: ${cls ? cls.fullName : 'This class'} is already assigned to ${existingCT.name} as Class Teacher.`);
+      }
+    } else {
+      teacherData.classTeacherOf = null;
+    }
+
     // Check if username exists
     const existingUser = await User.findOne({ username });
     if (existingUser) {
@@ -214,6 +231,23 @@ exports.updateTeacher = async (req, res) => {
 
     payload.assignedClassIds = Array.from(finalClassIds);
     delete payload.assignedClasses;
+
+    // 3. Process Class Teacher conflict
+    if (payload.isClassTeacher === true || payload.isClassTeacher === "true") {
+      if (!payload.classTeacherOf) {
+         return sendError(res, 400, "Class Teacher Of must be provided when isClassTeacher is true");
+      }
+      if (!mongoose.Types.ObjectId.isValid(payload.classTeacherOf)) {
+         return sendError(res, 400, `Invalid class ID format: ${payload.classTeacherOf}`);
+      }
+      const existingCT = await Teacher.findOne({ classTeacherOf: payload.classTeacherOf, _id: { $ne: req.params.id } });
+      if (existingCT) {
+         const cls = await Class.findById(payload.classTeacherOf);
+         return sendError(res, 409, `Conflict: ${cls ? cls.fullName : 'This class'} is already assigned to ${existingCT.name} as Class Teacher.`);
+      }
+    } else {
+      payload.classTeacherOf = null;
+    }
 
     if (payload.joiningDate && isNaN(new Date(payload.joiningDate).getTime())) {
       return sendError(res, 400, "Valid joining date is required");

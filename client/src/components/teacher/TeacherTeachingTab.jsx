@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { curriculumApi } from "@/lib/api";
+import { curriculumApi, classApi } from "@/lib/api";
 import { Book, CheckCircle, Clock, Loader2, Play } from "lucide-react";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { useAuth } from "@/context/AuthContext";
@@ -30,11 +31,19 @@ export function TeacherTeachingTab({ teacher }) {
     remarks: ""
   });
 
+
   const { data: currRes, isLoading } = useQuery({
     queryKey: ["teacher-curriculum", teacherId],
     queryFn: () => curriculumApi.getByTeacher(teacherId),
     enabled: !!teacherId,
   });
+
+  const { data: classRes } = useQuery({
+    queryKey: ["classes-for-teaching-tab"],
+    queryFn: () => classApi.getClasses(),
+  });
+  const apiClasses = classRes?.data || [];
+
 
   const curriculums = currRes?.data || [];
 
@@ -96,6 +105,57 @@ export function TeacherTeachingTab({ teacher }) {
 
   return (
     <div className="space-y-6">
+      
+      {/* Teaching Assignments Table */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3 border-b">
+          <CardTitle className="text-lg">Teaching Assignments</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {(!teacher.teachingAssignments || teacher.teachingAssignments.length === 0) ? (
+            <div className="text-sm text-muted-foreground italic">No teaching assignments</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Class</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Class Teacher</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {teacher.teachingAssignments.map((a, idx) => {
+                  const classObj = apiClasses.find(c => c._id === a.classId);
+                  const isClassTeacher = teacher.isClassTeacher && teacher.classTeacherOf === a.classId;
+                  return (
+                    <TableRow key={idx}>
+                      <TableCell className="font-medium">{classObj ? classObj.fullName : "Unknown Class"}</TableCell>
+                      <TableCell>{a.subjectId}</TableCell>
+                      <TableCell>
+                        {isClassTeacher ? (
+                           <span className="inline-flex items-center px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-700 text-xs font-medium">Yes</span>
+                        ) : (
+                           <span className="text-muted-foreground text-xs">No</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+          
+          <div className="mt-4 pt-4 border-t">
+            <h4 className="text-sm font-semibold mb-1">Class Teacher Of:</h4>
+            <div className="text-sm text-muted-foreground">
+              {teacher.isClassTeacher && teacher.classTeacherOf 
+                ? (apiClasses.find(c => c._id === teacher.classTeacherOf)?.fullName || "Unknown Class") 
+                : "No class assigned as Class Teacher"}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {curriculums.map((curr) => (
           <Card key={curr._id} className="relative overflow-hidden">

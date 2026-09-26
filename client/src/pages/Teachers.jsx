@@ -412,18 +412,39 @@ export default function Teachers() {
 
                   {/* Teaching Assignments */}
                   <div className="font-semibold text-sm border-b pb-1 mt-4 text-primary">Teaching Assignment</div>
-                  <div className="grid gap-2">
-                    <Label>{tr("teachers", "assignClasses")}</Label>
-                    <div className="flex flex-wrap gap-4 mt-1 border p-3 rounded-md bg-muted/10">
-                      {apiClasses.map((cls) => (
-                        <label key={cls._id} className="flex items-center space-x-2 text-sm cursor-pointer">
-                          <input type="checkbox" className="rounded border-gray-300 text-primary focus:ring-primary" checked={formData.assignedClassIds.includes(cls._id)} onChange={(e) => {
-                            if (e.target.checked) setFormData({...formData, assignedClassIds: [...formData.assignedClassIds, cls._id]});
-                            else setFormData({...formData, assignedClassIds: formData.assignedClassIds.filter(c => c !== cls._id)});
-                          }}/>
-                          <span>{cls.fullName}</span>
-                        </label>
+                  <div className="grid gap-2 mt-2">
+                    <Label>Assign Classes & Subjects</Label>
+                    <div className="flex flex-col gap-2 mt-1">
+                      {formData.teachingAssignments.map((assignment, idx) => (
+                        <div key={idx} className="flex gap-2 items-center bg-muted/10 p-2 border rounded-md">
+                          <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                            value={assignment.classId}
+                            onChange={(e) => {
+                              const newAssignments = [...formData.teachingAssignments];
+                              newAssignments[idx].classId = e.target.value;
+                              setFormData({ ...formData, teachingAssignments: newAssignments });
+                            }}
+                          >
+                            <option value="">Select Class</option>
+                            {apiClasses.map(cls => <option key={cls._id} value={cls._id}>{cls.fullName}</option>)}
+                          </select>
+                          <Input className="flex-1" placeholder="Subject" value={assignment.subjectId} onChange={(e) => {
+                            const newAssignments = [...formData.teachingAssignments];
+                            newAssignments[idx].subjectId = e.target.value;
+                            setFormData({ ...formData, teachingAssignments: newAssignments });
+                          }} />
+                          <Button type="button" variant="ghost" size="icon" className="text-red-500 h-8 w-8" onClick={() => {
+                            setFormData({ ...formData, teachingAssignments: formData.teachingAssignments.filter((_, i) => i !== idx) });
+                          }}>
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       ))}
+                      <Button type="button" variant="outline" size="sm" className="mt-2 w-fit" onClick={() => {
+                        setFormData({ ...formData, teachingAssignments: [...formData.teachingAssignments, { classId: "", subjectId: "" }] });
+                      }}>
+                        <Plus className="h-4 w-4 mr-2" /> Add Assignment
+                      </Button>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -593,18 +614,39 @@ export default function Teachers() {
 
                   {/* Teaching Assignments */}
                   <div className="font-semibold text-sm border-b pb-1 mt-4 text-primary">Teaching Assignment</div>
-                  <div className="grid gap-2">
-                    <Label>{tr("teachers", "assignClasses")}</Label>
-                    <div className="flex flex-wrap gap-4 mt-1 border p-3 rounded-md bg-muted/10">
-                      {apiClasses.map((cls) => (
-                        <label key={cls._id} className="flex items-center space-x-2 text-sm cursor-pointer">
-                          <input type="checkbox" className="rounded border-gray-300 text-primary focus:ring-primary" checked={editFormData.assignedClassIds.includes(cls._id)} onChange={(e) => {
-                            if (e.target.checked) setEditFormData({...editFormData, assignedClassIds: [...editFormData.assignedClassIds, cls._id]});
-                            else setEditFormData({...editFormData, assignedClassIds: editFormData.assignedClassIds.filter(c => c !== cls._id)});
-                          }}/>
-                          <span>{cls.fullName}</span>
-                        </label>
+                  <div className="grid gap-2 mt-2">
+                    <Label>Assign Classes & Subjects</Label>
+                    <div className="flex flex-col gap-2 mt-1">
+                      {editFormData.teachingAssignments.map((assignment, idx) => (
+                        <div key={idx} className="flex gap-2 items-center bg-muted/10 p-2 border rounded-md">
+                          <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                            value={assignment.classId}
+                            onChange={(e) => {
+                              const newAssignments = [...editFormData.teachingAssignments];
+                              newAssignments[idx].classId = e.target.value;
+                              setEditFormData({ ...editFormData, teachingAssignments: newAssignments });
+                            }}
+                          >
+                            <option value="">Select Class</option>
+                            {apiClasses.map(cls => <option key={cls._id} value={cls._id}>{cls.fullName}</option>)}
+                          </select>
+                          <Input className="flex-1" placeholder="Subject" value={assignment.subjectId} onChange={(e) => {
+                            const newAssignments = [...editFormData.teachingAssignments];
+                            newAssignments[idx].subjectId = e.target.value;
+                            setEditFormData({ ...editFormData, teachingAssignments: newAssignments });
+                          }} />
+                          <Button type="button" variant="ghost" size="icon" className="text-red-500 h-8 w-8" onClick={() => {
+                            setEditFormData({ ...editFormData, teachingAssignments: editFormData.teachingAssignments.filter((_, i) => i !== idx) });
+                          }}>
+                            <Trash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       ))}
+                      <Button type="button" variant="outline" size="sm" className="mt-2 w-fit" onClick={() => {
+                        setEditFormData({ ...editFormData, teachingAssignments: [...editFormData.teachingAssignments, { classId: "", subjectId: "" }] });
+                      }}>
+                        <Plus className="h-4 w-4 mr-2" /> Add Assignment
+                      </Button>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -658,8 +700,10 @@ export default function Teachers() {
                 <TableRow className="hover:bg-transparent border-b-border/60">
                   <TableHead className="w-[120px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "id")}</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "name")}</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "primarySubject")}</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "designation")}</TableHead>
                   <TableHead className="text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "classes")}</TableHead>
+                  <TableHead className="text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Subjects</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Class Teacher Of</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "mobile")}</TableHead>
                   <TableHead className="text-end text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "salaryLabel")}</TableHead>
                   <TableHead className="text-end text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("teachers", "attendance")}</TableHead>
@@ -674,11 +718,25 @@ export default function Teachers() {
                       </TableCell>
                       <TableCell className="font-semibold text-foreground text-sm">{teacher.name}</TableCell>
                       <TableCell>
-                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-700 text-xs font-medium border border-transparent">
-                          {teacher.subject}
+                        <span className="text-sm text-muted-foreground">
+                          {teacher.designation || "—"}
                         </span>
                       </TableCell>
-                      <TableCell className="text-center">{teacher.assignedClassIds ? teacher.assignedClassIds.length : 0}</TableCell>
+                      <TableCell className="text-center">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-indigo-500/15 text-indigo-700 text-xs font-medium border border-transparent">
+                          {teacher.assignedClassIds ? teacher.assignedClassIds.length : 0}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                         <span className="inline-flex items-center px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-700 text-xs font-medium border border-transparent">
+                           {teacher.teachingAssignments ? Array.from(new Set(teacher.teachingAssignments.map(a => a.subjectId))).length : 0}
+                         </span>
+                      </TableCell>
+                      <TableCell>
+                        {teacher.isClassTeacher && teacher.classTeacherOf ? (
+                          <span className="text-sm font-medium">{apiClasses.find(c => c._id === teacher.classTeacherOf)?.fullName || "—"}</span>
+                        ) : "—"}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center text-sm">
                           <Phone className="h-3 w-3 me-1 text-muted-foreground"/>

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Edit, CheckCircle, XCircle, BookOpen, Trash2, Filter } from "lucide-react";
 import ClassSyllabusModal from "@/components/classes/ClassSyllabusModal";
+import ClassTeachersModal from "@/components/classes/ClassTeachersModal";
+import { Users } from "lucide-react";
 import { classApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +59,8 @@ export default function Classes() {
 
   // Syllabus Modal State
   const [isSyllabusOpen, setIsSyllabusOpen] = useState(false);
+  const [isTeachersOpen, setIsTeachersOpen] = useState(false);
+  const [selectedClassForTeachers, setSelectedClassForTeachers] = useState(null);
   const [selectedClassForSyllabus, setSelectedClassForSyllabus] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -321,7 +325,19 @@ export default function Classes() {
                         <span>Syllabus</span>
                       </Button>
                       <Button
-                        variant={cls.status === "active" ? "secondary" : "default"}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedClassForTeachers(cls);
+                          setIsTeachersOpen(true);
+                        }}
+                        title="View Teachers"
+                        className="hidden sm:inline-flex items-center gap-1"
+                      >
+                        <Users className="h-4 w-4" />
+                        <span>Teachers</span>
+                      </Button>
+                      <Button
                         size="sm"
                         onClick={() => toggleStatus(cls)}
                         title={cls.status === "active" ? "Deactivate Class" : "Activate Class"}
@@ -420,7 +436,14 @@ export default function Classes() {
         </DialogContent>
       </Dialog>
 
-      {/* Class Syllabus Modal */}
+            {/* Class Syllabus Modal */}
+      {selectedClassForTeachers && (
+        <ClassTeachersModal
+          open={isTeachersOpen}
+          onOpenChange={setIsTeachersOpen}
+          classData={selectedClassForTeachers}
+        />
+      )}
       {selectedClassForSyllabus && (
         <ClassSyllabusModal
           open={isSyllabusOpen}
