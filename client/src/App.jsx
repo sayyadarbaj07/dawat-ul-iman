@@ -25,6 +25,7 @@ import TeacherProfile from "@/pages/TeacherProfile";
 import Attendance from "./pages/Attendance";
 import Exams from "@/pages/Exams";
 import Finance from "@/pages/Finance";
+import ReserveFund from "@/pages/ReserveFund";
 import Hostel from "@/pages/Hostel";
 import Activities from "@/pages/Activities";
 import Meetings from "@/pages/Meetings";
@@ -94,6 +95,7 @@ function Router() {
             <Route path="/attendance" component={Attendance} />
             <Route path="/exams" component={Exams} />
             <Route path="/finance" component={Finance} />
+            <Route path="/reserve-fund" component={ReserveFund} />
             <Route path="/hostel" component={Hostel} />
             <Route path="/activities" component={Activities} />
             <Route path="/meetings" component={Meetings} />

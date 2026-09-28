@@ -38,9 +38,7 @@ export default function Exams() {
     customExamType: "",
     examName: "",
     academicYear: new Date().getFullYear().toString(),
-    studentClassCategory: "Shob-e-Deeniyat",
-    studentClassSub: "Awwal",
-    customStudentClassSub: "",
+    classId: "",
     subjects: "",
     maxMarks: 100,
     passingMarks: 33,
@@ -63,7 +61,7 @@ export default function Exams() {
   
   const filteredExamsForMarks = exams.filter(e => 
     e.academicYear === filterYear && 
-    e.class === `${filterDept} - ${filterSubClass}` &&
+    e.class === filterDept &&
     e.examType === filterExamType
   );
   
@@ -92,7 +90,7 @@ export default function Exams() {
 
   const filteredExamsForResults = exams.filter(e => 
     e.academicYear === filterYearRes && 
-    e.class === `${filterDeptRes} - ${filterSubClassRes}` &&
+    e.class === filterDeptRes &&
     e.examType === filterExamTypeRes
   );
 
@@ -104,6 +102,7 @@ export default function Exams() {
 
   useEffect(() => {
     loadExams();
+    loadClasses();
     loadStudents();
   }, []);
 
@@ -128,7 +127,7 @@ export default function Exams() {
   const loadStudents = async () => {
     try {
       const res = await studentApi.list();
-      setStudents(res.data || []);
+      setStudents(Array.isArray(res.data) ? res.data : (res.data?.data || []));
     } catch (err) {
       console.error(err);
     }
@@ -145,9 +144,8 @@ export default function Exams() {
         return alert(tr("exams", "pleaseEnterCustomExamType"));
       }
 
-      const finalClassSub = examForm.studentClassSub === "Other" ? examForm.customStudentClassSub : examForm.studentClassSub;
-      if (examForm.studentClassSub === "Other" && !finalClassSub.trim()) {
-        return alert(tr("exams", "pleaseEnterCustomClassName"));
+      if (!examForm.classId) {
+        return alert("Please select a class");
       }
 
       const payload = {
@@ -359,90 +357,21 @@ export default function Exams() {
                      <DialogDescription>{tr("exams", "addNewExamToSchedule")}</DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleCreateExam} className="space-y-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>{tr("exams", "examType")}</Label>
-                        <select
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                          value={examForm.examType}
-                          onChange={(e) => setExamForm({ ...examForm, examType: e.target.value })}
-                        >
-                          <option value="Monthly">Monthly</option>
-                          <option value="Half-Yearly">Half-Yearly</option>
-                          <option value="Yearly">Yearly</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-                      {examForm.examType === "Other" && (
-                        <div className="space-y-2">
-                          <Label>Enter Other Exam Type <span className="text-red-500">*</span></Label>
-                          <Input
-                            required
-                            placeholder="e.g. Weekly Test"
-                            value={examForm.customExamType}
-                            onChange={(e) => setExamForm({ ...examForm, customExamType: e.target.value })}
-                          />
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        <Label>Exam Name / Month</Label>
-                        <Input
-                          placeholder="e.g. August Test"
-                          value={examForm.examName}
-                          onChange={(e) => setExamForm({ ...examForm, examName: e.target.value })}
-                        />
-                      </div>
-                    </div>
                     <div className="grid grid-cols-1 gap-4">
                       <div className="space-y-2">
-                        <Label>Academic Year</Label>
-                        <Input
+                        <Label>Select Class <span className="text-red-500">*</span></Label>
+                        <select
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                          value={examForm.classId}
+                          onChange={(e) => setExamForm({ ...examForm, classId: e.target.value })}
                           required
-                          value={examForm.academicYear}
-                          onChange={(e) => setExamForm({ ...examForm, academicYear: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Department</Label>
-                        <select
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                          value={examForm.studentClassCategory}
-                          onChange={(e) => {
-                            const cat = e.target.value;
-                            setExamForm({ ...examForm, studentClassCategory: cat, studentClassSub: CLASS_TREE[cat][0] });
-                          }}
                         >
-                          {Object.keys(CLASS_TREE).map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
+                          <option value="">-- Choose Class --</option>
+                          {canonicalClasses.map(c => (
+                            <option key={c._id} value={c._id}>{c.fullName}</option>
                           ))}
                         </select>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Class / Grade</Label>
-                        <select
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                          value={examForm.studentClassSub}
-                          onChange={(e) => setExamForm({ ...examForm, studentClassSub: e.target.value })}
-                        >
-                          {CLASS_TREE[examForm.studentClassCategory]?.map(sub => (
-                            <option key={sub} value={sub}>{sub}</option>
-                          ))}
-                        </select>
-                      </div>
-                      {examForm.studentClassSub === "Other" && (
-                        <div className="space-y-2">
-                          <Label>Enter Other Class <span className="text-red-500">*</span></Label>
-                          <Input
-                            required
-                            placeholder="e.g. Special Batch"
-                            value={examForm.customStudentClassSub}
-                            onChange={(e) => setExamForm({ ...examForm, customStudentClassSub: e.target.value })}
-                          />
-                        </div>
-                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -551,44 +480,19 @@ export default function Exams() {
                     onChange={(e) => { setFilterYear(e.target.value); setSelectedExamIdMarks(""); }} 
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label>Department</Label>
+                <div className="space-y-1 col-span-2">
+                  <Label>Class</Label>
                   <select
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                     value={filterDept}
                     onChange={(e) => {
-                      const dept = e.target.value;
-                      setFilterDept(dept);
-                      setFilterSubClass(CLASS_TREE[dept][0]);
+                      setFilterDept(e.target.value);
                       setSelectedExamIdMarks("");
                     }}
                   >
-                    {Object.keys(CLASS_TREE).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    <option value="">-- Choose Class --</option>
+                    {canonicalClasses.map(c => <option key={c._id} value={c.fullName}>{c.fullName}</option>)}
                   </select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Class</Label>
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                    value={filterSubClassDropdown}
-                    onChange={(e) => { 
-                      const val = e.target.value;
-                      setFilterSubClassDropdown(val); 
-                      if (val !== "Other") setFilterSubClass(val);
-                      else setFilterSubClass("");
-                      setSelectedExamIdMarks(""); 
-                    }}
-                  >
-                    {CLASS_TREE[filterDept]?.map(sub => <option key={sub} value={sub}>{sub}</option>)}
-                  </select>
-                  {filterSubClassDropdown === "Other" && (
-                    <Input 
-                      className="mt-2 h-8 text-sm"
-                      placeholder="Enter Class" 
-                      value={filterSubClass} 
-                      onChange={(e) => { setFilterSubClass(e.target.value); setSelectedExamIdMarks(""); }}
-                    />
-                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>Exam Type</Label>
@@ -716,45 +620,19 @@ export default function Exams() {
                     onChange={(e) => { setFilterYearRes(e.target.value); setSelectedExamIdResults(""); }} 
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label>Department</Label>
+                <div className="space-y-1 col-span-2">
+                  <Label>Class</Label>
                   <select
                     className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                     value={filterDeptRes}
                     onChange={(e) => {
-                      const dept = e.target.value;
-                      setFilterDeptRes(dept);
-                      setFilterSubClassDropdownRes(CLASS_TREE[dept][0]);
-                      setFilterSubClassRes(CLASS_TREE[dept][0]);
+                      setFilterDeptRes(e.target.value);
                       setSelectedExamIdResults("");
                     }}
                   >
-                    {Object.keys(CLASS_TREE).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    <option value="">-- Choose Class --</option>
+                    {canonicalClasses.map(c => <option key={c._id} value={c.fullName}>{c.fullName}</option>)}
                   </select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Class</Label>
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                    value={filterSubClassDropdownRes}
-                    onChange={(e) => { 
-                      const val = e.target.value;
-                      setFilterSubClassDropdownRes(val); 
-                      if (val !== "Other") setFilterSubClassRes(val);
-                      else setFilterSubClassRes("");
-                      setSelectedExamIdResults(""); 
-                    }}
-                  >
-                    {CLASS_TREE[filterDeptRes]?.map(sub => <option key={sub} value={sub}>{sub}</option>)}
-                  </select>
-                  {filterSubClassDropdownRes === "Other" && (
-                    <Input 
-                      className="mt-2 h-8 text-sm"
-                      placeholder="Enter Class" 
-                      value={filterSubClassRes} 
-                      onChange={(e) => { setFilterSubClassRes(e.target.value); setSelectedExamIdResults(""); }}
-                    />
-                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>Exam Type</Label>

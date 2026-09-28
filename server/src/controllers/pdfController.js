@@ -7,6 +7,7 @@ const Transaction = require("../models/transactionModel");
 const Attendance = require("../models/attendanceModel");
 const Exam = require("../models/examModel");
 const ExamResult = require("../models/examResultModel");
+const { calculateResult } = require("../utils/grading");
 const TeacherSalary = require("../models/teacherSalaryModel");
 const { getTotalWorkingDays, getStudentAttendanceForPDF } = require("../services/attendanceService");
 const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
@@ -552,22 +553,21 @@ exports.generateStudentReportCard = async (req, res) => {
     const totalMarks = exam.subjects.length * exam.maxMarks;
     const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
     
-    let grade = "F";
-    if (!hasFailed) {
-      if (percentage >= 90) grade = "A+";
-      else if (percentage >= 80) grade = "A";
-      else if (percentage >= 70) grade = "B";
-      else if (percentage >= 60) grade = "C";
-      else if (percentage >= 50) grade = "D";
-      else { grade = "F"; hasFailed = true; }
-    }
+    let isAbsentInAny = false;
+      exam.subjects.forEach(sub => {
+        if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
+          isAbsentInAny = true;
+        }
+      });
+      const calcRes = calculateResult({
+        marks: obtainedMarks,
+        maxMarks: typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks,
+        passingMarks: isAbsentInAny ? (typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks) + 1 : (exam.passingMarks * exam.subjects.length)
+      });
+      let grade = isAbsentInAny ? "F" : calcRes.grade;
+      hasFailed = isAbsentInAny ? true : !calcRes.passed;
     
-    exam.subjects.forEach(sub => {
-      if (subjectMarks[sub] === null) {
-        hasFailed = true;
-        grade = "F";
-      }
-    });
+    
 
     const isUrdu = language === 'ur';
     generatePDF(res, `Student Marksheet`, (doc) => {
@@ -762,22 +762,21 @@ exports.generateClassResultPDF = async (req, res) => {
       const totalMarks = exam.subjects.length * exam.maxMarks;
       const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
       
-      let grade = "F";
-      if (!hasFailed) {
-        if (percentage >= 90) grade = "A+";
-        else if (percentage >= 80) grade = "A";
-        else if (percentage >= 70) grade = "B";
-        else if (percentage >= 60) grade = "C";
-        else if (percentage >= 50) grade = "D";
-        else { grade = "F"; hasFailed = true; }
-      }
-      
+      let isAbsentInAny = false;
       exam.subjects.forEach(sub => {
-        if (subjectMarks[sub] === null) {
-          hasFailed = true;
-          grade = "F";
+        if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
+          isAbsentInAny = true;
         }
       });
+      const calcRes = calculateResult({
+        marks: obtainedMarks,
+        maxMarks: typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks,
+        passingMarks: isAbsentInAny ? (typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks) + 1 : (exam.passingMarks * exam.subjects.length)
+      });
+      let grade = isAbsentInAny ? "F" : calcRes.grade;
+      hasFailed = isAbsentInAny ? true : !calcRes.passed;
+      
+      
 
       return {
         rollNumber: student.rollNumber,
@@ -958,22 +957,21 @@ exports.generateClassMarksheetsPDF = async (req, res) => {
         const totalMarks = exam.subjects.length * exam.maxMarks;
         const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
         
-        let grade = "F";
-        if (!hasFailed) {
-          if (percentage >= 90) grade = "A+";
-          else if (percentage >= 80) grade = "A";
-          else if (percentage >= 70) grade = "B";
-          else if (percentage >= 60) grade = "C";
-          else if (percentage >= 50) grade = "D";
-          else { grade = "F"; hasFailed = true; }
+        let isAbsentInAny = false;
+      exam.subjects.forEach(sub => {
+        if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
+          isAbsentInAny = true;
         }
+      });
+      const calcRes = calculateResult({
+        marks: obtainedMarks,
+        maxMarks: typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks,
+        passingMarks: isAbsentInAny ? (typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks) + 1 : (exam.passingMarks * exam.subjects.length)
+      });
+      let grade = isAbsentInAny ? "F" : calcRes.grade;
+      hasFailed = isAbsentInAny ? true : !calcRes.passed;
         
-        exam.subjects.forEach(sub => {
-          if (subjectMarks[sub] === null) {
-            hasFailed = true;
-            grade = "F";
-          }
-        });
+        
 
         
         const RIGHT_MARGIN = 550;
@@ -2159,15 +2157,19 @@ exports.generateAcademicHistoryPDF = async (req, res) => {
         const totalMarks = exam.subjects.length * exam.maxMarks;
         const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
         
-        let grade = "F";
-        if (!hasFailed) {
-          if (percentage >= 90) grade = "A+";
-          else if (percentage >= 80) grade = "A";
-          else if (percentage >= 70) grade = "B";
-          else if (percentage >= 60) grade = "C";
-          else if (percentage >= 50) grade = "D";
-          else { grade = "F"; hasFailed = true; }
+        let isAbsentInAny = false;
+      exam.subjects.forEach(sub => {
+        if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
+          isAbsentInAny = true;
         }
+      });
+      const calcRes = calculateResult({
+        marks: obtainedMarks,
+        maxMarks: typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks,
+        passingMarks: isAbsentInAny ? (typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks) + 1 : (exam.passingMarks * exam.subjects.length)
+      });
+      let grade = isAbsentInAny ? "F" : calcRes.grade;
+      hasFailed = isAbsentInAny ? true : !calcRes.passed;
         
         // If they missed a subject
         const subjectsFound = new Set(results.map(r => r.subject));
@@ -2402,22 +2404,21 @@ exports.generateYearlyResultPDF = async (req, res) => {
           const totalMarks = exam.subjects.length * exam.maxMarks;
           const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
           
-          let grade = "F";
-          if (!hasFailed) {
-            if (percentage >= 90) grade = "A+";
-            else if (percentage >= 80) grade = "A";
-            else if (percentage >= 70) grade = "B";
-            else if (percentage >= 60) grade = "C";
-            else if (percentage >= 50) grade = "D";
-            else { grade = "F"; hasFailed = true; }
-          }
+          let isAbsentInAny = false;
+      exam.subjects.forEach(sub => {
+        if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
+          isAbsentInAny = true;
+        }
+      });
+      const calcRes = calculateResult({
+        marks: obtainedMarks,
+        maxMarks: typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks,
+        passingMarks: isAbsentInAny ? (typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks) + 1 : (exam.passingMarks * exam.subjects.length)
+      });
+      let grade = isAbsentInAny ? "F" : calcRes.grade;
+      hasFailed = isAbsentInAny ? true : !calcRes.passed;
 
-          exam.subjects.forEach(sub => {
-            if (subjectMarks[sub] === null) {
-              hasFailed = true;
-              grade = "F";
-            }
-          });
+          
 
           // Subjects Table Header
           const tableTop = doc.y;
@@ -2494,22 +2495,21 @@ exports.generateYearlyResultPDF = async (req, res) => {
           const totalMarks = exam.subjects.length * exam.maxMarks;
           const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
           
-          let grade = "F";
-          if (!hasFailed) {
-            if (percentage >= 90) grade = "A+";
-            else if (percentage >= 80) grade = "A";
-            else if (percentage >= 70) grade = "B";
-            else if (percentage >= 60) grade = "C";
-            else if (percentage >= 50) grade = "D";
-            else { grade = "F"; hasFailed = true; }
-          }
+          let isAbsentInAny = false;
+      exam.subjects.forEach(sub => {
+        if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
+          isAbsentInAny = true;
+        }
+      });
+      const calcRes = calculateResult({
+        marks: obtainedMarks,
+        maxMarks: typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks,
+        passingMarks: isAbsentInAny ? (typeof finalTotalMarks !== 'undefined' ? finalTotalMarks : totalMarks) + 1 : (exam.passingMarks * exam.subjects.length)
+      });
+      let grade = isAbsentInAny ? "F" : calcRes.grade;
+      hasFailed = isAbsentInAny ? true : !calcRes.passed;
 
-          exam.subjects.forEach(sub => {
-            if (subjectMarks[sub] === null) {
-              hasFailed = true;
-              grade = "F";
-            }
-          });
+          
 
           // Subjects Table Header
           const tableTop = doc.y;

@@ -6,6 +6,7 @@ const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
 const ActivityNotificationService = require("../services/activityNotificationService");
 const mongoose = require("mongoose");
 const ActivityLog = require("../models/activityLogModel");
+const { calculateResult } = require("../utils/grading");
 
 const sendSuccess = (res, statusCode, message, data = null) => {
   const payload = { success: true, message };
@@ -452,23 +453,18 @@ exports.getCalculatedResults = async (req, res) => {
       });
 
       const finalTotalMarks = exam.subjects.length * exam.maxMarks;
-      const percentage = finalTotalMarks > 0 ? (obtainedMarks / finalTotalMarks) * 100 : 0;
       
-      let grade = "F";
-      if (!hasFailed) {
-        if (percentage >= 90) grade = "A+";
-        else if (percentage >= 80) grade = "A";
-        else if (percentage >= 70) grade = "B";
-        else if (percentage >= 60) grade = "C";
-        else if (percentage >= 50) grade = "D";
-        else { grade = "F"; hasFailed = true; }
-      }
-      
+      let isAbsentInAny = false;
       exam.subjects.forEach(sub => {
-        if (subjectMarks[sub] === null) {
-          hasFailed = true; // Missing marks = Fail
-          grade = "F";
+        if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
+          isAbsentInAny = true;
         }
+      });
+
+      const { percentage, grade, passed, status } = calculateResult({
+        marks: obtainedMarks,
+        maxMarks: finalTotalMarks,
+        passingMarks: isAbsentInAny ? finalTotalMarks + 1 : (exam.passingMarks * exam.subjects.length)
       });
 
       return {
@@ -480,8 +476,10 @@ exports.getCalculatedResults = async (req, res) => {
         obtainedMarks,
         totalMarks: finalTotalMarks,
         percentage: percentage.toFixed(2),
-        grade,
-        status: hasFailed ? "Fail" : "Pass"
+        grade: isAbsentInAny ? "F" : grade,
+        status: isAbsentInAny ? "Fail" : status,
+        passed: isAbsentInAny ? false : passed,
+        hasFailed: isAbsentInAny ? true : !passed
       };
     });
 
@@ -534,23 +532,18 @@ exports.getStudentHistoricalResults = async (req, res) => {
       });
 
       const totalMarks = exam.subjects.length * exam.maxMarks;
-      const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
-      
-      let grade = "F";
-      if (!hasFailed) {
-        if (percentage >= 90) grade = "A+";
-        else if (percentage >= 80) grade = "A";
-        else if (percentage >= 70) grade = "B";
-        else if (percentage >= 60) grade = "C";
-        else if (percentage >= 50) grade = "D";
-        else { grade = "F"; hasFailed = true; }
-      }
-      
+
+      let isAbsentInAny = false;
       exam.subjects.forEach(sub => {
-        if (subjectMarks[sub] === null) {
-          hasFailed = true;
-          grade = "F";
+        if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
+          isAbsentInAny = true;
         }
+      });
+
+      const { percentage, grade, passed, status } = calculateResult({
+        marks: obtainedMarks,
+        maxMarks: totalMarks,
+        passingMarks: isAbsentInAny ? totalMarks + 1 : (exam.passingMarks * exam.subjects.length)
       });
 
       return {
@@ -563,8 +556,10 @@ exports.getStudentHistoricalResults = async (req, res) => {
         obtainedMarks,
         totalMarks,
         percentage: percentage.toFixed(2),
-        grade,
-        status: hasFailed ? "Fail" : "Pass"
+        grade: isAbsentInAny ? "F" : grade,
+        status: isAbsentInAny ? "Fail" : status,
+        passed: isAbsentInAny ? false : passed,
+        hasFailed: isAbsentInAny ? true : !passed
       };
     });
 

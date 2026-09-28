@@ -32,6 +32,7 @@ export const NAV_ITEMS = [
   { href: "/attendance", key: "attendance", icon: CalendarCheck, group: "academic" },
   { href: "/exams", key: "exams", icon: FileSpreadsheet, group: "academic" },
   { href: "/finance", key: "finance", icon: Landmark, group: "operations" },
+  { href: "/reserve-fund", key: "reserveFund", icon: Landmark, group: "operations" },
   { href: "/hostel", key: "hostel", icon: Home, group: "operations" },
   { href: "/activities", key: "activities", icon: Activity, group: "operations" },
   { href: "/meetings", key: "meetings", icon: UsersRound, group: "operations" },

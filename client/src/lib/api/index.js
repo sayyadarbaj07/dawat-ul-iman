@@ -3,6 +3,7 @@ export { userApi } from "./user";
 export { studentApi } from "./student";
 export { teacherApi } from "./teacher";
 export { financeApi } from "./finance";
+export { reserveFundApi } from "./reserveFund";
 export { pdfApi } from "./pdf";
 export { curriculumApi } from "./curriculum";
 export { examApi } from "./exam";

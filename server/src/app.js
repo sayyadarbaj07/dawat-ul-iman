@@ -11,6 +11,7 @@ const studentRoutes = require("./routes/studentRoutes");
 const authRoutes = require("./routes/authRoutes");
 const teacherRoutes = require("./routes/teacherRoutes");
 const financeRoutes = require("./routes/financeRoutes");
+const reserveFundRoutes = require("./routes/reserveFundRoutes");
 const pdfRoutes = require("./routes/pdfRoutes");
 const meetingRoutes = require("./routes/meetingRoutes");
 const eventRoutes = require("./routes/eventRoutes");
@@ -116,6 +117,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api/auth", authLimiter, authRoutes); // Apply strict limiter to auth routes
 app.use("/api/teachers", teacherRoutes);
 app.use("/api/finance", financeRoutes);
+app.use("/api/reserve-fund", reserveFundRoutes);
 app.use("/api/pdf", pdfRoutes);
 app.use("/api/meetings", meetingRoutes);
 app.use("/api/calendar", eventRoutes);

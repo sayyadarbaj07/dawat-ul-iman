@@ -5,6 +5,7 @@ const Transaction = require("../models/transactionModel");
 const Exam = require("../models/examModel");
 const ExamResult = require("../models/examResultModel");
 const excelService = require("../services/excelService");
+const { getGradeFromPercentage } = require("../utils/grading");
 
 const sendSuccess = (res, statusCode, message, data = null) => {
   const payload = { success: true, message };
@@ -726,16 +727,7 @@ const getCombinedStudentResult = async (req, res) => {
   }
 };
 
-const getGradeFromPercentage = (percentage) => {
-  if (percentage >= 80) return "A+";
-  if (percentage >= 70) return "A";
-  if (percentage >= 60) return "B";
-  if (percentage >= 50) return "C";
-  if (percentage >= 40) return "D";
-  if (percentage >= 33) return "E";
-  return "F";
-};
-
+// Grading logic moved to shared utility
 
 module.exports = {
   fetchCombinedStudentResult,
