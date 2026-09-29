@@ -163,6 +163,41 @@ exports.voidTransaction = async (req, res) => {
   }
 };
 
+exports.deleteTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validate object id
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return sendError(res, 400, "Invalid Transaction ID format");
+    }
+
+    const transaction = await Transaction.findById(id);
+    if (!transaction) {
+      return sendError(res, 404, "Transaction not found");
+    }
+
+    // Capture details before deletion for ActivityLog
+    const description = `Permanently deleted transaction ${transaction._id}: ${transaction.category} (${transaction.type}) - Amount: ${transaction.amount}`;
+    
+    // Log Activity (must happen before or as part of deletion)
+    try {
+        const { logActivity } = require("../middleware/auditMiddleware");
+        await logActivity(req.user, "FINANCE_TRANSACTION_DELETED", description, "Finance");
+    } catch (logErr) {
+        console.error("ActivityLog Error before deletion:", logErr);
+        return sendError(res, 500, "Failed to create activity log, aborting deletion");
+    }
+
+    await Transaction.findByIdAndDelete(id);
+
+    return sendSuccess(res, 200, "Transaction deleted successfully");
+  } catch (error) {
+    console.error("Delete Error:", error);
+    return sendError(res, 500, "Failed to permanently delete transaction", error);
+  }
+};
+
 exports.getFinanceSummary = async (req, res) => {
   try {
     const { startDate, endDate, academicYear } = req.query;

@@ -13,9 +13,8 @@ const generateToken = (id) => {
 // @access  Public
 const loginUser = async (req, res) => {
   const { username, password } = req.body;
-
-  const user = await User.findOne({ username });
-
+  const normalizedUsername = username ? username.trim() : "";
+  const user = await User.findOne({ username: { $regex: new RegExp(`^${normalizedUsername}$`, 'i') } });
   if (user && (await user.matchPassword(password))) {
     if (!user.isActive) {
       return res.status(403).json({ message: "Your account is deactivated. Contact Admin." });

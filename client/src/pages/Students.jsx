@@ -45,10 +45,12 @@ import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/LanguageContext";
 import { useLocation } from "wouter";
 import { formatLocalizedNumber, formatLocalizedDate, formatLocalizedPercent, getLocalizedStudentName } from "@/utils/localizationUtils";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Students() {
   const [, setLocation] = useLocation();
   const { tr, language } = useLanguage();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [students, setStudents] = useState([]);
@@ -154,7 +156,20 @@ export default function Students() {
       try {
         const { classApi } = await import("@/lib/api/classApi");
         const res = await classApi.getClasses();
-        const activeClasses = res.data?.filter(c => c.status === "active") || [];
+        let activeClasses = res.data?.filter(c => c.status === "active") || [];
+        
+        if (user?.role === "teacher") {
+          const { teacherApi } = await import("@/lib/api/teacher");
+          const meRes = await teacherApi.getMe();
+          const meData = meRes.data?.data || meRes.data;
+          const myClassId = meData?.classTeacherOf;
+          if (myClassId) {
+             activeClasses = activeClasses.filter(c => String(c._id) === String(myClassId));
+          } else {
+             activeClasses = [];
+          }
+        }
+        
         setApiClasses(activeClasses);
         setSchoolClasses(activeClasses.filter(c => c.department === "school"));
         setMadrasaClasses(activeClasses.filter(c => c.department !== "school"));

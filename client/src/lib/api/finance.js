@@ -24,6 +24,9 @@ export const financeApi = {
   voidTransaction(id) {
     return request(`/finance/${id}/void`, { method: "PUT" });
   },
+  deleteTransaction(id) {
+    return request(`/finance/${id}`, { method: "DELETE" });
+  },
 
   async downloadPdf(url, filename) {
     const token = localStorage.getItem("dawat_token");

@@ -14,15 +14,17 @@ router.use(protect);
 
 router.post(
   "/",
+  authorize("admin"),
   upload.single("photo"),
   studentValidationRules,
   handleValidationErrors,
   studentController.createStudent,
 );
-router.get("/", studentController.getAllStudents);
-router.get("/:id", studentController.getStudentById);
+router.get("/", authorize("admin", "teacher"), studentController.getAllStudents);
+router.get("/:id", authorize("admin", "teacher"), studentController.getStudentById);
 router.put(
   "/:id",
+  authorize("admin"),
   upload.single("photo"),
   studentValidationRules,
   handleValidationErrors,

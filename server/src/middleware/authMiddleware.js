@@ -147,4 +147,31 @@ const verifyTeacherClassAccess = async (user, classId, legacyClassName = null) =
   return false;
 };
 
-module.exports = { protect, authorize, checkClassAccess, verifyTeacherClassAccess };
+// Helper function for strict Class Teacher access (Management/Write Authority)
+const verifyTeacherClassTeacherAccess = async (user, classId) => {
+  if (user.role === "admin" || user.role === "accountant") {
+    return true;
+  }
+  if (user.role === "teacher") {
+    const teacher = await Teacher.findOne({ userId: user._id }).lean();
+    if (!teacher) return false;
+
+    if (!teacher.classTeacherOf) {
+      return false;
+    }
+
+    // Normalize populated classId if necessary
+    const targetClassId = classId && typeof classId === "object" && classId._id ? classId._id : classId;
+    
+    if (!targetClassId) return false;
+
+    if (String(teacher.classTeacherOf) === String(targetClassId)) {
+      return true;
+    }
+
+    return false;
+  }
+  return false;
+};
+
+module.exports = { protect, authorize, checkClassAccess, verifyTeacherClassAccess, verifyTeacherClassTeacherAccess };

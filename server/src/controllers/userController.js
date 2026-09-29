@@ -33,7 +33,7 @@ exports.createUser = async (req, res) => {
   try {
     const { username, password, name, role, isActive } = req.body;
     
-    const userExists = await User.findOne({ username });
+    const userExists = await User.findOne({ username: { $regex: new RegExp(`^${username.trim()}$`, 'i') } });
     if (userExists) {
       return sendError(res, 400, "User already exists");
     }

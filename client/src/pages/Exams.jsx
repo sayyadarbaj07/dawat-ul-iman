@@ -19,12 +19,15 @@ import {
 } from "@/components/ui/dialog";
 import { FileEdit, CalendarDays, Plus, CheckCircle2, XCircle } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 import { formatLocalizedDate, formatLocalizedNumber, formatLocalizedPercent, getLocalizedStudentName } from "@/utils/localizationUtils";
-import { examApi, studentApi, classApi } from "@/lib/api";
+import { examApi, studentApi, classApi, teacherApi } from "@/lib/api";
 import { CLASS_TREE, getAllClassesFlat } from "@/lib/classTree";
 
 export default function Exams() {
   const { tr, language } = useLanguage();
+  const { user } = useAuth();
+  const [me, setMe] = useState(null);
   const [activeTab, setActiveTab] = useState("exams");
 
   const [exams, setExams] = useState([]);
@@ -104,7 +107,33 @@ export default function Exams() {
     loadExams();
     loadClasses();
     loadStudents();
-  }, []);
+    if (user?.role === "teacher") {
+      teacherApi.getMe().then(res => setMe(res.data)).catch(console.error);
+    }
+  }, [user]);
+
+  const canCreateExam = user?.role === "admin" || (user?.role === "teacher" && me?.classTeacherOf);
+  const createExamClasses = user?.role === "admin" 
+    ? canonicalClasses 
+    : canonicalClasses.filter(c => me?.classTeacherOf && (me.classTeacherOf === c._id || (me.classTeacherOf._id && me.classTeacherOf._id === c._id)));
+
+  const getWritableSubjectsForExam = (exam) => {
+    if (!exam || !exam.subjects) return [];
+    if (user?.role === "admin") return exam.subjects;
+    if (user?.role === "teacher" && me) {
+      const ctId = typeof me.classTeacherOf === "object" ? me.classTeacherOf?._id : me.classTeacherOf;
+      if (ctId && exam.classId && ctId.toString() === exam.classId.toString()) return exam.subjects;
+
+      const allowedAssignments = me.teachingAssignments?.filter(a => {
+        const aClassId = typeof a.classId === "object" ? a.classId._id : a.classId;
+        return aClassId && exam.classId && aClassId.toString() === exam.classId.toString();
+      }) || [];
+      const allowedSubjectIds = allowedAssignments.map(a => a.subjectId.toLowerCase().trim());
+      
+      return exam.subjects.filter(s => allowedSubjectIds.includes(s.toLowerCase().trim()));
+    }
+    return [];
+  };
 
   const loadExams = async () => {
     try {
@@ -367,7 +396,7 @@ export default function Exams() {
                           required
                         >
                           <option value="">-- Choose Class --</option>
-                          {canonicalClasses.map(c => (
+                          {createExamClasses.map(c => (
                             <option key={c._id} value={c._id}>{c.fullName}</option>
                           ))}
                         </select>

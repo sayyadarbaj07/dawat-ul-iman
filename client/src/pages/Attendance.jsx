@@ -90,17 +90,25 @@ export default function Attendance() {
         
         if (me) {
           let teacherClasses = [];
-          if (me.assignedClassIds && me.assignedClassIds.length > 0) {
-            // Use assignedClassIds to get the precise active classes assigned
-            teacherClasses = activeApiClasses.filter(c => me.assignedClassIds.includes(c._id));
-          } else if (me.assignedClasses && me.assignedClasses.length > 0) {
-            // Legacy fallback: match by legacy department/name mapping
-            teacherClasses = activeApiClasses.filter(c => me.assignedClasses.includes(c.department) || me.assignedClasses.includes(c.name));
+          if (me.assignedClassIds && Array.isArray(me.assignedClassIds) && me.assignedClassIds.length > 0) {
+            const assignedIdsStrings = me.assignedClassIds.map(id => typeof id === "object" ? (id._id || id.toString()) : String(id));
+            teacherClasses = activeApiClasses.filter(c => assignedIdsStrings.includes(String(c._id)));
+          } else if (me.classTeacherOf) {
+            const classTeacherId = typeof me.classTeacherOf === "object" ? me.classTeacherOf._id : me.classTeacherOf;
+            teacherClasses = activeApiClasses.filter(c => String(c._id) === String(classTeacherId));
           }
           
           if (teacherClasses.length > 0) {
             setAssignedClasses(teacherClasses);
-            setClassFilter(teacherClasses[0]?._id || "");
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlClassId = urlParams.get("classId");
+            
+            if (urlClassId && teacherClasses.some(c => String(c._id) === urlClassId)) {
+              setClassFilter(urlClassId);
+            } else {
+              setClassFilter(teacherClasses[0]?._id || "");
+            }
           } else {
             setAssignedClasses([]);
             setClassFilter("");

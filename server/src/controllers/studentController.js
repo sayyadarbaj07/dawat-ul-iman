@@ -22,8 +22,8 @@ exports.createStudent = async (req, res) => {
       if (!req.body.classId) {
         return sendError(res, 403, "Forbidden: Teachers must explicitly specify a valid classId when creating students.");
       }
-      const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
-      const hasAccess = await verifyTeacherClassAccess(req.user, req.body.classId, null);
+      const { verifyTeacherClassTeacherAccess } = require("../middleware/authMiddleware");
+      const hasAccess = await verifyTeacherClassTeacherAccess(req.user, req.body.classId);
       if (!hasAccess) {
         return sendError(res, 403, "Forbidden: You are not authorized to add students to this class.");
       }
@@ -144,14 +144,14 @@ exports.updateStudent = async (req, res) => {
     if (!existingStudent) return sendError(res, 404, "Student not found");
 
     if (req.user && req.user.role === "teacher") {
-      const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
-      const hasAccess = await verifyTeacherClassAccess(req.user, existingStudent.classId, existingStudent.className || existingStudent.studentClass);
+      const { verifyTeacherClassTeacherAccess } = require("../middleware/authMiddleware");
+      const hasAccess = await verifyTeacherClassTeacherAccess(req.user, existingStudent.classId);
       if (!hasAccess) {
         return sendError(res, 403, "Forbidden: You are not authorized to update this student.");
       }
 
       if (req.body.classId && req.body.classId.toString() !== (existingStudent.classId ? existingStudent.classId.toString() : "")) {
-         const hasTargetAccess = await verifyTeacherClassAccess(req.user, req.body.classId, null);
+         const hasTargetAccess = await verifyTeacherClassTeacherAccess(req.user, req.body.classId);
          if (!hasTargetAccess) {
             return sendError(res, 403, "Forbidden: You are not authorized to move student to this class.");
          }

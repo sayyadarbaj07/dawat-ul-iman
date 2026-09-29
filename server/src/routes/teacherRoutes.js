@@ -8,14 +8,14 @@ const upload = require("../middleware/uploadMiddleware");
 router.use(protect);
 
 router.route("/")
-  .get(teacherController.getAllTeachers)
+  .get(authorize("admin", "teacher"), teacherController.getAllTeachers)
   .post(authorize("admin"), upload.single("photo"), teacherController.createTeacher);
 
 router.route("/me")
   .get(teacherController.getCurrentTeacher);
 
 router.route("/:id")
-  .get(teacherController.getTeacherById)
+  .get(authorize("admin", "teacher"), teacherController.getTeacherById)
   .put(authorize("admin"), upload.single("photo"), teacherController.updateTeacher)
   .delete(authorize("admin"), teacherController.deleteTeacher);
 

@@ -59,6 +59,9 @@ export default function Finance() {
   const [previewImage, setPreviewImage] = useState(null);
   const [receiptPreviewData, setReceiptPreviewData] = useState(null);
 
+  // Delete Modal
+  const [deleteTx, setDeleteTx] = useState(null);
+
   useEffect(() => {
     loadSettings();
     loadTransactions();
@@ -193,6 +196,20 @@ export default function Finance() {
     }
   };
 
+  const handleDeleteTransaction = async () => {
+    if (!deleteTx) return;
+    try {
+      await financeApi.deleteTransaction(deleteTx._id);
+      loadTransactions();
+      loadSummary();
+      setDeleteTx(null);
+      alert("Transaction deleted successfully.");
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to delete transaction");
+    }
+  };
+
   const exportSummaryPDF = async () => {
     try {
       await financeApi.downloadPdf(`/pdf/finance/summary?language=${language}`, `Finance_Summary_${language}.pdf`);
@@ -305,9 +322,15 @@ export default function Finance() {
                             {exportingId === tx._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                           </Button>
                           {user?.role === "admin" && (
-                            <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleVoidTransaction(tx._id)}>{tr("finance", "void")}</Button>
+                            <>
+                              <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleVoidTransaction(tx._id)}>{tr("finance", "void")}</Button>
+                              <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => setDeleteTx(tx)}>Delete</Button>
+                            </>
                           )}
                         </>
+                      )}
+                      {tx.status === 'Cancelled' && user?.role === "admin" && (
+                         <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => setDeleteTx(tx)}>Delete</Button>
                       )}
                     </div>
                   </TableCell>
@@ -625,6 +648,52 @@ export default function Finance() {
                 {exportingId === receiptPreviewData._id ? tr("finance", "downloadingPdf") : tr("finance", "downloadFinalPdf")}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTx} onOpenChange={(open) => !open && setDeleteTx(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Transaction?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete this transaction?
+              <br/><br/>
+              Warning: This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {deleteTx && (
+            <div className="bg-muted p-4 rounded-md space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Description:</span>
+                <span className="font-medium">{deleteTx.description}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Category:</span>
+                <span className="font-medium">{deleteTx.category}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Date:</span>
+                <span className="font-medium">{formatLocalizedDate(deleteTx.date, language)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Amount:</span>
+                <span className={`font-bold ${deleteTx.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                  Rs {formatLocalizedNumber(deleteTx.amount, language)}
+                </span>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setDeleteTx(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteTransaction}>
+              Delete Permanently
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

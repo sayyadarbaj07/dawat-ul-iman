@@ -75,13 +75,19 @@ exports.createExam = async (req, res) => {
     }
 
     if (req.user && req.user.role === "teacher") {
-      const hasAccess = await verifyTeacherClassAccess(
-        req.user,
-        req.body.classId,
-        req.body.class
-      );
-      if (!hasAccess) {
-        return sendError(res, 403, "You are not authorized to manage exams for this class.");
+      const Teacher = require("../models/teacherModel");
+      const teacher = await Teacher.findOne({ userId: req.user._id });
+      
+      let isAuthorized = false;
+      if (teacher && teacher.classTeacherOf) {
+        const ctId = typeof teacher.classTeacherOf === 'object' ? teacher.classTeacherOf._id : teacher.classTeacherOf;
+        if (req.body.classId && String(ctId) === String(req.body.classId)) {
+          isAuthorized = true;
+        }
+      }
+      
+      if (!isAuthorized) {
+        return sendError(res, 403, "Only the Class Teacher can manage exams for this class.");
       }
     }
 
@@ -138,11 +144,16 @@ exports.updateExam = async (req, res) => {
       const Teacher = require("../models/teacherModel");
       const teacher = await Teacher.findOne({ userId: req.user._id });
       
-      const hasClassIdAuth = exam.classId && teacher.assignedClassIds && teacher.assignedClassIds.some(id => id.toString() === exam.classId.toString());
-      const hasClassStringAuth = !exam.classId && teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
+      let isAuthorized = false;
+      if (teacher && teacher.classTeacherOf) {
+        const ctId = typeof teacher.classTeacherOf === 'object' ? teacher.classTeacherOf._id : teacher.classTeacherOf;
+        if (exam.classId && String(ctId) === String(exam.classId)) {
+          isAuthorized = true;
+        }
+      }
       
-      if (!teacher || (!hasClassIdAuth && !hasClassStringAuth)) {
-        return sendError(res, 403, "You are not authorized to edit this exam");
+      if (!isAuthorized) {
+        return sendError(res, 403, "Only the Class Teacher can manage exams for this class.");
       }
     }
 
@@ -222,13 +233,19 @@ exports.deleteExam = async (req, res) => {
     if (!exam) return sendError(res, 404, "Exam not found");
 
     if (req.user && req.user.role === "teacher") {
-      const hasAccess = await verifyTeacherClassAccess(
-        req.user,
-        exam.classId,
-        exam.class
-      );
-      if (!hasAccess) {
-        return sendError(res, 403, "You are not authorized to delete this exam.");
+      const Teacher = require("../models/teacherModel");
+      const teacher = await Teacher.findOne({ userId: req.user._id });
+      
+      let isAuthorized = false;
+      if (teacher && teacher.classTeacherOf) {
+        const ctId = typeof teacher.classTeacherOf === 'object' ? teacher.classTeacherOf._id : teacher.classTeacherOf;
+        if (exam.classId && String(ctId) === String(exam.classId)) {
+          isAuthorized = true;
+        }
+      }
+      
+      if (!isAuthorized) {
+        return sendError(res, 403, "Only the Class Teacher can manage exams for this class.");
       }
     }
 
@@ -283,11 +300,33 @@ exports.saveBulkMarks = async (req, res) => {
       const Teacher = require("../models/teacherModel");
       const teacher = await Teacher.findOne({ userId: req.user._id }).session(session);
       
-      const hasClassIdAuth = exam.classId && teacher.assignedClassIds && teacher.assignedClassIds.some(id => id.toString() === exam.classId.toString());
-      const hasClassStringAuth = !exam.classId && teacher.assignedClasses && teacher.assignedClasses.includes(exam.class);
+      if (!teacher) {
+        throw Object.assign(new Error("Teacher profile not found"), { status: 403 });
+      }
+
+      let isAuthorized = false;
       
-      if (!teacher || (!hasClassIdAuth && !hasClassStringAuth)) {
-        throw Object.assign(new Error("You are not authorized to manage marks for this class"), { status: 403 });
+      if (teacher.classTeacherOf) {
+        const ctId = typeof teacher.classTeacherOf === 'object' ? teacher.classTeacherOf._id : teacher.classTeacherOf;
+        if (exam.classId && String(ctId) === String(exam.classId)) {
+          isAuthorized = true;
+        }
+      }
+      
+      if (!isAuthorized && teacher.teachingAssignments && teacher.teachingAssignments.length > 0) {
+        if (exam.classId) {
+          const matches = teacher.teachingAssignments.some(assignment => {
+             const assignmentClassId = assignment.classId && typeof assignment.classId === 'object' ? assignment.classId._id : assignment.classId;
+             const assignmentSubject = assignment.subjectId;
+             return String(assignmentClassId) === String(exam.classId) && 
+                    String(assignmentSubject).toLowerCase().trim() === String(subject).toLowerCase().trim();
+          });
+          if (matches) isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized) {
+        throw Object.assign(new Error("Teacher is not authorized to enter marks for this subject in this class"), { status: 403 });
       }
     }
 

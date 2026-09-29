@@ -48,8 +48,21 @@ function ProtectedRoute({ path, component: Component }) {
   const { isAuthenticated, user } = useAuth();
   const [location] = useLocation();
   if (!isAuthenticated) return <Redirect to="/login" />;
-  const allowed = user ? ROLE_PERMISSIONS[user.role].includes(location) : false;
-  if (!allowed) return <Redirect to="/" />;
+  
+  let allowed = false;
+  if (user) {
+    if (user.role === "admin") {
+      allowed = true;
+    } else {
+      const allowedPaths = ROLE_PERMISSIONS[user.role] || [];
+      allowed = allowedPaths.some(p => location === p || (p !== "/" && location.startsWith(p)));
+    }
+  }
+
+  if (!allowed) {
+    const fallbackPath = user && ROLE_PERMISSIONS[user.role]?.length > 0 ? ROLE_PERMISSIONS[user.role][0] : "/login";
+    return <Redirect to={fallbackPath} />;
+  }
   return <Route path={path} component={Component} />;
 }
 function Router() {
@@ -83,33 +96,33 @@ function Router() {
       <Route>
         <Layout>
           <Switch>
-            <Route path="/" component={Dashboard} />
-            <Route path="/students" component={Students} />
-            <Route path="/students/:studentId" component={StudentProfile} />
-            <Route path="/promotions" component={Promotions} />
-            <Route path="/teachers" component={Teachers} />
-            <Route path="/teachers/:teacherId" component={TeacherProfile} />
-            <Route path="/employees" component={Employees} />
-            <Route path="/employee-attendance" component={EmployeeAttendance} />
-            <Route path="/curriculum" component={Curriculum} />
-            <Route path="/attendance" component={Attendance} />
-            <Route path="/exams" component={Exams} />
-            <Route path="/finance" component={Finance} />
-            <Route path="/reserve-fund" component={ReserveFund} />
-            <Route path="/hostel" component={Hostel} />
-            <Route path="/activities" component={Activities} />
-            <Route path="/meetings" component={Meetings} />
-            <Route path="/calendar" component={CalendarPage} />
-            <Route path="/reports" component={Reports} />
-            <Route path="/users" component={UsersManagement} />
-            <Route path="/audit" component={SystemLogs} />
-            <Route path="/settings" component={InstituteSettings} />
-            <Route path="/classes" component={Classes} />
-            <Route path="/class-attendance" component={ClassAttendanceOverview} />
-            <Route path="/class-attendance/:classId" component={ClassAttendanceDetail} />
-            <Route path="/data-resolution" component={DataResolution} />
-            <Route path="/payroll" component={Payroll} />
-            <Route path="/admin/exam-mapping" component={ExamMappingPage} />
+            <ProtectedRoute path="/" component={Dashboard} />
+            <ProtectedRoute path="/students" component={Students} />
+            <ProtectedRoute path="/students/:studentId" component={StudentProfile} />
+            <ProtectedRoute path="/promotions" component={Promotions} />
+            <ProtectedRoute path="/teachers" component={Teachers} />
+            <ProtectedRoute path="/teachers/:teacherId" component={TeacherProfile} />
+            <ProtectedRoute path="/employees" component={Employees} />
+            <ProtectedRoute path="/employee-attendance" component={EmployeeAttendance} />
+            <ProtectedRoute path="/curriculum" component={Curriculum} />
+            <ProtectedRoute path="/attendance" component={Attendance} />
+            <ProtectedRoute path="/exams" component={Exams} />
+            <ProtectedRoute path="/finance" component={Finance} />
+            <ProtectedRoute path="/reserve-fund" component={ReserveFund} />
+            <ProtectedRoute path="/hostel" component={Hostel} />
+            <ProtectedRoute path="/activities" component={Activities} />
+            <ProtectedRoute path="/meetings" component={Meetings} />
+            <ProtectedRoute path="/calendar" component={CalendarPage} />
+            <ProtectedRoute path="/reports" component={Reports} />
+            <ProtectedRoute path="/users" component={UsersManagement} />
+            <ProtectedRoute path="/audit" component={SystemLogs} />
+            <ProtectedRoute path="/settings" component={InstituteSettings} />
+            <ProtectedRoute path="/classes" component={Classes} />
+            <ProtectedRoute path="/class-attendance" component={ClassAttendanceOverview} />
+            <ProtectedRoute path="/class-attendance/:classId" component={ClassAttendanceDetail} />
+            <ProtectedRoute path="/data-resolution" component={DataResolution} />
+            <ProtectedRoute path="/payroll" component={Payroll} />
+            <ProtectedRoute path="/admin/exam-mapping" component={ExamMappingPage} />
             <Route component={NotFound} />
           </Switch>
         </Layout>

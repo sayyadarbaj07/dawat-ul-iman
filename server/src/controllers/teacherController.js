@@ -134,7 +134,7 @@ exports.createTeacher = async (req, res) => {
     }
 
     // Check if username exists
-    const existingUser = await User.findOne({ username });
+    const existingUser = await User.findOne({ username: { $regex: new RegExp(`^${username.trim()}$`, 'i') } });
     if (existingUser) {
       return sendError(res, 400, "Username already exists");
     }

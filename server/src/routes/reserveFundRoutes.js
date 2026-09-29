@@ -5,7 +5,7 @@ const { protect, authorize } = require("../middleware/authMiddleware");
 
 // All routes are protected and strictly admin-only
 router.use(protect);
-router.use(authorize("admin"));
+router.use(authorize("admin", "accountant"));
 
 router.route("/")
   .get(reserveFundController.getList)

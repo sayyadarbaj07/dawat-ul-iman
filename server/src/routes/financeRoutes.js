@@ -14,6 +14,9 @@ router.route("/")
 router.route("/:id/void")
   .put(authorize("admin"), financeController.voidTransaction);
 
+router.route("/:id")
+  .delete(authorize("admin"), financeController.deleteTransaction);
+
 router.route("/summary")
   .get(authorize("admin", "accountant", "viewer"), financeController.getFinanceSummary);
 

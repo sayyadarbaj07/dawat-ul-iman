@@ -61,6 +61,6 @@ export function useAuth() {
 export const ROLE_PERMISSIONS = {
     admin: ["/", "/students", "/promotions", "/teachers", "/curriculum", "/attendance", "/exams", "/finance", "/reserve-fund", "/hostel", "/activities", "/meetings", "/calendar", "/reports", "/users", "/audit", "/settings", "/classes", "/data-resolution", "/employees", "/employee-attendance", "/payroll"],
     teacher: ["/", "/students", "/curriculum", "/attendance", "/exams", "/activities", "/calendar", "/classes"],
-    accountant: ["/", "/finance", "/reports"],
+    accountant: ["/finance", "/reserve-fund"],
     viewer: ["/", "/reports", "/calendar"],
 };
