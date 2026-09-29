@@ -35,13 +35,14 @@ exports.getAttendanceByDate = async (req, res) => {
       
       const hasClassIds = teacherProfile && teacherProfile.assignedClassIds && teacherProfile.assignedClassIds.length > 0;
       const hasLegacyClasses = teacherProfile && teacherProfile.assignedClasses && teacherProfile.assignedClasses.length > 0;
+      const classTeacherId = teacherProfile && teacherProfile.classTeacherOf ? (typeof teacherProfile.classTeacherOf === "object" ? teacherProfile.classTeacherOf._id : teacherProfile.classTeacherOf) : null;
 
-      if (!hasClassIds && !hasLegacyClasses) {
+      if (!hasClassIds && !hasLegacyClasses && !classTeacherId) {
         return sendError(res, 403, "Teacher is not assigned to any classes");
       }
       
       if (classId) {
-        if (!hasClassIds || !teacherProfile.assignedClassIds.includes(classId.toString())) {
+        if (!classTeacherId || classTeacherId.toString() !== classId.toString()) {
           return sendError(res, 403, "Not authorized to access this class");
         }
       } else if (className && className !== "all") {
@@ -204,8 +205,9 @@ exports.getClassAttendance = async (req, res) => {
       
       const hasClassIds = teacherProfile && teacherProfile.assignedClassIds && teacherProfile.assignedClassIds.length > 0;
       const hasLegacyClasses = teacherProfile && teacherProfile.assignedClasses && teacherProfile.assignedClasses.length > 0;
+      const classTeacherId = teacherProfile && teacherProfile.classTeacherOf ? (typeof teacherProfile.classTeacherOf === "object" ? teacherProfile.classTeacherOf._id : teacherProfile.classTeacherOf) : null;
 
-      if (!hasClassIds && !hasLegacyClasses) {
+      if (!hasClassIds && !hasLegacyClasses && !classTeacherId) {
         return sendError(res, 403, "Teacher is not assigned to any classes");
       }
       let authorized = false;
@@ -217,7 +219,7 @@ exports.getClassAttendance = async (req, res) => {
           resolvedFullName = cls.fullName;
         }
 
-        if (hasClassIds && teacherProfile.assignedClassIds.includes(classId.toString())) {
+        if (classTeacherId && classTeacherId.toString() === classId.toString()) {
           authorized = true;
         } else if (hasLegacyClasses && resolvedFullName && teacherProfile.assignedClasses.includes(resolvedFullName)) {
           authorized = true;

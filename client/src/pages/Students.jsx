@@ -162,9 +162,9 @@ export default function Students() {
           const { teacherApi } = await import("@/lib/api/teacher");
           const meRes = await teacherApi.getMe();
           const meData = meRes.data?.data || meRes.data;
-          const myClassId = meData?.classTeacherOf;
-          if (myClassId) {
-             activeClasses = activeClasses.filter(c => String(c._id) === String(myClassId));
+          if (meData?.assignedClassIds && Array.isArray(meData.assignedClassIds)) {
+             const assignedIdsStrings = meData.assignedClassIds.map(id => typeof id === "object" ? (id._id || id.toString()) : String(id));
+             activeClasses = activeClasses.filter(c => assignedIdsStrings.includes(String(c._id)));
           } else {
              activeClasses = [];
           }
@@ -788,7 +788,7 @@ export default function Students() {
                     <Label htmlFor="edit-classId">Class (Assigned via API)</Label>
                     <select id="edit-classId" value={editFormData.classId} onChange={(e) => setEditFormData({ ...editFormData, classId: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                       <option value="">{tr("common", "selectClass")}</option>
-                      {madrasaClasses.map(cls => (
+                      {apiClasses.map(cls => (
                         <option key={cls._id} value={cls._id}>{cls.fullName}</option>
                       ))}
                     </select>

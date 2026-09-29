@@ -14,7 +14,7 @@ router.use(protect);
 
 router.post(
   "/",
-  authorize("admin"),
+  authorize("admin", "teacher"),
   upload.single("photo"),
   studentValidationRules,
   handleValidationErrors,
@@ -24,7 +24,7 @@ router.get("/", authorize("admin", "teacher"), studentController.getAllStudents)
 router.get("/:id", authorize("admin", "teacher"), studentController.getStudentById);
 router.put(
   "/:id",
-  authorize("admin"),
+  authorize("admin", "teacher"),
   upload.single("photo"),
   studentValidationRules,
   handleValidationErrors,

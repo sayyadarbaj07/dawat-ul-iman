@@ -90,10 +90,7 @@ export default function Attendance() {
         
         if (me) {
           let teacherClasses = [];
-          if (me.assignedClassIds && Array.isArray(me.assignedClassIds) && me.assignedClassIds.length > 0) {
-            const assignedIdsStrings = me.assignedClassIds.map(id => typeof id === "object" ? (id._id || id.toString()) : String(id));
-            teacherClasses = activeApiClasses.filter(c => assignedIdsStrings.includes(String(c._id)));
-          } else if (me.classTeacherOf) {
+          if (me.classTeacherOf) {
             const classTeacherId = typeof me.classTeacherOf === "object" ? me.classTeacherOf._id : me.classTeacherOf;
             teacherClasses = activeApiClasses.filter(c => String(c._id) === String(classTeacherId));
           }
@@ -514,7 +511,7 @@ export default function Attendance() {
           {user?.role === "teacher" && assignedClasses.length === 0 ? (
             <Card className="p-8 text-center text-muted-foreground">
               <AlertTriangle className="h-10 w-10 mx-auto mb-2 text-amber-500" />
-              {tr("attendance", "notAssigned")}
+              You are not assigned as Class Teacher for any class.
             </Card>
           ) : (!classFilter || classFilter === "all") ? (
             <Card className="p-12 text-center text-muted-foreground">
