@@ -6,10 +6,35 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(() => {
         try {
-            const stored = localStorage.getItem("dawat_user");
-            return stored ? JSON.parse(stored) : null;
+            const storedUserStr = localStorage.getItem("dawat_user");
+            const storedToken = localStorage.getItem("dawat_token");
+            if (!storedUserStr || !storedToken) {
+                localStorage.removeItem("dawat_user");
+                localStorage.removeItem("dawat_token");
+                return null;
+            }
+
+            const storedUser = JSON.parse(storedUserStr);
+
+            const base64Url = storedToken.split('.')[1];
+            if (!base64Url) throw new Error("Invalid token");
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            const payload = JSON.parse(jsonPayload);
+
+            if (payload.id !== storedUser.id) {
+                localStorage.removeItem("dawat_user");
+                localStorage.removeItem("dawat_token");
+                return null;
+            }
+
+            return storedUser;
         }
-        catch {
+        catch (e) {
+            localStorage.removeItem("dawat_user");
+            localStorage.removeItem("dawat_token");
             return null;
         }
     });
@@ -26,6 +51,9 @@ export function AuthProvider({ children }) {
 
     const login = async (username, password) => {
         try {
+            localStorage.removeItem("dawat_user");
+            localStorage.removeItem("dawat_token");
+
             const response = await authApi.login(username, password);
             localStorage.setItem("dawat_token", response.token);
             setUser({
@@ -42,7 +70,11 @@ export function AuthProvider({ children }) {
         }
     };
 
-    const logout = () => setUser(null);
+    const logout = () => {
+        localStorage.removeItem("dawat_user");
+        localStorage.removeItem("dawat_token");
+        setUser(null);
+    };
 
     return (
         <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
