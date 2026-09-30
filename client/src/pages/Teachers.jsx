@@ -225,26 +225,32 @@ export default function Teachers() {
         
         payload.append("teachingAssignments", JSON.stringify(editFormData.teachingAssignments || []));
         payload.append("joiningDate", editFormData.joiningDate);
-        if (editFormData.address !== undefined) payload.append("address", editFormData.address ?? "");
-        if (editFormData.city !== undefined) payload.append("city", editFormData.city ?? "");
-        if (editFormData.district !== undefined) payload.append("district", editFormData.district ?? "");
-        if (editFormData.state !== undefined) payload.append("state", editFormData.state ?? "");
-        if (editFormData.pinCode !== undefined) payload.append("pinCode", editFormData.pinCode ?? "");
-        if (editFormData.whatsapp) payload.append("whatsapp", editFormData.whatsapp);
-        if (editFormData.email) payload.append("email", editFormData.email);
-        if (editFormData.emergencyContact) payload.append("emergencyContact", editFormData.emergencyContact);
-        if (editFormData.fatherName) payload.append("fatherName", editFormData.fatherName);
-        if (editFormData.dateOfBirth) payload.append("dateOfBirth", editFormData.dateOfBirth);
-        if (editFormData.designation) payload.append("designation", editFormData.designation);
-        if (editFormData.department) payload.append("department", editFormData.department);
+        payload.append("address", editFormData.address || "");
+        payload.append("city", editFormData.city || "");
+        payload.append("district", editFormData.district || "");
+        payload.append("state", editFormData.state || "");
+        payload.append("pinCode", editFormData.pinCode || "");
+        payload.append("whatsapp", editFormData.whatsapp || "");
+        payload.append("email", editFormData.email || "");
+        payload.append("emergencyContact", editFormData.emergencyContact || "");
+        payload.append("fatherName", editFormData.fatherName || "");
+        payload.append("dateOfBirth", editFormData.dateOfBirth || "");
+        payload.append("designation", editFormData.designation || "");
+        payload.append("department", editFormData.department || "");
         if (editFormData.experience !== "") payload.append("experience", Number(editFormData.experience));
         if (editFormData.weeklyPeriods !== "") payload.append("weeklyPeriods", Number(editFormData.weeklyPeriods));
         payload.append("isClassTeacher", editFormData.isClassTeacher);
         if (editFormData.classTeacherOf) payload.append("classTeacherOf", editFormData.classTeacherOf);
-        if (editFormData.remarks) payload.append("remarks", editFormData.remarks);
+        payload.append("remarks", editFormData.remarks || "");
         if (editFormData.deactivationDate) payload.append("deactivationDate", editFormData.deactivationDate);
 
-        editFormData.assignedClassIds.forEach(c => payload.append("assignedClassIds[]", c));
+        if (editFormData.assignedClassIds && editFormData.assignedClassIds.length > 0) {
+          editFormData.assignedClassIds.forEach(c => payload.append("assignedClassIds", c));
+        } else {
+          // Explicitly send empty string to signal an empty array
+          payload.append("assignedClassIds", "");
+        }
+
         if (editFormData.photo) {
           payload.append("photo", editFormData.photo);
         }

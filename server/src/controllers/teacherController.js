@@ -183,7 +183,12 @@ exports.updateTeacher = async (req, res) => {
     const finalClassIds = new Set();
     
     // 1. Process explicitly provided assignedClassIds
-    if (payload.assignedClassIds && Array.isArray(payload.assignedClassIds)) {
+    if (payload.assignedClassIds !== undefined) {
+      if (payload.assignedClassIds === "") {
+        payload.assignedClassIds = [];
+      } else if (!Array.isArray(payload.assignedClassIds)) {
+        payload.assignedClassIds = [payload.assignedClassIds];
+      }
       for (const cid of payload.assignedClassIds) {
         if (!mongoose.Types.ObjectId.isValid(cid)) {
           return sendError(res, 400, `Invalid class ID format: ${cid}`);
@@ -229,7 +234,9 @@ exports.updateTeacher = async (req, res) => {
       }
     }
 
-    payload.assignedClassIds = Array.from(finalClassIds);
+    if (payload.assignedClassIds !== undefined || payload.teachingAssignments !== undefined) {
+      payload.assignedClassIds = Array.from(finalClassIds);
+    }
     delete payload.assignedClasses;
 
     // 3. Process Class Teacher conflict
