@@ -20,13 +20,13 @@ const getTotalWorkingDays = async (userType, className, classId = null) => {
       matchQuery.className = className;
     }
   }
-  
+
   const result = await Attendance.aggregate([
     { $match: matchQuery },
     { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } } } },
     { $count: "totalWorkingDays" }
   ]);
-  
+
   return result.length > 0 ? result[0].totalWorkingDays : 0;
 };
 
@@ -37,33 +37,26 @@ const getTotalWorkingDays = async (userType, className, classId = null) => {
  * @param {string} userType - "Student" or "Teacher"
  */
 const recalculateAttendancePercentage = async (userId, userType) => {
-  // First, get the class for students to get the correct denominator
-  let className = null;
-  let classId = null;
-  if (userType === "Student") {
-    const student = await Student.findById(userId);
-    if (!student) return;
-    className = student.className;
-    classId = student.classId;
-  } else {
-    const teacher = await Teacher.findById(userId);
-    if (!teacher) return;
-  }
+  const dates = await Attendance.distinct("date", { userId, userType });
+  const totalWorkingDays = dates.length;
 
-  const totalWorkingDays = await getTotalWorkingDays(userType, className, classId);
-  
   if (totalWorkingDays === 0) {
-    return; // No working days recorded yet, leave percentage as is or set to 0.
+    if (userType === "Student") {
+      await Student.findByIdAndUpdate(userId, { attendancePercent: 0 });
+    } else if (userType === "Teacher") {
+      await Teacher.findByIdAndUpdate(userId, { attendancePercent: 0 });
+    }
+    return;
   }
 
-  // Count Present Days for this user
   const presentDays = await Attendance.countDocuments({
     userId,
     userType,
-    status: { $in: ["Present", "Late"] } // Considering "Late" as present for percentage
+    status: { $in: ["Present", "Late"] }
   });
 
-  const percentage = Math.round((presentDays / totalWorkingDays) * 100);
+  let percentage = Math.round((presentDays / totalWorkingDays) * 100);
+  if (percentage > 100) percentage = 100;
 
   if (userType === "Student") {
     await Student.findByIdAndUpdate(userId, { attendancePercent: percentage });
@@ -82,17 +75,17 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
   if (!records || records.length === 0) return;
 
   const targetDate = new Date(date);
-  
+
   // 0. 7-Day Historical Edit Restriction for Teachers
   if (reqUser.role === "teacher") {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const editDate = new Date(targetDate);
     editDate.setHours(0, 0, 0, 0);
-    
+
     const diffTime = today - editDate;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     // Allow if diffDays is between -1 (timezone edge case) and 7.
     if (diffDays > 7 || diffDays < -1) {
       const err = new Error("Teachers can only edit attendance for today and the past 7 days. Contact Admin for older records.");
@@ -104,7 +97,7 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
   // Phase 6.6: Canonical Class Resolution
   let classData = null;
   const hasStudentRecords = records.some(r => r.userType === "Student");
-  
+
   if (hasStudentRecords) {
     if (!classId) {
       const err = new Error("classId is required for student attendance.");
@@ -123,11 +116,11 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
     if (!teacherRecord) {
       throw new Error("Teacher profile not found for the logged-in user.");
     }
-    
+
     for (const record of records) {
       if (record.userType === "Student") {
-        const classTeacherClassId = teacherRecord.classTeacherOf && typeof teacherRecord.classTeacherOf === "object" ? teacherRecord.classTeacherOf._id : teacherRecord.classTeacherOf;
-        if (!classTeacherClassId || String(classTeacherClassId) !== String(classId)) {
+        const assignedIds = (teacherRecord.assignedClassIds || []).map(id => String(id));
+        if (!assignedIds.includes(String(classId))) {
           const err = new Error(`Teacher is not authorized to mark attendance for this class.`);
           err.status = 403; throw err;
         }
@@ -144,7 +137,7 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
   if (studentIds.length > 0) {
     const students = await Student.find({ _id: { $in: studentIds } });
     studentMap = new Map(students.map(s => [s._id.toString(), s]));
-    
+
     for (const record of records) {
       if (record.userType === "Student") {
         const student = studentMap.get(record.userId.toString());
@@ -205,64 +198,14 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
 
   // 3. Recalculate Attendance Percentage for affected users efficiently
   try {
-    const mongoose = require("mongoose");
-    const studentRecords = records.filter(r => r.userType === "Student");
-    if (studentRecords.length > 0 && classId) {
-      const totalWorkingDays = await getTotalWorkingDays("Student", null, classId);
-      if (totalWorkingDays > 0) {
-        const userIds = studentRecords.map(r => new mongoose.Types.ObjectId(r.userId));
-        
-        const attendanceStats = await Attendance.aggregate([
-          { $match: { userType: "Student", classId: new mongoose.Types.ObjectId(classId), userId: { $in: userIds }, status: { $in: ["Present", "Late"] } } },
-          { $group: { _id: "$userId", presentDays: { $sum: 1 } } }
-        ]);
-        
-        const statsMap = new Map();
-        attendanceStats.forEach(stat => statsMap.set(stat._id.toString(), stat.presentDays));
-        
-        const studentBulkOps = userIds.map(userId => {
-          const presentDays = statsMap.get(userId.toString()) || 0;
-          const percentage = Math.round((presentDays / totalWorkingDays) * 100);
-          return {
-            updateOne: {
-              filter: { _id: userId },
-              update: { $set: { attendancePercent: percentage } }
-            }
-          };
-        });
-        
-        if (studentBulkOps.length > 0) {
-          await Student.bulkWrite(studentBulkOps);
-        }
-      }
-    }
-    
-    const teacherRecords = records.filter(r => r.userType === "Teacher");
-    if (teacherRecords.length > 0) {
-      const totalWorkingDaysT = await getTotalWorkingDays("Teacher", null);
-      if (totalWorkingDaysT > 0) {
-        const tIds = teacherRecords.map(r => new mongoose.Types.ObjectId(r.userId));
-        const tStats = await Attendance.aggregate([
-          { $match: { userType: "Teacher", userId: { $in: tIds }, status: { $in: ["Present", "Late"] } } },
-          { $group: { _id: "$userId", presentDays: { $sum: 1 } } }
-        ]);
-        const tStatsMap = new Map();
-        tStats.forEach(s => tStatsMap.set(s._id.toString(), s.presentDays));
-        const tBulkOps = tIds.map(tId => {
-          const presentDays = tStatsMap.get(tId.toString()) || 0;
-          const percentage = Math.round((presentDays / totalWorkingDaysT) * 100);
-          return {
-            updateOne: {
-              filter: { _id: tId },
-              update: { $set: { attendancePercent: percentage } }
-            }
-          };
-        });
-        if (tBulkOps.length > 0) {
-          await Teacher.bulkWrite(tBulkOps);
-        }
-      }
-    }
+    const uniqueUsers = new Map();
+    records.forEach(r => uniqueUsers.set(r.userId.toString(), { userId: r.userId, userType: r.userType }));
+
+    await Promise.all(
+      Array.from(uniqueUsers.values()).map(user =>
+        recalculateAttendancePercentage(user.userId, user.userType)
+      )
+    );
   } catch (error) {
     console.error("Failed to recalculate percentages in bulk:", error);
   }
@@ -271,25 +214,25 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
   try {
     const Notification = require("../models/notificationModel");
     const absentRecords = records.filter(r => r.userType === "Student" && r.status === "Absent");
-    
+
     if (absentRecords.length > 0) {
-      const classTeachers = classId 
+      const classTeachers = classId
         ? await Teacher.find({ assignedClassIds: classId, status: "active" })
         : await Teacher.find({ assignedClasses: { $in: [...new Set(absentRecords.map(r => r.className))] }, status: "active" });
       const adminUsers = await require("../models/userModel").find({ role: "admin", isActive: true });
-      
+
       const newNotifications = [];
       const targetStart = new Date(targetDate); targetStart.setHours(0,0,0,0);
       const targetEnd = new Date(targetDate); targetEnd.setHours(23,59,59,999);
       const dateStr = targetDate.toLocaleDateString('en-IN');
 
       const studentIds = absentRecords.map(r => studentMap.get(r.userId.toString())?._id).filter(Boolean);
-      
+
       const existingNotifications = await Notification.find({
         "relatedEntity.entityId": { $in: studentIds },
         createdAt: { $gte: targetStart, $lte: targetEnd }
       });
-      
+
       for (const record of absentRecords) {
         const student = studentMap.get(record.userId.toString());
         if (!student) continue;
@@ -297,8 +240,8 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
         const title = `Absence Alert: ${student.name}`;
         const classNameDisplay = classData ? classData.fullName : student.className;
         const message = `${student.name} (Roll: ${student.rollNumber || "N/A"}) from Class ${classNameDisplay} has been marked absent on ${dateStr}.`;
-        
-        const studentExisting = existingNotifications.filter(n => 
+
+        const studentExisting = existingNotifications.filter(n =>
           n.relatedEntity?.entityId?.toString() === student._id.toString()
         );
 
@@ -322,7 +265,7 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
         const teachersForClass = classId
           ? classTeachers.filter(t => t.assignedClassIds && t.assignedClassIds.includes(classId.toString()))
           : classTeachers.filter(t => t.assignedClasses.includes(student.className));
-          
+
         for (const teacher of teachersForClass) {
           if (reqUser && reqUser._id.toString() !== teacher.userId?.toString()) {
             if (!studentExisting.some(n => n.recipient?.toString() === teacher.userId.toString())) {

@@ -11,11 +11,12 @@ import { formatLocalizedNumber, formatLocalizedPercent } from "@/utils/localizat
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/button";
+import { localISODate } from "@/hooks/useDashboardData";
 
 export default function ClassAttendanceOverview() {
   const [, setLocation] = useLocation();
   const { tr, language } = useLanguage();
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(localISODate());
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   

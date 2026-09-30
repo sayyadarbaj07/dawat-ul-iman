@@ -42,7 +42,8 @@ exports.getAttendanceByDate = async (req, res) => {
       }
       
       if (classId) {
-        if (!classTeacherId || classTeacherId.toString() !== classId.toString()) {
+        const assignedIds = (teacherProfile.assignedClassIds || []).map(id => String(id));
+        if (!assignedIds.includes(String(classId))) {
           return sendError(res, 403, "Not authorized to access this class");
         }
       } else if (className && className !== "all") {
@@ -152,14 +153,15 @@ exports.getStudentAttendanceSummary = async (req, res) => {
     
     const records = await Attendance.find({ userId: studentId, userType: "Student" }).sort({ date: -1 });
     
-    let present = 0, absent = 0, late = 0;
+    let present = 0, absent = 0, late = 0, leave = 0;
     records.forEach(r => {
       if (r.status === "Present") present++;
       else if (r.status === "Absent") absent++;
       else if (r.status === "Late") late++;
+      else if (r.status === "Leave") leave++;
     });
 
-    return sendSuccess(res, 200, "Student attendance summary fetched successfully", { records, summary: { present, absent, late, total: records.length } });
+    return sendSuccess(res, 200, "Student attendance summary fetched successfully", { records, summary: { present, absent, late, leave, total: records.length } });
   } catch (error) {
     return sendError(res, 500, "Failed to fetch student attendance", error);
   }

@@ -8,15 +8,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { studentApi, teacherApi, attendanceApi, eventApi, classApi } from "@/lib/api";
 import { CalendarIcon, Check, X, Clock, AlertTriangle, Search, Info } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-import { formatLocalizedNumber, formatLocalizedDate } from "@/utils/localizationUtils";
+import { formatLocalizedNumber, formatLocalizedDate, getLocalizedStudentName } from "@/utils/localizationUtils";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { localISODate } from "@/hooks/useDashboardData";
 
 export default function Attendance() {
   const { tr, language } = useLanguage();
   const { user } = useAuth();
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(localISODate());
   
   const [mainTab, setMainTab] = useState("mark");
   const [activeTab, setActiveTab] = useState("students");
@@ -90,7 +91,10 @@ export default function Attendance() {
         
         if (me) {
           let teacherClasses = [];
-          if (me.classTeacherOf) {
+          if (me.assignedClassIds && Array.isArray(me.assignedClassIds) && me.assignedClassIds.length > 0) {
+            const assignedIds = me.assignedClassIds.map(id => typeof id === "object" ? String(id._id || id) : String(id));
+            teacherClasses = activeApiClasses.filter(c => assignedIds.includes(String(c._id)));
+          } else if (me.classTeacherOf) {
             const classTeacherId = typeof me.classTeacherOf === "object" ? me.classTeacherOf._id : me.classTeacherOf;
             teacherClasses = activeApiClasses.filter(c => String(c._id) === String(classTeacherId));
           }
@@ -154,7 +158,7 @@ export default function Attendance() {
   const loadStudentsForClass = async (classId) => {
     try {
       setLoadingUsers(true);
-      const res = await studentApi.list({ classId, limit: 500 });
+      const res = await studentApi.list({ classId, status: "active", limit: 500 });
       setStudents(res.data?.data || res.data || []);
     } catch (error) {
       console.error("Failed to load students", error);
@@ -267,10 +271,11 @@ export default function Attendance() {
     let list = activeTab === "students" ? students : teachers;
     if (searchTerm) {
       list = list.filter(u => {
-        const name = (u.fullName || u.name || "").toLowerCase();
+        const name = getLocalizedStudentName(u, language).toLowerCase();
+        const enName = (u.fullName || u.name || "").toLowerCase();
         const roll = (u.rollNumber || "").toLowerCase();
         const q = searchTerm.toLowerCase();
-        return name.includes(q) || roll.includes(q);
+        return name.includes(q) || enName.includes(q) || roll.includes(q);
       });
     }
     return list;
@@ -579,7 +584,7 @@ export default function Attendance() {
                               {u.rollNumber || (u._id || u.id).slice(-6).toUpperCase()}
                             </TableCell>
                             <TableCell>
-                              <div className="font-semibold text-sm" dir="auto">{u.fullName || u.name}</div>
+                              <div className="font-semibold text-sm" dir="auto">{getLocalizedStudentName(u, language)}</div>
                               {isPending && <div className="text-[10px] text-amber-600 font-medium tracking-wider uppercase mt-0.5">{tr("attendance", "notMarked")}</div>}
                             </TableCell>
                             <TableCell className="text-center">{renderStatusButtons(u._id)}</TableCell>
@@ -710,7 +715,7 @@ export default function Attendance() {
                         <TableCell className="font-medium whitespace-nowrap text-sm" dir="ltr">
                           {formatLocalizedDate(record.date, language, "EEE, dd MMM yyyy")}
                         </TableCell>
-                        <TableCell className="text-sm font-semibold" dir="auto">{record.userId?.fullName || record.userId?.name || "—"}</TableCell>
+                        <TableCell className="text-sm font-semibold" dir="auto">{record.userId ? getLocalizedStudentName(record.userId, language) : "—"}</TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border border-transparent ${
                             record.status === 'Present' ? 'bg-emerald-500/15 text-emerald-700' :

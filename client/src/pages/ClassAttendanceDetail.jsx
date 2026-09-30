@@ -16,6 +16,7 @@ import {
 } from "@/utils/localizationUtils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { localISODate } from "@/hooks/useDashboardData";
 
 export default function ClassAttendanceDetail() {
   const [match, params] = useRoute("/class-attendance/:classId");
@@ -31,7 +32,7 @@ export default function ClassAttendanceDetail() {
     if (queryDate && !isNaN(new Date(queryDate).getTime())) {
       return queryDate;
     }
-    return new Date().toISOString().split("T")[0];
+    return localISODate();
   };
 
   const [date, setDate] = useState(getInitialDate());
