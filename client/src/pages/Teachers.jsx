@@ -735,7 +735,15 @@ export default function Teachers() {
                       </TableCell>
                       <TableCell className="text-center">
                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-700 text-xs font-medium border border-transparent">
-                           {teacher.teachingAssignments ? Array.from(new Set(teacher.teachingAssignments.map(a => a.subjectId))).length : 0}
+                           {teacher.teachingAssignments?.length > 0
+                             ? new Set(
+                                 teacher.teachingAssignments
+                                   .map((a) => a.subjectId)
+                                   .filter(Boolean)
+                               ).size
+                             : teacher.subject
+                             ? 1
+                             : 0}
                          </span>
                       </TableCell>
                       <TableCell>
