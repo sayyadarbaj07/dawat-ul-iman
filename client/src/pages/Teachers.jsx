@@ -142,7 +142,6 @@ export default function Teachers() {
         payload.append("salary", Number(formData.salary));
         
         payload.append("teachingAssignments", JSON.stringify(formData.teachingAssignments));
-        formData.assignedClassIds.forEach(c => payload.append("assignedClassIds[]", c));
         payload.append("username", formData.username);
         payload.append("password", formData.password);
         payload.append("isActive", formData.isActive);
@@ -243,13 +242,6 @@ export default function Teachers() {
         if (editFormData.classTeacherOf) payload.append("classTeacherOf", editFormData.classTeacherOf);
         payload.append("remarks", editFormData.remarks || "");
         if (editFormData.deactivationDate) payload.append("deactivationDate", editFormData.deactivationDate);
-
-        if (editFormData.assignedClassIds && editFormData.assignedClassIds.length > 0) {
-          editFormData.assignedClassIds.forEach(c => payload.append("assignedClassIds", c));
-        } else {
-          // Explicitly send empty string to signal an empty array
-          payload.append("assignedClassIds", "");
-        }
 
         if (editFormData.photo) {
           payload.append("photo", editFormData.photo);

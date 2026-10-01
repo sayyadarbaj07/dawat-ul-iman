@@ -70,7 +70,7 @@ export default function TeacherDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-           {data.canAccess("/attendance") && selectedClassId && (
+           {data.canAccess("/attendance") && selectedClassId && data.teacherInfo?.isClassTeacher && String(typeof data.teacherInfo.classTeacherOf === "object" ? data.teacherInfo.classTeacherOf._id : data.teacherInfo.classTeacherOf) === String(selectedClassId) && (
              <Link href={`/attendance?classId=${selectedClassId}`}>
                <Button className="bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-all duration-200">
                  <ClipboardList className={`h-4 w-4 ${isRtl ? 'ml-2' : 'mr-2'}`} />

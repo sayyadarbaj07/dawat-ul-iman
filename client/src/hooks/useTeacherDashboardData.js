@@ -111,6 +111,7 @@ export function useTeacherDashboardData(user) {
 
         setData({
           teacherName: teacher?.name || user?.name,
+          teacherInfo: teacher,
           assignedClasses,
           totalStudents,
           pendingAttendanceCount,

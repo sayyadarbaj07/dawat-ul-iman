@@ -91,10 +91,7 @@ export default function Attendance() {
         
         if (me) {
           let teacherClasses = [];
-          if (me.assignedClassIds && Array.isArray(me.assignedClassIds) && me.assignedClassIds.length > 0) {
-            const assignedIds = me.assignedClassIds.map(id => typeof id === "object" ? String(id._id || id) : String(id));
-            teacherClasses = activeApiClasses.filter(c => assignedIds.includes(String(c._id)));
-          } else if (me.classTeacherOf) {
+          if (me.isClassTeacher && me.classTeacherOf) {
             const classTeacherId = typeof me.classTeacherOf === "object" ? me.classTeacherOf._id : me.classTeacherOf;
             teacherClasses = activeApiClasses.filter(c => String(c._id) === String(classTeacherId));
           }

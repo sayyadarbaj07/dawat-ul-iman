@@ -119,9 +119,17 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
 
     for (const record of records) {
       if (record.userType === "Student") {
-        const assignedIds = (teacherRecord.assignedClassIds || []).map(id => String(id));
-        if (!assignedIds.includes(String(classId))) {
-          const err = new Error(`Teacher is not authorized to mark attendance for this class.`);
+        if (!teacherRecord.isClassTeacher) {
+          const err = new Error("Only the designated Class Teacher can modify student attendance for this class.");
+          err.status = 403; throw err;
+        }
+        
+        const classTeacherId = teacherRecord.classTeacherOf && typeof teacherRecord.classTeacherOf === "object"
+          ? teacherRecord.classTeacherOf._id
+          : teacherRecord.classTeacherOf;
+          
+        if (!classTeacherId || String(classTeacherId) !== String(classId)) {
+          const err = new Error("Only the designated Class Teacher can modify student attendance for this class.");
           err.status = 403; throw err;
         }
       } else if (record.userType === "Teacher") {
