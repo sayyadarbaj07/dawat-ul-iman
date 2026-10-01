@@ -1743,7 +1743,7 @@ exports.generateWeakStudentsReport = async (req, res) => {
 
 exports.generateClassAttendancePDF = async (req, res) => {
   try {
-    const { className, month, year, startDate, endDate } = req.query;
+    const { className, classId, month, year, startDate, endDate } = req.query;
     const language = resolvePdfLanguage(req.query.language);
     const isUrdu = language === "ur";
     
@@ -1752,8 +1752,8 @@ exports.generateClassAttendancePDF = async (req, res) => {
     // but just to be safe, we will leave the middleware check as is in the routes.
     // We can clean this redundant check up since checkClassAccess handles it.
     // If className is an ObjectId string, pass it as classId, otherwise as legacyClassName
-    let cId = null;
-    let cName = className;
+    let cId = classId || null;
+    let cName = className || null;
     if (className && className.match(/^[0-9a-fA-F]{24}$/)) {
       cId = className;
       cName = null;
@@ -1761,6 +1761,10 @@ exports.generateClassAttendancePDF = async (req, res) => {
     const hasAccess = await verifyTeacherClassAccess(req.user, cId, cName);
     if (!hasAccess) {
       return res.status(403).json({ message: "Forbidden: Not assigned to this class" });
+    }
+
+    if (!cId && !cName) {
+      return res.status(400).json({ message: "A valid class filter (classId or className) is required." });
     }
 
     let matchQuery = { userType: "Student" };

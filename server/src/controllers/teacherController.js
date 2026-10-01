@@ -106,15 +106,12 @@ exports.createTeacher = async (req, res) => {
           const key = `${assignment.classId.toString()}_${subject.toLowerCase()}`;
           if (!uniqueCombos.has(key)) {
             uniqueCombos.set(key, { classId: assignment.classId, subjectId: subject });
-            finalClassIds.add(assignment.classId.toString());
           }
         }
         teacherData.teachingAssignments = Array.from(uniqueCombos.values());
       }
     }
 
-    teacherData.assignedClassIds = Array.from(finalClassIds);
-    delete teacherData.assignedClasses;
 
     // 3. Process Class Teacher conflict
     if (teacherData.isClassTeacher === true || teacherData.isClassTeacher === "true") {
@@ -129,9 +126,14 @@ exports.createTeacher = async (req, res) => {
          const cls = await Class.findById(teacherData.classTeacherOf);
          return sendError(res, 409, `Conflict: ${cls ? cls.fullName : 'This class'} is already assigned to ${existingCT.name} as Class Teacher.`);
       }
+      // Auto-grant authorization for Class Teacher
+      finalClassIds.add(teacherData.classTeacherOf.toString());
     } else {
       teacherData.classTeacherOf = null;
     }
+
+    teacherData.assignedClassIds = Array.from(finalClassIds);
+    delete teacherData.assignedClasses;
 
     // Check if username exists
     const existingUser = await User.findOne({ username: { $regex: new RegExp(`^${username.trim()}$`, 'i') } });
@@ -227,17 +229,11 @@ exports.updateTeacher = async (req, res) => {
           const key = `${assignment.classId.toString()}_${subject.toLowerCase()}`;
           if (!uniqueCombos.has(key)) {
             uniqueCombos.set(key, { classId: assignment.classId, subjectId: subject });
-            finalClassIds.add(assignment.classId.toString());
           }
         }
         payload.teachingAssignments = Array.from(uniqueCombos.values());
       }
     }
-
-    if (payload.assignedClassIds !== undefined || payload.teachingAssignments !== undefined) {
-      payload.assignedClassIds = Array.from(finalClassIds);
-    }
-    delete payload.assignedClasses;
 
     // 3. Process Class Teacher conflict
     if (payload.isClassTeacher === true || payload.isClassTeacher === "true") {
@@ -252,9 +248,17 @@ exports.updateTeacher = async (req, res) => {
          const cls = await Class.findById(payload.classTeacherOf);
          return sendError(res, 409, `Conflict: ${cls ? cls.fullName : 'This class'} is already assigned to ${existingCT.name} as Class Teacher.`);
       }
+      
+      // Auto-grant authorization for Class Teacher
+      finalClassIds.add(payload.classTeacherOf.toString());
     } else {
       payload.classTeacherOf = null;
     }
+
+    if (payload.assignedClassIds !== undefined || payload.teachingAssignments !== undefined || payload.isClassTeacher === true || payload.isClassTeacher === "true") {
+      payload.assignedClassIds = Array.from(finalClassIds);
+    }
+    delete payload.assignedClasses;
 
     if (payload.joiningDate && isNaN(new Date(payload.joiningDate).getTime())) {
       return sendError(res, 400, "Valid joining date is required");

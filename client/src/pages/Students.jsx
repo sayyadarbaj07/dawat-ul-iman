@@ -946,7 +946,7 @@ export default function Students() {
                     <TableCell className="text-sm text-muted-foreground">{student.fatherName}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted font-medium border-transparent">
-                        {student.studentClass || student.className}
+                        {student.classId?.fullName || student.studentClass || student.className}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
