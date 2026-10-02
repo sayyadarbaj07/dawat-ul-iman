@@ -11,10 +11,11 @@ import { formatLocalizedNumber, formatLocalizedDate } from "@/utils/localization
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { toast } from "sonner";
+import { localISODate } from "@/hooks/useDashboardData";
 
 export default function EmployeeAttendance() {
   const { tr, language, isRtl } = useLanguage();
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(localISODate());
   
   const [employees, setEmployees] = useState([]);
   const [attendanceData, setAttendanceData] = useState({});

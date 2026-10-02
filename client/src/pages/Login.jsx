@@ -33,11 +33,33 @@ export default function Login() {
   const onSubmit = async (data) => {
     setIsLoading(true);
     setError("");
-    const success = await login(data.username, data.password);
-    if (success) {
+    const result = await login(data.username, data.password);
+    
+    if (result && (result === true || result.success)) {
       setLocation("/");
     } else {
-      setError(t("invalidCredentials"));
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      const err = result?.error;
+      
+      if (err) {
+        if (err.status === 401) {
+          errorMessage = "Incorrect username or password.";
+        } else if (err.status === 403) {
+          errorMessage = "Access denied.";
+        } else if (err.status === 429) {
+          errorMessage = "Too many login attempts. Please try again later.";
+        } else if (err.status >= 500) {
+          errorMessage = "Server error. Please try again later.";
+        } else if (!err.status) {
+          errorMessage = "Unable to connect to the server. Please check your internet connection.";
+        } else {
+          errorMessage = "An unexpected error occurred. Please try again.";
+        }
+      } else {
+         errorMessage = t("invalidCredentials") || "Incorrect username or password.";
+      }
+      
+      setError(errorMessage);
     }
     setIsLoading(false);
   };

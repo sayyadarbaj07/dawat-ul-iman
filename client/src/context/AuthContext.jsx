@@ -63,10 +63,10 @@ export function AuthProvider({ children }) {
                 initials: response.initials,
                 mustChangePassword: response.mustChangePassword,
             });
-            return true;
+            return { success: true };
         } catch (error) {
             console.error("Login failed:", error);
-            return false;
+            return { success: false, error };
         }
     };
 

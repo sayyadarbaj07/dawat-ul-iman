@@ -921,6 +921,7 @@ export default function Students() {
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "studentName")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "fatherName")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "classLabel")}</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("departments", "department") || tr("students", "department") || "Department"}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "schoolClass")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "status")}</TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{tr("students", "admission")}</TableHead>
@@ -946,8 +947,11 @@ export default function Students() {
                     <TableCell className="text-sm text-muted-foreground">{student.fatherName}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted font-medium border-transparent">
-                        {student.studentClass || student.className}
+                        {student.classId?.fullName || student.studentClass || student.className}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {student.classId?.department ? (tr("departments", student.classId.department) || student.classId.department) : "—"}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {student.schoolClassId?.fullName || student.schoolClass || "—"}

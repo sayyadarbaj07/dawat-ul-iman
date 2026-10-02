@@ -70,7 +70,19 @@ export default function StudentProfile() {
     try {
       setLoadingAttendance(true);
       const res = await attendanceApi.getStudentSummary(id);
-      if (res.data) setAttendanceSummary(res.data);
+      if (res.data && res.data.summary) {
+        const s = res.data.summary;
+        const attended = s.present + s.late;
+        const percentage = s.total > 0 ? Math.round((attended / s.total) * 100) : 0;
+        
+        setAttendanceSummary({
+          present: s.present,
+          absent: s.absent,
+          late: s.late,
+          leave: s.leave,
+          percentage: percentage
+        });
+      }
     } catch (err) {
       console.error(err);
     } finally {
