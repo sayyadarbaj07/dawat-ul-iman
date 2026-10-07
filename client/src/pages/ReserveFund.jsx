@@ -58,7 +58,7 @@ export default function ReserveFund() {
   });
 
   useEffect(() => {
-    if (user?.role !== "admin") {
+    if (user?.role !== "admin" && user?.role !== "accountant") {
       setAccessDenied(true);
       return;
     }
@@ -394,7 +394,9 @@ export default function ReserveFund() {
                         {tx.status !== 'Cancelled' && (
                           <div className="flex justify-end gap-2">
                              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openEditModal(tx)}>{tr("common", "update")}</Button>
-                             <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleDelete(tx._id)}>{tr("common", "delete")}</Button>
+                             {user?.role === "admin" && (
+                               <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleDelete(tx._id)}>{tr("common", "delete")}</Button>
+                             )}
                           </div>
                         )}
                       </TableCell>

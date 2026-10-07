@@ -98,7 +98,7 @@ export default function UsersManagement() {
         description="Manage system access and roles"
         showBack={true}
         backLabel="Back to Dashboard"
-        action={
+        actions={
           <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
             <DialogTrigger asChild>
               <Button>

@@ -15,6 +15,7 @@ router.route("/:id/void")
   .put(authorize("admin"), financeController.voidTransaction);
 
 router.route("/:id")
+  .put(authorize("admin", "accountant"), upload.single("receiptPhoto"), financeController.updateTransaction)
   .delete(authorize("admin"), financeController.deleteTransaction);
 
 router.route("/summary")

@@ -21,6 +21,18 @@ export const financeApi = {
       body: formData, // request wrapper handles FormData
     });
   },
+  update(id, payload) {
+    return request(`/finance/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+  updateWithFile(id, formData) {
+    return request(`/finance/${id}`, {
+      method: "PUT",
+      body: formData,
+    });
+  },
   voidTransaction(id) {
     return request(`/finance/${id}/void`, { method: "PUT" });
   },

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatCard } from "@/components/ui/StatCard";
-import { ArrowUpRight, ArrowDownRight, Download, Plus, Search, CheckCircle, XCircle, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Download, Plus, Search, CheckCircle, XCircle, FileText, Image as ImageIcon, Loader2, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -25,6 +25,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { formatLocalizedNumber, formatLocalizedDate } from "@/utils/localizationUtils";
 import { financeApi, settingsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const INCOME_CATEGORIES = ["Kafalat", "Atiya", "Zakat", "Sadqa", "Isale Sawab", "Other"];
 const EXPENSE_CATEGORIES = ["Tankha", "Food", "Medical", "Wazifa", "Other"];
@@ -40,7 +41,21 @@ export default function Finance() {
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, currentBalance: 0, categorySummary: {} });
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState(null);
-  
+  const { toast } = useToast();
+
+  // Pagination & Filters
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit] = useState(50);
+  const [totalPages, setTotalPages] = useState(1);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [paymentModeFilter, setPaymentModeFilter] = useState("all");
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState(null);
+
   // Transaction Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -64,9 +79,12 @@ export default function Finance() {
 
   useEffect(() => {
     loadSettings();
+  }, []);
+
+  useEffect(() => {
     loadTransactions();
     loadSummary();
-  }, [activeTab]);
+  }, [activeTab, page, search, startDate, endDate, categoryFilter, paymentModeFilter]);
 
   const loadSettings = async () => {
     try {
@@ -80,12 +98,22 @@ export default function Finance() {
   const loadTransactions = async () => {
     try {
       setLoading(true);
-      const res = await financeApi.list();
-      // Handle the new paginated API response { data: { data: [...], meta: {...} } }
+      const params = { page, limit };
+      if (search) params.search = search;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      if (categoryFilter !== "all") params.category = categoryFilter;
+      if (paymentModeFilter !== "all") params.paymentMode = paymentModeFilter;
+      if (activeTab === "income") params.type = "income";
+      if (activeTab === "expense") params.type = "expense";
+
+      const res = await financeApi.list(params);
       if (res.data && res.data.meta) {
         setTransactions(res.data.data || []);
+        setTotalPages(res.data.meta.totalPages || 1);
       } else {
         setTransactions(res.data || []);
+        setTotalPages(1);
       }
     } catch (err) {
       console.error(err);
@@ -107,7 +135,9 @@ export default function Finance() {
   const handleCreateTransaction = async (e) => {
     e.preventDefault();
     try {
-      if (formData.type === "income" && (formData.receiptPhoto || formData.receiptId)) {
+      let newTxRes;
+
+      if (formData.receiptPhoto instanceof File) {
         const payload = new FormData();
         payload.append("type", formData.type);
         payload.append("amount", Number(formData.amount));
@@ -117,41 +147,15 @@ export default function Finance() {
         payload.append("remarks", formData.remarks);
         payload.append("date", formData.date);
         if (formData.receiptId) payload.append("receiptId", formData.receiptId);
-        if (formData.receiptPhoto) payload.append("receiptPhoto", formData.receiptPhoto);
-        
-        let newTxRes;
-        if (formData.receiptId || formData.receiptPhoto) {
-          newTxRes = await financeApi.createWithFile(payload);
+        payload.append("receiptPhoto", formData.receiptPhoto);
+
+        if (isEditing) {
+          newTxRes = await financeApi.updateWithFile(editId, payload);
         } else {
-          newTxRes = await financeApi.createWithFile(payload); // Ensure we capture the response
-        }
-        setIsModalOpen(false);
-        setFormData({
-          type: "income",
-          amount: "",
-          description: "",
-          category: INCOME_CATEGORIES[0],
-          paymentMode: "Cash",
-          remarks: "",
-          date: new Date().toISOString().split("T")[0],
-          receiptId: "",
-          receiptPhoto: null,
-        });
-        loadTransactions();
-        loadSummary();
-        
-        // Auto-open preview for new receipt
-        if (newTxRes && newTxRes.data && newTxRes.data._id) {
-           // We need to fetch the populated version for the preview
-           try {
-             const res = await financeApi.getSummary(`?referenceId=${newTxRes.data.referenceId || ''}`);
-             // Wait, it's easier to just pass the newTxRes.data directly, but referenceId won't be populated.
-             // We can just set it anyway, the preview has fallbacks.
-             setReceiptPreviewData(newTxRes.data);
-           } catch(e) {}
+          newTxRes = await financeApi.createWithFile(payload);
         }
       } else {
-        const newTxRes = await financeApi.create({
+        const payload = {
           type: formData.type,
           amount: Number(formData.amount),
           description: formData.description,
@@ -159,30 +163,66 @@ export default function Finance() {
           paymentMode: formData.paymentMode,
           remarks: formData.remarks,
           date: formData.date,
-        });
-        setIsModalOpen(false);
-        setFormData({
-          type: "income",
-          amount: "",
-          description: "",
-          category: INCOME_CATEGORIES[0],
-          paymentMode: "Cash",
-          remarks: "",
-          date: new Date().toISOString().split("T")[0],
-          receiptId: "",
-          receiptPhoto: null,
-        });
-        loadTransactions();
-        loadSummary();
-        
-        if (newTxRes && newTxRes.data) {
-           setReceiptPreviewData(newTxRes.data);
+          receiptId: formData.receiptId,
+        };
+
+        if (isEditing) {
+          newTxRes = await financeApi.update(editId, payload);
+        } else {
+          newTxRes = await financeApi.create(payload);
         }
+      }
+
+      setIsModalOpen(false);
+      setFormData({
+        type: "income",
+        amount: "",
+        description: "",
+        category: INCOME_CATEGORIES[0],
+        paymentMode: "Cash",
+        remarks: "",
+        date: new Date().toISOString().split("T")[0],
+        receiptId: "",
+        receiptPhoto: null,
+      });
+      setIsEditing(false);
+      setEditId(null);
+      loadTransactions();
+      loadSummary();
+
+      toast({
+        title: "Success",
+        description: isEditing ? tr("finance", "transactionUpdated") || "Transaction updated successfully" : tr("finance", "transactionCreated") || "Transaction added successfully",
+      });
+
+      if (!isEditing && newTxRes && newTxRes.data && newTxRes.data._id) {
+         setReceiptPreviewData(newTxRes.data);
       }
     } catch (err) {
       console.error(err);
-      alert(err.message || tr("finance", "failedToSave"));
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || err.message || tr("finance", "failedToSave"),
+        variant: "destructive"
+      });
     }
+  };
+
+  const openEditModal = (tx) => {
+    setFormData({
+      type: tx.type,
+      amount: tx.amount,
+      description: tx.description,
+      category: tx.category,
+      paymentMode: tx.paymentMode || "Cash",
+      remarks: tx.remarks || "",
+      date: tx.date ? new Date(tx.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      receiptId: tx.receiptId || "",
+      receiptPhoto: null,
+    });
+    setEditId(tx._id);
+    setIsEditing(true);
+    setIsModalOpen(true);
   };
 
   const handleVoidTransaction = async (id) => {
@@ -250,11 +290,58 @@ export default function Finance() {
   };
   const chartData = generateChartData();
 
-  const renderTransactionTable = (typeFilter, limit = null) => {
-    let filtered = typeFilter === "all" ? transactions : transactions.filter(t => t.type === typeFilter);
-    if (limit) filtered = filtered.slice(0, limit);
+  const renderTransactionTable = (isDashboard = false) => {
+    let filtered = isDashboard ? transactions.slice(0, 10) : transactions;
     return (
-      <Card className="overflow-x-auto mt-4 border shadow-sm">
+      <div className="space-y-4">
+        {!isDashboard && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-card border rounded-lg p-4 shadow-sm">
+            <div className="relative col-span-1 md:col-span-2">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder={tr("finance", "search") || "Search description, receipt, remarks..."}
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              />
+            </div>
+            <div>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={categoryFilter}
+                onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
+              >
+                <option value="all">All Categories</option>
+                {activeTab === "income" ? INCOME_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>) :
+                 activeTab === "expense" ? EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>) :
+                 [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES].map(c => <option key={c} value={c}>{c}</option>)
+                }
+              </select>
+            </div>
+            <div>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={paymentModeFilter}
+                onChange={(e) => { setPaymentModeFilter(e.target.value); setPage(1); }}
+              >
+                <option value="all">All Payment Modes</option>
+                {PAYMENT_MODES.map(pm => <option key={pm} value={pm}>{pm}</option>)}
+              </select>
+            </div>
+            <div className="md:col-span-2 grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Start Date</Label>
+                <Input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">End Date</Label>
+                <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <Card className="overflow-x-auto border shadow-sm">
         <Table className="min-w-[1000px]">
           <TableHeader className="bg-muted/40">
             <TableRow>
@@ -290,7 +377,7 @@ export default function Finance() {
                     <div className="flex flex-col gap-1">
                       {tx.receiptId && <span className="font-mono text-[10px] bg-muted px-1 py-0.5 rounded w-max">{tx.receiptId}</span>}
                       {tx.receiptPhoto && (
-                        <div 
+                        <div
                           className="h-8 w-8 rounded overflow-hidden cursor-pointer border hover:opacity-80 transition"
                           onClick={() => setPreviewImage(`${API_BASE_URL}${tx.receiptPhoto}`)}
                         >
@@ -309,14 +396,19 @@ export default function Finance() {
                   <TableCell className="text-end">
                     <div className="flex justify-end gap-2">
                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => openReceiptPreview(tx)}>{tr("finance", "viewReceipt")}</Button>
+                       {tx.status !== 'Cancelled' && (
+                         <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => openEditModal(tx)} title="Edit">
+                           <Edit className="h-4 w-4" />
+                         </Button>
+                       )}
                       {tx.status !== 'Cancelled' && (
                         <>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-7 w-7 text-muted-foreground hover:text-primary" 
-                            disabled={exportingId === tx._id} 
-                            onClick={() => exportReceiptPDF(tx._id)} 
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            disabled={exportingId === tx._id}
+                            onClick={() => exportReceiptPDF(tx._id)}
                             title={tr("finance", "downloadReceipt")}
                           >
                             {exportingId === tx._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
@@ -339,7 +431,7 @@ export default function Finance() {
             ) : (
               <TableRow>
                 <TableCell colSpan={8} className="p-0">
-                  <EmptyState 
+                  <EmptyState
                     title={tr("finance", "noTransactions")}
                     description={tr("finance", "noTransactionsDesc")}
                     icon={FileText}
@@ -350,12 +442,21 @@ export default function Finance() {
           </TableBody>
         </Table>
       </Card>
+
+      {!isDashboard && !loading && totalPages > 1 && (
+         <div className="flex justify-center items-center gap-4 mt-4">
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Previous</Button>
+            <div className="text-sm">Page {page} of {totalPages}</div>
+            <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next</Button>
+         </div>
+      )}
+    </div>
     );
   };
 
   return (
     <motion.div className="space-y-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-      <PageHeader 
+      <PageHeader
         title={tr("finance", "pageTitle")}
         description={tr("finance", "pageSubtitle")}
         showBack={true}
@@ -365,7 +466,22 @@ export default function Finance() {
             <Button variant="outline" onClick={exportSummaryPDF} className="w-full sm:w-auto">
               <Download className="me-2 h-4 w-4" /> {tr("finance", "export")}
             </Button>
-            <Button onClick={() => setIsModalOpen(true)} className="w-full sm:w-auto">
+            <Button onClick={() => {
+              setFormData({
+                type: "income",
+                amount: "",
+                description: "",
+                category: INCOME_CATEGORIES[0],
+                paymentMode: "Cash",
+                remarks: "",
+                date: new Date().toISOString().split("T")[0],
+                receiptId: "",
+                receiptPhoto: null,
+              });
+              setIsEditing(false);
+              setEditId(null);
+              setIsModalOpen(true);
+            }} className="w-full sm:w-auto">
               <Plus className="me-2 h-4 w-4" /> {tr("finance", "newTransaction")}
             </Button>
           </div>
@@ -375,7 +491,7 @@ export default function Finance() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>{tr("finance", "addTransaction")}</DialogTitle>
+                <DialogTitle>{isEditing ? tr("finance", "editTransaction") || "Edit Transaction" : tr("finance", "addTransaction")}</DialogTitle>
                 <DialogDescription>{tr("finance", "pageSubtitle")}</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreateTransaction} className="space-y-4 py-4">
@@ -387,8 +503,8 @@ export default function Finance() {
                       value={formData.type}
                       onChange={(e) => {
                         const newType = e.target.value;
-                        setFormData({ 
-                          ...formData, 
+                        setFormData({
+                          ...formData,
                           type: newType,
                           category: newType === "income" ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]
                         });
@@ -527,22 +643,22 @@ export default function Finance() {
               </CardContent>
             </Card>
           </div>
-          
+
           <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
                <h3 className="text-lg font-bold">{tr("finance", "recentActivity")}</h3>
                <Button variant="ghost" size="sm" onClick={() => setActiveTab("income")}>{tr("common", "viewAll")}</Button>
             </div>
-            {renderTransactionTable("all", 10)}
+            {renderTransactionTable(true)}
           </div>
         </TabsContent>
 
         <TabsContent value="income" className="mt-6">
-          {renderTransactionTable("income")}
+          {renderTransactionTable(false)}
         </TabsContent>
 
         <TabsContent value="expense" className="mt-6">
-          {renderTransactionTable("expense")}
+          {renderTransactionTable(false)}
         </TabsContent>
 
       </Tabs>
@@ -564,7 +680,7 @@ export default function Finance() {
             <div className="mt-2 p-6 border rounded-lg bg-card shadow-sm space-y-6 relative overflow-y-auto flex-1 min-h-0">
                {/* Decorative background element */}
                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -z-10" />
-               
+
                <div className="text-center border-b pb-4">
                  <h2 className="text-xl font-bold text-primary tracking-tight">{settings?.instituteName || "Madrasa Dawat-ul-Iman"}</h2>
                  {settings?.instituteNameUrdu && <h3 className="text-lg font-urdu mt-1">{settings.instituteNameUrdu}</h3>}
@@ -583,7 +699,7 @@ export default function Finance() {
                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{tr("common", "date")}</p>
                    <p className="font-semibold">{formatLocalizedDate(receiptPreviewData.date, language)}</p>
                  </div>
-                 
+
                  <div className="col-span-2 pt-2">
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{tr("finance", "payerName")}</p>
                    <p className="font-medium text-base">
@@ -595,7 +711,7 @@ export default function Finance() {
                  <div className="pt-2">
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{tr("finance", "academicYearClass")}</p>
                    <p className="font-medium">
-                     {receiptPreviewData.academicYear || "N/A"} 
+                     {receiptPreviewData.academicYear || "N/A"}
                      {receiptPreviewData.className && ` / ${receiptPreviewData.className}`}
                      {receiptPreviewData.referenceId?.studentClass && !receiptPreviewData.className && ` / ${receiptPreviewData.referenceId.studentClass}`}
                    </p>
@@ -621,7 +737,7 @@ export default function Finance() {
                     {tr("finance", "note")}: {receiptPreviewData.remarks}
                   </div>
                )}
-               
+
                {receiptPreviewData.receiptPhoto && (
                  <div className="mt-4 pt-4 border-t">
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-2 flex items-center gap-1">
@@ -630,7 +746,7 @@ export default function Finance() {
                    <img src={`${API_BASE_URL}${receiptPreviewData.receiptPhoto}`} alt="Attached Receipt" className="h-24 w-auto rounded border object-contain" loading="lazy" />
                  </div>
                )}
-               
+
                {receiptPreviewData.status === 'Cancelled' && (
                  <div className="absolute inset-0 bg-red-500/10 flex items-center justify-center backdrop-blur-[1px]">
                     <div className="border-4 border-red-600 text-red-600 text-4xl font-black uppercase tracking-widest px-8 py-2 rotate-[-15deg] opacity-70 rounded">
@@ -663,7 +779,7 @@ export default function Finance() {
               Warning: This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          
+
           {deleteTx && (
             <div className="bg-muted p-4 rounded-md space-y-2 text-sm">
               <div className="flex justify-between">
@@ -686,7 +802,7 @@ export default function Finance() {
               </div>
             </div>
           )}
-          
+
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setDeleteTx(null)}>
               Cancel

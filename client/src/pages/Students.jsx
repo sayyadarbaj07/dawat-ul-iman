@@ -52,6 +52,9 @@ export default function Students() {
   const { tr, language } = useLanguage();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterClassId, setFilterClassId] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterResidential, setFilterResidential] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -132,11 +135,16 @@ export default function Students() {
 
   const [isSearching, setIsSearching] = useState(false);
 
-  const loadStudents = async (term = "", isBackground = false) => {
+  const loadStudents = async (term = searchTerm, isBackground = false) => {
     try {
       if (isBackground) setIsSearching(true);
       else setLoading(true);
-      const res = await studentApi.list({ search: term });
+      const params = { search: term, limit: 5000 };
+      if (filterClassId) params.classId = filterClassId;
+      if (filterStatus) params.status = filterStatus;
+      if (filterResidential !== "") params.residential = filterResidential;
+
+      const res = await studentApi.list(params);
       setStudents(res.data?.data || []);
     } catch (error) {
       setStudents([]);
@@ -186,7 +194,7 @@ export default function Students() {
       loadStudents(searchTerm, true);
     }, 300);
     return () => clearTimeout(timeout);
-  }, [searchTerm]);
+  }, [searchTerm, filterClassId, filterStatus, filterResidential]);
 
   const handlePhotoSelection = (e, setFormDataCallback) => {
     const file = e.target.files[0];
@@ -283,6 +291,9 @@ export default function Students() {
   };
 
   const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to permanently delete this student? This action cannot be undone and related records such as attendance, exams, hostel assignments, and documents may also be deleted.")) {
+      return;
+    }
     try {
       await studentApi.remove(id);
       loadStudents(searchTerm);
@@ -899,7 +910,7 @@ export default function Students() {
         </Dialog>
 
         <div className="bg-card rounded-lg border shadow-sm">
-        <div className="p-4 border-b flex items-center justify-between">
+        <div className="p-4 border-b flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
@@ -908,6 +919,40 @@ export default function Students() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+          </div>
+
+          <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
+            <select
+              value={filterClassId}
+              onChange={(e) => setFilterClassId(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[120px]"
+            >
+              <option value="">All Classes</option>
+              {apiClasses.map(cls => (
+                <option key={cls._id} value={cls._id}>{cls.fullName}</option>
+              ))}
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[120px]"
+            >
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="on_leave">On Leave</option>
+              <option value="transferred">Transferred</option>
+              <option value="completed">Completed</option>
+            </select>
+            <select
+              value={filterResidential}
+              onChange={(e) => setFilterResidential(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[120px]"
+            >
+              <option value="">All Types</option>
+              <option value="true">Residential</option>
+              <option value="false">Day Scholar</option>
+            </select>
           </div>
         </div>
 
@@ -1004,16 +1049,20 @@ export default function Students() {
                             <Plus className="me-2 h-4 w-4" />
                             Promote
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={() =>
-                              handleDelete(student._id || student.id)
-                            }
-                          >
-                            <Trash className="me-2 h-4 w-4" />
-                            {tr("students", "deleteRecord")}
-                          </DropdownMenuItem>
+                          {user?.role === "admin" && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() =>
+                                  handleDelete(student._id || student.id)
+                                }
+                              >
+                                <Trash className="me-2 h-4 w-4" />
+                                {tr("students", "deleteRecord")}
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

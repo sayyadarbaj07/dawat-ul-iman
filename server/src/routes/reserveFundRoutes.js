@@ -3,20 +3,19 @@ const router = express.Router();
 const reserveFundController = require("../controllers/reserveFundController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
-// All routes are protected and strictly admin-only
+// All routes are protected
 router.use(protect);
-router.use(authorize("admin", "accountant"));
 
 router.route("/")
-  .get(reserveFundController.getList)
-  .post(reserveFundController.createTransaction);
+  .get(authorize("admin", "accountant"), reserveFundController.getList)
+  .post(authorize("admin", "accountant"), reserveFundController.createTransaction);
 
 router.route("/summary")
-  .get(reserveFundController.getSummary);
+  .get(authorize("admin", "accountant"), reserveFundController.getSummary);
 
 router.route("/:id")
-  .get(reserveFundController.getSingle)
-  .put(reserveFundController.updateTransaction)
-  .delete(reserveFundController.deleteTransaction);
+  .get(authorize("admin", "accountant"), reserveFundController.getSingle)
+  .put(authorize("admin", "accountant"), reserveFundController.updateTransaction)
+  .delete(authorize("admin"), reserveFundController.deleteTransaction);
 
 module.exports = router;

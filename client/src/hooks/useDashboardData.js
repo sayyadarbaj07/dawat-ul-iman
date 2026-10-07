@@ -103,7 +103,7 @@ export function useDashboardData(user) {
 
       try {
         const [studentRes, teacherRes, reportRes, meRes] = await Promise.allSettled([
-          role === "accountant" ? Promise.reject(new Error("Unauthorized")) : studentApi.list(),
+          role === "accountant" ? Promise.reject(new Error("Unauthorized")) : studentApi.list({ limit: 5000 }),
           role === "admin" ? teacherApi.list() : Promise.reject(new Error("Unauthorized")),
           reportApi.getSummary(),
           role === "teacher" ? teacherApi.getMe() : Promise.resolve(null),

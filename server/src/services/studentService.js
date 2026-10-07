@@ -147,7 +147,7 @@ class StudentService {
       filter.residential = residential === "true" || residential === true;
 
     const parsedPage = Math.max(1, parseInt(page, 10));
-    const parsedLimit = Math.min(parseInt(limit, 10), 500);
+    const parsedLimit = Math.min(parseInt(limit, 10), 5000);
     const skip = (parsedPage - 1) * parsedLimit;
 
     const total = await Student.countDocuments(filter);
