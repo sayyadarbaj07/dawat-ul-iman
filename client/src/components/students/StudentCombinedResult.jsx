@@ -8,7 +8,7 @@ import { pdfApi } from "@/lib/api/pdf";
 import { useToast } from "@/hooks/use-toast";
 import { Award, FileDown, GraduationCap, Loader2 } from "lucide-react";
 
-export function StudentCombinedResult({ studentId }) {
+export function StudentCombinedResult({ studentId, profileContext }) {
   const { tr, language } = useLanguage();
   const { toast } = useToast();
   
@@ -146,35 +146,39 @@ export function StudentCombinedResult({ studentId }) {
             </div>
             
             {/* Madrasa Class */}
-            <div className="flex flex-col gap-1 bg-muted/30 p-3 rounded-md border border-border/50">
-              <span className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">
-                {tr("combinedResult", "deeniEducation") || "DEENI / MADRASA"}
-              </span>
-              <div className="flex gap-2 items-center">
-                <span className="text-muted-foreground">{tr("combinedResult", "class") || "Class"}:</span>
-                <span className="font-medium">{student.madrasaClass || "—"}</span>
+            {(!profileContext || profileContext === 'diniyat') && (
+              <div className="flex flex-col gap-1 bg-muted/30 p-3 rounded-md border border-border/50">
+                <span className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">
+                  {tr("combinedResult", "deeniEducation") || "DEENI / MADRASA"}
+                </span>
+                <div className="flex gap-2 items-center">
+                  <span className="text-muted-foreground">{tr("combinedResult", "class") || "Class"}:</span>
+                  <span className="font-medium">{student.madrasaClass || "—"}</span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* School Class */}
-            <div className="flex flex-col gap-1 bg-muted/30 p-3 rounded-md border border-border/50">
-              <span className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">
-                {tr("combinedResult", "asriEducation") || "ASRI / SCHOOL"}
-              </span>
-              <div className="flex gap-2 items-center">
-                <span className="text-muted-foreground">{tr("combinedResult", "schoolClass") || "School Class"}:</span>
-                <span className="font-medium">{student.schoolClass || "—"}</span>
+            {(!profileContext || profileContext === 'school') && (
+              <div className="flex flex-col gap-1 bg-muted/30 p-3 rounded-md border border-border/50">
+                <span className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">
+                  {tr("combinedResult", "asriEducation") || "ASRI / SCHOOL"}
+                </span>
+                <div className="flex gap-2 items-center">
+                  <span className="text-muted-foreground">{tr("combinedResult", "schoolClass") || "School Class"}:</span>
+                  <span className="font-medium">{student.schoolClass || "—"}</span>
+                </div>
+                <div className="flex gap-2 items-center mt-1">
+                  <span className="text-muted-foreground">{tr("combinedResult", "section") || "Section"}:</span>
+                  <span className="font-medium">{student.schoolSection || "—"}</span>
+                </div>
               </div>
-              <div className="flex gap-2 items-center mt-1">
-                <span className="text-muted-foreground">{tr("combinedResult", "section") || "Section"}:</span>
-                <span className="font-medium">{student.schoolSection || "—"}</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
         {/* PART A: Madrasa */}
-        {madrasa && madrasa.resultsAvailable && (
+        {(!profileContext || profileContext === 'diniyat') && madrasa && madrasa.resultsAvailable && (
           <div className="p-6 border-b">
             <h3 className="font-bold text-lg mb-4 text-primary">
               {tr("combinedResult", "deeniEducation") || "PART (A) — DEENI EDUCATION"}
@@ -217,53 +221,55 @@ export function StudentCombinedResult({ studentId }) {
         )}
 
         {/* PART B: School */}
-        <div className="p-6 border-b bg-muted/10">
-          <h3 className="font-bold text-lg mb-4 text-primary">
-            {tr("combinedResult", "asriEducation") || "PART (B) — ASRI EDUCATION"}
-          </h3>
-          
-          {school && school.resultsAvailable ? (
-            <div className="overflow-x-auto rounded-md border bg-card">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 text-muted-foreground uppercase text-xs">
-                  <tr>
-                    <th className={`px-4 py-3 font-medium ${isRtl ? 'text-right' : 'text-left'}`}>{tr("combinedResult", "subject") || "Subject"}</th>
-                    <th className="px-4 py-3 font-medium text-center">{tr("combinedResult", "maximumMarks") || "Max Marks"}</th>
-                    <th className="px-4 py-3 font-medium text-center">{tr("combinedResult", "obtainedMarks") || "Obtained"}</th>
-                    <th className={`px-4 py-3 font-medium ${isRtl ? 'text-left' : 'text-right'}`}>{tr("combinedResult", "remarks") || "Remarks"}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {school.subjects.map((sub, idx) => (
-                    <tr key={idx} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3 font-medium">{sub.subject}</td>
-                      <td className="px-4 py-3 text-center">{sub.maxMarks}</td>
-                      <td className="px-4 py-3 text-center font-semibold">{sub.marks === -1 ? (tr("reports", "absent") || "Absent") : sub.marks}</td>
+        {(!profileContext || profileContext === 'school') && (
+          <div className="p-6 border-b bg-muted/10">
+            <h3 className="font-bold text-lg mb-4 text-primary">
+              {tr("combinedResult", "asriEducation") || "PART (B) — ASRI EDUCATION"}
+            </h3>
+            
+            {school && school.resultsAvailable ? (
+              <div className="overflow-x-auto rounded-md border bg-card">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 text-muted-foreground uppercase text-xs">
+                    <tr>
+                      <th className={`px-4 py-3 font-medium ${isRtl ? 'text-right' : 'text-left'}`}>{tr("combinedResult", "subject") || "Subject"}</th>
+                      <th className="px-4 py-3 font-medium text-center">{tr("combinedResult", "maximumMarks") || "Max Marks"}</th>
+                      <th className="px-4 py-3 font-medium text-center">{tr("combinedResult", "obtainedMarks") || "Obtained"}</th>
+                      <th className={`px-4 py-3 font-medium ${isRtl ? 'text-left' : 'text-right'}`}>{tr("combinedResult", "remarks") || "Remarks"}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {school.subjects.map((sub, idx) => (
+                      <tr key={idx} className="hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3 font-medium">{sub.subject}</td>
+                        <td className="px-4 py-3 text-center">{sub.maxMarks}</td>
+                        <td className="px-4 py-3 text-center font-semibold">{sub.marks === -1 ? (tr("reports", "absent") || "Absent") : sub.marks}</td>
+                        <td className={`px-4 py-3 ${isRtl ? 'text-left' : 'text-right'}`}>
+                          {sub.marks === -1 ? "—" : (sub.marks >= sub.passingMarks ? (tr("reports", "pass") || "Pass") : (tr("reports", "fail") || "Fail"))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-primary/5 font-semibold">
+                    <tr>
+                      <td className="px-4 py-3">{tr("combinedResult", "total") || "Total"}</td>
+                      <td className="px-4 py-3 text-center">{school.totals.maxMarks}</td>
+                      <td className="px-4 py-3 text-center">{school.totals.obtainedMarks}</td>
                       <td className={`px-4 py-3 ${isRtl ? 'text-left' : 'text-right'}`}>
-                        {sub.marks === -1 ? "—" : (sub.marks >= sub.passingMarks ? (tr("reports", "pass") || "Pass") : (tr("reports", "fail") || "Fail"))}
+                        {school.totals.percentage.toFixed(2)}% ({school.totals.grade})
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-primary/5 font-semibold">
-                  <tr>
-                    <td className="px-4 py-3">{tr("combinedResult", "total") || "Total"}</td>
-                    <td className="px-4 py-3 text-center">{school.totals.maxMarks}</td>
-                    <td className="px-4 py-3 text-center">{school.totals.obtainedMarks}</td>
-                    <td className={`px-4 py-3 ${isRtl ? 'text-left' : 'text-right'}`}>
-                      {school.totals.percentage.toFixed(2)}% ({school.totals.grade})
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          ) : (
-            <div className="p-4 border rounded-md border-dashed bg-muted/30 text-muted-foreground flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-muted-foreground/40"></span>
-              {tr("combinedResult", "schoolResultNotAvailable") || "School result not available"}
-            </div>
-          )}
-        </div>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <div className="p-4 border rounded-md border-dashed bg-muted/30 text-muted-foreground flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-muted-foreground/40"></span>
+                {tr("combinedResult", "schoolResultNotAvailable") || "School result not available"}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* COMBINED TOTALS */}
         {combined && (

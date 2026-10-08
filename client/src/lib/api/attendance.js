@@ -28,8 +28,10 @@ export const attendanceApi = {
     return request(url);
   },
   
-  getStudentSummary: (studentId) => {
-    return request(`/attendance/student/${studentId}`);
+  getStudentSummary: (studentId, classId) => {
+    let url = `/attendance/student/${studentId}`;
+    if (classId) url += `?classId=${classId}`;
+    return request(url);
   },
   
   getTeacherSummary: (teacherId) => {

@@ -11,7 +11,7 @@ import { Book, CheckCircle, Clock, Loader2, Play } from "lucide-react";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { useAuth } from "@/context/AuthContext";
 
-export function StudentCurriculumTab({ student }) {
+export function StudentCurriculumTab({ student, profileContext }) {
   const studentId = student?._id || student?.id;
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -35,7 +35,16 @@ export function StudentCurriculumTab({ student }) {
     enabled: !!studentId,
   });
 
-  const curriculums = currRes?.data || [];
+  const rawCurriculums = currRes?.data || [];
+  
+  // Filter curriculums by active profile context to prevent mixing Diniyat and School subjects
+  const curriculums = rawCurriculums.filter(curr => {
+    if (!profileContext) return true;
+    const diniyatId = student.classId?._id || student.classId;
+    const schoolId = student.schoolClassId?._id || student.schoolClassId;
+    const targetClassId = profileContext === 'school' ? schoolId : diniyatId;
+    return curr.classId?.toString() === targetClassId?.toString();
+  });
 
   const progressMutation = useMutation({
     mutationFn: (data) => curriculumApi.logLearningProgress(selectedCurriculum._id, studentId, data),

@@ -534,6 +534,33 @@ exports.getStudentHistoricalResults = async (req, res) => {
     const student = await Student.findById(studentId).lean();
     if (!student) return sendError(res, 404, "Student not found");
 
+    const { classId } = req.query;
+
+    if (classId) {
+      if (!mongoose.Types.ObjectId.isValid(classId)) {
+        return sendError(res, 400, "Invalid classId format");
+      }
+      
+      const isDiniyatClass = student.classId && student.classId.toString() === classId;
+      const isSchoolClass = student.schoolClassId && student.schoolClassId.toString() === classId;
+
+      if (!isDiniyatClass && !isSchoolClass) {
+        return sendError(res, 400, "Student does not belong to the requested class");
+      }
+
+      if (req.user.role === "teacher") {
+        const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
+        const hasAccess = await verifyTeacherClassAccess(req.user, isDiniyatClass ? classId : null, null, isSchoolClass ? classId : null);
+        if (!hasAccess) {
+          return sendError(res, 403, "Not authorized to view exams for this class");
+        }
+      }
+    } else {
+      if (req.user.role === "teacher") {
+         return sendError(res, 400, "classId is required for teachers to fetch historical exams");
+      }
+    }
+
     // Get all results for this student
     const studentResults = await ExamResult.find({ studentId }).lean();
     
@@ -541,7 +568,11 @@ exports.getStudentHistoricalResults = async (req, res) => {
     const examIds = [...new Set(studentResults.map(r => String(r.examId)))];
     
     // Fetch those exams
-    const exams = await Exam.find({ _id: { $in: examIds } }).lean();
+    let examQuery = { _id: { $in: examIds } };
+    if (classId) {
+       examQuery.classId = classId;
+    }
+    const exams = await Exam.find(examQuery).lean();
 
     // Calculate historical results
     const history = exams.map(exam => {

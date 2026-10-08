@@ -17,16 +17,18 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { FileEdit, CalendarDays, Plus, CheckCircle2, XCircle } from "lucide-react";
+import { FileEdit, CalendarDays, Plus, CheckCircle2, XCircle, Trash2 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatLocalizedDate, formatLocalizedNumber, formatLocalizedPercent, getLocalizedStudentName } from "@/utils/localizationUtils";
 import { examApi, studentApi, classApi, teacherApi } from "@/lib/api";
 import { CLASS_TREE, getAllClassesFlat } from "@/lib/classTree";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Exams() {
   const { tr, language } = useLanguage();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [me, setMe] = useState(null);
   const [activeTab, setActiveTab] = useState("exams");
 
@@ -196,6 +198,18 @@ export default function Exams() {
     } catch (err) {
       console.error(err);
       alert(tr("exams", "failedToCreateExam"));
+    }
+  };
+
+  const handleDeleteExam = async (examId) => {
+    if (!window.confirm("Are you sure you want to delete this exam? This action cannot be undone.")) return;
+    try {
+      await examApi.removeExam(examId);
+      loadExams();
+      toast({ title: "Success", description: "Exam deleted successfully" });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Error", description: err.message || "Failed to delete exam", variant: "destructive" });
     }
   };
 
@@ -460,6 +474,7 @@ export default function Exams() {
                     <TableHead>Subjects</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Max Marks</TableHead>
+                    {user?.role === "admin" && <TableHead className="text-right">Action</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -479,10 +494,22 @@ export default function Exams() {
                         {formatLocalizedDate(exam.date, language)}
                       </TableCell>
                       <TableCell className="text-right font-medium">{exam.maxMarks}</TableCell>
+                      {user?.role === "admin" && (
+                        <TableCell className="text-right">
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => handleDeleteExam(exam._id)}
+                            title="Delete Exam"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   )) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                      <TableCell colSpan={user?.role === "admin" ? 7 : 6} className="text-center py-6 text-muted-foreground">
                         No exams found.
                       </TableCell>
                     </TableRow>

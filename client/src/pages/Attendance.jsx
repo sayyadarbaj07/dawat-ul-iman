@@ -91,9 +91,9 @@ export default function Attendance() {
         
         if (me) {
           let teacherClasses = [];
-          if (me.isClassTeacher && me.classTeacherOf) {
-            const classTeacherId = typeof me.classTeacherOf === "object" ? me.classTeacherOf._id : me.classTeacherOf;
-            teacherClasses = activeApiClasses.filter(c => String(c._id) === String(classTeacherId));
+          if (me.assignedClassIds && me.assignedClassIds.length > 0) {
+            const assignedIds = me.assignedClassIds.map(id => typeof id === "object" ? String(id._id || id.id) : String(id));
+            teacherClasses = activeApiClasses.filter(c => assignedIds.includes(String(c._id)));
           }
           
           if (teacherClasses.length > 0) {
@@ -404,6 +404,29 @@ export default function Attendance() {
 
   const filteredUserList = getFilteredUserList();
   
+  const normalizeId = (value) => {
+    if (!value) return null;
+    if (typeof value === "object") {
+      return value._id || value.id || null;
+    }
+    return String(value);
+  };
+
+  const selectedClassId = normalizeId(classFilter);
+  const meTeacher = teachers && teachers.length > 0 ? teachers[0] : null;
+  const classTeacherOfId = meTeacher ? normalizeId(meTeacher.classTeacherOf) : null;
+
+  const canMarkAttendance =
+    user?.role === "admin" ||
+    activeTab === "teachers" ||
+    (
+      user?.role === "teacher" &&
+      activeTab === "students" &&
+      selectedClassId &&
+      classTeacherOfId &&
+      String(selectedClassId) === String(classTeacherOfId)
+    );
+
   // History Computations
   const historyTotal = historyData.length;
   const historyPresent = historyData.filter(d => d.status === 'Present').length;
@@ -533,13 +556,28 @@ export default function Attendance() {
                     />
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
-                  <Button variant="outline" size="sm" onClick={() => handleMarkAll("Present")} disabled={!!holidayEvent}>{tr("attendance", "allPresent")}</Button>
-                  <Button variant="outline" size="sm" onClick={() => handleMarkAll("Absent")} disabled={!!holidayEvent}>{tr("attendance", "allAbsent")}</Button>
-                  <Button variant="outline" size="sm" onClick={() => handleMarkAll("Leave")} disabled={!!holidayEvent}>{tr("attendance", "allLeave")}</Button>
-                </div>
+                {canMarkAttendance && (
+                  <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
+                    <Button variant="outline" size="sm" onClick={() => handleMarkAll("Present")} disabled={!!holidayEvent}>{tr("attendance", "allPresent")}</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleMarkAll("Absent")} disabled={!!holidayEvent}>{tr("attendance", "allAbsent")}</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleMarkAll("Leave")} disabled={!!holidayEvent}>{tr("attendance", "allLeave")}</Button>
+                  </div>
+                )}
               </div>
               
+              {user?.role === "teacher" && activeTab === "students" && !canMarkAttendance && classFilter && classFilter !== "all" && (
+                <div className="bg-blue-50 border-b border-blue-200 text-blue-800 px-4 py-3 flex items-start gap-3">
+                  <Info className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-blue-900 text-sm" dir="auto">
+                      {language === "ur" 
+                        ? "آپ اس جماعت کے مضمون کے استاد ہیں۔ طلبہ کی حاضری صرف کلاس ٹیچر درج کر سکتا ہے۔" 
+                        : "You are assigned to this class as a subject teacher. Only the Class Teacher can mark student attendance."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="overflow-x-auto">
                 <Table className="min-w-[800px]">
                   <TableHeader className="bg-muted/40">
@@ -584,16 +622,22 @@ export default function Attendance() {
                               <div className="font-semibold text-sm" dir="auto">{getLocalizedStudentName(u, language)}</div>
                               {isPending && <div className="text-[10px] text-amber-600 font-medium tracking-wider uppercase mt-0.5">{tr("attendance", "notMarked")}</div>}
                             </TableCell>
-                            <TableCell className="text-center">{renderStatusButtons(u._id)}</TableCell>
+                            <TableCell className="text-center">
+                              {canMarkAttendance ? renderStatusButtons(u._id) : <span className="text-sm font-medium text-gray-700">{attendanceData[u._id] ? tr("attendance", attendanceData[u._id].toLowerCase()) : "-"}</span>}
+                            </TableCell>
                             <TableCell>
-                              <Input
-                                placeholder={tr("attendance", "remarksPlaceholder")}
-                                value={remarksData[u._id] || ""}
-                                onChange={(e) => handleRemark(u._id, e.target.value)}
-                                className="h-8 text-sm"
-                                dir="auto"
-                                disabled={!!holidayEvent}
-                              />
+                              {canMarkAttendance ? (
+                                <Input
+                                  placeholder={tr("attendance", "remarksPlaceholder")}
+                                  value={remarksData[u._id] || ""}
+                                  onChange={(e) => handleRemark(u._id, e.target.value)}
+                                  className="h-8 text-sm"
+                                  dir="auto"
+                                  disabled={!!holidayEvent}
+                                />
+                              ) : (
+                                <span className="text-sm text-muted-foreground" dir="auto">{remarksData[u._id] || "-"}</span>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -608,12 +652,16 @@ export default function Attendance() {
                   {isDirty && <span className="ms-2 text-amber-600 font-medium flex items-center inline-flex"><AlertTriangle className="w-3 h-3 me-1"/> {tr("attendance", "unsavedChanges")}</span>}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={handleReset} disabled={loadingAttendance || saving || !isDirty}>
-                    {tr("attendance", "discardChanges")}
-                  </Button>
-                  <Button onClick={handleSave} disabled={loadingAttendance || saving || !!holidayEvent || !isDirty}>
-                    {saving ? tr("attendance", "saving") : tr("attendance", "saveAttendance")}
-                  </Button>
+                  {canMarkAttendance && (
+                    <>
+                      <Button variant="outline" onClick={handleReset} disabled={loadingAttendance || saving || !isDirty}>
+                        {tr("attendance", "discardChanges")}
+                      </Button>
+                      <Button onClick={handleSave} disabled={loadingAttendance || saving || !!holidayEvent || !isDirty}>
+                        {saving ? tr("attendance", "saving") : tr("attendance", "saveAttendance")}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             </Card>

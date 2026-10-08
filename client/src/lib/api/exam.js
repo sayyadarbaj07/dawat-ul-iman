@@ -51,8 +51,10 @@ export const examApi = {
   getCalculatedResults(examId) {
     return request(`/exams/${examId}/calculated`);
   },
-  getStudentHistoricalResults(studentId) {
-    return request(`/exams/results/student/${studentId}`);
+  getStudentHistoricalResults(studentId, classId) {
+    let url = `/exams/results/student/${studentId}`;
+    if (classId) url += `?classId=${classId}`;
+    return request(url);
   },
   async downloadPdf(url, filename) {
     const token = localStorage.getItem("dawat_token");

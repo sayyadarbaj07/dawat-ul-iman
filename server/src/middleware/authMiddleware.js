@@ -86,7 +86,7 @@ const checkClassAccess = async (req, res, next) => {
 };
 
 // Helper function for controllers that load a student first
-const verifyTeacherClassAccess = async (user, classId, legacyClassName = null) => {
+const verifyTeacherClassAccess = async (user, classId, legacyClassName = null, schoolClassId = null) => {
   if (user.role === "admin" || user.role === "accountant") {
     return true;
   }
@@ -101,17 +101,34 @@ const verifyTeacherClassAccess = async (user, classId, legacyClassName = null) =
       return false;
     }
 
-    // Normalize populated classId if necessary
+    // Normalize populated classId and schoolClassId if necessary
     const studentClassId = classId && typeof classId === "object" && classId._id ? classId._id : classId;
+    const studentSchoolClassId = schoolClassId && typeof schoolClassId === "object" && schoolClassId._id ? schoolClassId._id : schoolClassId;
 
-    // Check canonical classId if present
-    if (studentClassId && studentClassId.toString().match(/^[0-9a-fA-F]{24}$/)) {
-      if (hasClassIds && teacher.assignedClassIds.some(id => String(id) === String(studentClassId))) {
-        return true;
+    let hasMatch = false;
+
+    if (hasClassIds) {
+      if (studentClassId && studentClassId.toString().match(/^[0-9a-fA-F]{24}$/)) {
+        if (teacher.assignedClassIds.some(id => String(id) === String(studentClassId))) {
+          hasMatch = true;
+        }
       }
-      // CRITICAL: Do NOT fall back to legacyClassName if canonical classId failed.
+      if (!hasMatch && studentSchoolClassId && studentSchoolClassId.toString().match(/^[0-9a-fA-F]{24}$/)) {
+        if (teacher.assignedClassIds.some(id => String(id) === String(studentSchoolClassId))) {
+          hasMatch = true;
+        }
+      }
+    }
+
+    if (hasMatch) {
+      return true;
+    }
+
+    // CRITICAL: Do NOT fall back to legacyClassName if canonical classId or schoolClassId was provided but failed.
+    if (studentClassId || studentSchoolClassId) {
       return false;
     }
+
     
     if (legacyClassName) {
       // Resolve legacy string against the Class collection ONLY if the mapping is exact and unique.

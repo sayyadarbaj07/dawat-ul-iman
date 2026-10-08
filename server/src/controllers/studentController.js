@@ -117,7 +117,12 @@ exports.getStudentById = async (req, res) => {
 
     if (req.user && req.user.role === "teacher") {
       const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
-      const hasAccess = await verifyTeacherClassAccess(req.user, student.classId, student.className || student.studentClass);
+      const hasAccess = await verifyTeacherClassAccess(
+        req.user,
+        student.classId,
+        student.className || student.studentClass,
+        student.schoolClassId
+      );
       if (!hasAccess) {
         return sendError(res, 403, "Forbidden: You are not authorized to access this student.");
       }
@@ -145,7 +150,12 @@ exports.updateStudent = async (req, res) => {
 
     if (req.user && req.user.role === "teacher") {
       const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
-      const hasAccess = await verifyTeacherClassAccess(req.user, existingStudent.classId);
+      const hasAccess = await verifyTeacherClassAccess(
+        req.user,
+        existingStudent.classId,
+        existingStudent.className || existingStudent.studentClass,
+        existingStudent.schoolClassId
+      );
       if (!hasAccess) {
         return sendError(res, 403, "Forbidden: You are not authorized to update this student.");
       }

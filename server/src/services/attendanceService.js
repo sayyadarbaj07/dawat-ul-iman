@@ -153,13 +153,24 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
           const err = new Error(`Student ${record.userId} not found`);
           err.status = 404; throw err;
         }
-        if (!student.classId) {
-          const err = new Error(`Student ${student.name} has not been assigned to a specific Class. Update their profile first.`);
-          err.status = 400; throw err;
-        }
-        if (student.classId.toString() !== classId.toString()) {
-          const err = new Error(`Student ${student.name} does not belong to the selected class.`);
-          err.status = 400; throw err;
+        if (classData && classData.department === "school") {
+            if (!student.schoolClassId) {
+              const err = new Error(`Student ${student.name} has not been assigned to a specific Class. Update their profile first.`);
+              err.status = 400; throw err;
+            }
+            if (student.schoolClassId.toString() !== classId.toString()) {
+              const err = new Error(`Student ${student.name} does not belong to the selected class.`);
+              err.status = 400; throw err;
+            }
+        } else {
+            if (!student.classId) {
+              const err = new Error(`Student ${student.name} has not been assigned to a specific Class. Update their profile first.`);
+              err.status = 400; throw err;
+            }
+            if (student.classId.toString() !== classId.toString()) {
+              const err = new Error(`Student ${student.name} does not belong to the selected class.`);
+              err.status = 400; throw err;
+            }
         }
       }
     }
@@ -186,9 +197,14 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
       ...(record.remarks !== undefined && { remarks: record.remarks })
     };
 
+    const filter = { date: targetDate, userId: record.userId };
+    if (actualClassId) {
+      filter.classId = actualClassId;
+    }
+
     return {
       updateOne: {
-        filter: { date: targetDate, userId: record.userId },
+        filter: filter,
         update: {
           $set: setFields,
           $setOnInsert: {

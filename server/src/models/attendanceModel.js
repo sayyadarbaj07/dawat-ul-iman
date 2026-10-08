@@ -43,8 +43,8 @@ const attendanceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Existing unique constraint
-attendanceSchema.index({ date: 1, userId: 1 }, { unique: true });
+// Dual-context unique constraint: one record per student per date per class
+attendanceSchema.index({ date: 1, userId: 1, classId: 1 }, { unique: true });
 
 // Existing index for daily class-wide attendance queries
 attendanceSchema.index({ className: 1, date: 1 });

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { User, MapPin, Phone, Mail, Calendar, Info, FileText, CheckCircle, Clock } from "lucide-react";
-import { studentApi, attendanceApi, examApi, pdfApi } from "@/lib/api";
+import { studentApi, attendanceApi, examApi, pdfApi, teacherApi } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatLocalizedDate, getLocalizedStudentName } from "@/utils/localizationUtils";
 import { StudentDocumentManager } from "@/components/students/StudentDocumentManager";
@@ -30,8 +30,12 @@ export default function StudentProfile() {
   
   const { user } = useAuth();
   
-  const [attendanceSummary, setAttendanceSummary] = useState(null);
-  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [diniyatAttendanceSummary, setDiniyatAttendanceSummary] = useState(null);
+  const [schoolAttendanceSummary, setSchoolAttendanceSummary] = useState(null);
+  const [loadingDiniyat, setLoadingDiniyat] = useState(false);
+  const [loadingSchool, setLoadingSchool] = useState(false);
+  const [profileContext, setProfileContext] = useState(null);
+  const [teacherProfile, setTeacherProfile] = useState(null);
   
   const [academicHistory, setAcademicHistory] = useState([]);
   const [loadingAcademic, setLoadingAcademic] = useState(false);
@@ -44,9 +48,73 @@ export default function StudentProfile() {
         setLoading(true);
         const res = await studentApi.get(studentId);
         if (res.data) {
-          setStudent(res.data);
-          loadAttendance(studentId);
-          loadAcademic(studentId);
+          const student = res.data;
+          setStudent(student);
+
+          let tProfile = null;
+          if (user?.role === 'teacher') {
+             try {
+                 const tRes = await teacherApi.getMe();
+                 tProfile = tRes.data !== undefined ? tRes.data : tRes;
+                 setTeacherProfile(tProfile);
+             } catch (e) {
+                 console.error("Failed to fetch teacher profile", e);
+             }
+          }
+
+          let teacherContext = null;
+          const diniyatId = student.classId?._id || student.classId;
+          const schoolId = student.schoolClassId?._id || student.schoolClassId;
+
+          if (user?.role === 'teacher' && tProfile) {
+             const assigned = (tProfile.assignedClassIds || []).map(id => id.toString());
+             if (schoolId && assigned.includes(schoolId.toString())) {
+                teacherContext = 'school';
+             } else if (diniyatId && assigned.includes(diniyatId.toString())) {
+                teacherContext = 'diniyat';
+             }
+             
+             if (teacherContext === 'school') {
+                loadAttendanceData(studentId, schoolId, 'school');
+                loadAcademic(studentId, schoolId);
+                setProfileContext('school');
+             } else if (teacherContext === 'diniyat') {
+                loadAttendanceData(studentId, diniyatId, 'diniyat');
+                loadAcademic(studentId, diniyatId);
+                setProfileContext('diniyat');
+             } else {
+                 setProfileContext(null);
+                 loadAcademic(studentId, null);
+             }
+          } else {
+             // Admin / Accountant
+             console.log("[ADMIN ATTENDANCE]", {
+               role: user?.role,
+               diniyatClassId: student?.classId,
+               schoolClassId: student?.schoolClassId,
+               resolvedDiniyatId: diniyatId,
+               resolvedSchoolId: schoolId
+             });
+             
+             if (diniyatId) {
+                loadAttendanceData(studentId, diniyatId, 'diniyat');
+             }
+             if (schoolId) {
+                loadAttendanceData(studentId, schoolId, 'school');
+             }
+             
+             if (diniyatId) {
+                 setProfileContext('diniyat');
+                 loadAcademic(studentId, diniyatId);
+             } else if (schoolId) {
+                 setProfileContext('school');
+                 loadAcademic(studentId, schoolId);
+             } else {
+                 setProfileContext(null);
+                 loadAcademic(studentId, null);
+             }
+          }
+
         } else {
           setError("Profile not found.");
         }
@@ -64,36 +132,45 @@ export default function StudentProfile() {
       }
     };
     if (studentId) fetchProfile();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId]);
 
-  const loadAttendance = async (id) => {
+  const loadAttendanceData = async (id, classId, type) => {
     try {
-      setLoadingAttendance(true);
-      const res = await attendanceApi.getStudentSummary(id);
+      if (type === 'diniyat') setLoadingDiniyat(true);
+      if (type === 'school') setLoadingSchool(true);
+      const res = await attendanceApi.getStudentSummary(id, classId);
+      console.log(`[${type.toUpperCase()} ATTENDANCE RESPONSE]`, res.data);
+      let summary = null;
       if (res.data && res.data.summary) {
         const s = res.data.summary;
         const attended = s.present + s.late;
         const percentage = s.total > 0 ? Math.round((attended / s.total) * 100) : 0;
         
-        setAttendanceSummary({
+        summary = {
           present: s.present,
           absent: s.absent,
           late: s.late,
           leave: s.leave,
           percentage: percentage
-        });
+        };
       }
+      if (type === 'diniyat') setDiniyatAttendanceSummary(summary);
+      if (type === 'school') setSchoolAttendanceSummary(summary);
     } catch (err) {
-      console.error(err);
+      console.error(`[${type.toUpperCase()} ATTENDANCE ERROR]`, err);
+      if (type === 'diniyat') setDiniyatAttendanceSummary(null);
+      if (type === 'school') setSchoolAttendanceSummary(null);
     } finally {
-      setLoadingAttendance(false);
+      if (type === 'diniyat') setLoadingDiniyat(false);
+      if (type === 'school') setLoadingSchool(false);
     }
   };
 
-  const loadAcademic = async (id) => {
+  const loadAcademic = async (id, classId) => {
     try {
       setLoadingAcademic(true);
-      const res = await examApi.getStudentHistoricalResults(id);
+      const res = await examApi.getStudentHistoricalResults(id, classId);
       if (res.data) setAcademicHistory(res.data);
     } catch (err) {
       console.error(err);
@@ -180,6 +257,33 @@ export default function StudentProfile() {
           </div>
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
+          {(user?.role === 'admin' || user?.role === 'accountant') && student?.classId && student?.schoolClassId && (
+             <div className="flex items-center gap-2 mr-2 bg-muted p-1 rounded-md">
+                <Button 
+                   size="sm" 
+                   variant={profileContext === 'diniyat' ? 'default' : 'ghost'} 
+                   onClick={() => {
+                       setProfileContext('diniyat');
+                      const cId = student.classId?._id || student.classId;
+                      loadAcademic(studentId, cId);
+                   }}
+                >
+                   Diniyat
+                </Button>
+                <Button 
+                   size="sm" 
+                   variant={profileContext === 'school' ? 'default' : 'ghost'} 
+                   onClick={() => {
+                      setProfileContext('school');
+                      const cId = student.schoolClassId?._id || student.schoolClassId;
+                      loadAcademic(studentId, cId);
+                   }}
+                >
+                   School
+                </Button>
+             </div>
+          )}
+
           <Button variant="outline" onClick={exportIdCard} disabled={isExportingPDF === 'id_card'} className="w-full md:w-auto">
             <FileText className="w-4 h-4 mr-2" />
             Print ID Card
@@ -211,9 +315,8 @@ export default function StudentProfile() {
 
         {/* 1. OVERVIEW TAB */}
         <TabsContent value="overview" className="space-y-6 mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="md:col-span-2">
-              <CardHeader>
+          <Card>
+            <CardHeader>
                 <CardTitle>Basic Information</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-6">
@@ -258,36 +361,83 @@ export default function StudentProfile() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loadingAttendance ? (
-                  <p className="text-sm text-muted-foreground">Loading...</p>
-                ) : attendanceSummary ? (
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Overall</span>
-                      <span className="text-lg font-bold text-primary">{attendanceSummary.percentage}%</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 p-2 rounded">
-                        Present: {attendanceSummary.present || 0}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {diniyatAttendanceSummary !== null || loadingDiniyat ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Diniyat Attendance</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingDiniyat ? (
+                      <p className="text-sm text-muted-foreground">Loading...</p>
+                    ) : diniyatAttendanceSummary ? (
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Overall</span>
+                          <span className="text-lg font-bold text-primary">{diniyatAttendanceSummary.percentage}%</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 p-2 rounded">
+                            Present: {diniyatAttendanceSummary.present || 0}
+                          </div>
+                          <div className="bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 p-2 rounded">
+                            Absent: {diniyatAttendanceSummary.absent || 0}
+                          </div>
+                          <div className="bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 p-2 rounded">
+                            Leave: {diniyatAttendanceSummary.leave || 0}
+                          </div>
+                        </div>
                       </div>
-                      <div className="bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 p-2 rounded">
-                        Absent: {attendanceSummary.absent || 0}
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No attendance data available.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {schoolAttendanceSummary !== null || loadingSchool ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>School Attendance</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingSchool ? (
+                      <p className="text-sm text-muted-foreground">Loading...</p>
+                    ) : schoolAttendanceSummary ? (
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Overall</span>
+                          <span className="text-lg font-bold text-primary">{schoolAttendanceSummary.percentage}%</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 p-2 rounded">
+                            Present: {schoolAttendanceSummary.present || 0}
+                          </div>
+                          <div className="bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 p-2 rounded">
+                            Absent: {schoolAttendanceSummary.absent || 0}
+                          </div>
+                          <div className="bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 p-2 rounded">
+                            Leave: {schoolAttendanceSummary.leave || 0}
+                          </div>
+                        </div>
                       </div>
-                      <div className="bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 p-2 rounded">
-                        Leave: {attendanceSummary.leave || 0}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No attendance data available.</p>
-                )}
-              </CardContent>
-            </Card>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No attendance data available.</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : null}
+              
+              {!loadingDiniyat && !loadingSchool && diniyatAttendanceSummary === null && schoolAttendanceSummary === null && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Attendance Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">No attendance data available.</p>
+                  </CardContent>
+                </Card>
+              )}
           </div>
         </TabsContent>
 
@@ -492,45 +642,105 @@ export default function StudentProfile() {
         </TabsContent>
 
         {/* 6. ATTENDANCE TAB */}
+        {/* 6. ATTENDANCE TAB */}
         <TabsContent value="attendance" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Detailed Attendance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingAttendance ? (
-                 <p className="text-sm text-muted-foreground">Loading attendance...</p>
-              ) : attendanceSummary ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                    <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-lg border border-green-200 dark:border-green-800">
-                      <p className="text-2xl font-bold text-green-600 dark:text-green-400">{attendanceSummary.present || 0}</p>
-                      <p className="text-xs text-muted-foreground">Present</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {diniyatAttendanceSummary !== null || loadingDiniyat ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Attendance Records — Diniyat</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingDiniyat ? (
+                     <p className="text-sm text-muted-foreground">Loading attendance...</p>
+                  ) : diniyatAttendanceSummary ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                        <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{diniyatAttendanceSummary.present || 0}</p>
+                          <p className="text-xs text-muted-foreground">Present</p>
+                        </div>
+                        <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                          <p className="text-2xl font-bold text-red-600 dark:text-red-400">{diniyatAttendanceSummary.absent || 0}</p>
+                          <p className="text-xs text-muted-foreground">Absent</p>
+                        </div>
+                        <div className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                          <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{diniyatAttendanceSummary.leave || 0}</p>
+                          <p className="text-xs text-muted-foreground">Leave</p>
+                        </div>
+                        <div className="bg-orange-50 dark:bg-orange-900/10 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+                          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{diniyatAttendanceSummary.late || 0}</p>
+                          <p className="text-xs text-muted-foreground">Late</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center pt-4 border-t">Full date-wise attendance is managed in the Attendance module.</p>
                     </div>
-                    <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">{attendanceSummary.absent || 0}</p>
-                      <p className="text-xs text-muted-foreground">Absent</p>
+                  ) : (
+                    <EmptyState
+                      icon={Calendar}
+                      title="No Attendance Data"
+                      description="No attendance records found for this student."
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {schoolAttendanceSummary !== null || loadingSchool ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Attendance Records — School</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingSchool ? (
+                     <p className="text-sm text-muted-foreground">Loading attendance...</p>
+                  ) : schoolAttendanceSummary ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                        <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{schoolAttendanceSummary.present || 0}</p>
+                          <p className="text-xs text-muted-foreground">Present</p>
+                        </div>
+                        <div className="bg-red-50 dark:bg-red-900/10 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                          <p className="text-2xl font-bold text-red-600 dark:text-red-400">{schoolAttendanceSummary.absent || 0}</p>
+                          <p className="text-xs text-muted-foreground">Absent</p>
+                        </div>
+                        <div className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                          <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{schoolAttendanceSummary.leave || 0}</p>
+                          <p className="text-xs text-muted-foreground">Leave</p>
+                        </div>
+                        <div className="bg-orange-50 dark:bg-orange-900/10 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+                          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{schoolAttendanceSummary.late || 0}</p>
+                          <p className="text-xs text-muted-foreground">Late</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center pt-4 border-t">Full date-wise attendance is managed in the Attendance module.</p>
                     </div>
-                    <div className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                      <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{attendanceSummary.leave || 0}</p>
-                      <p className="text-xs text-muted-foreground">Leave</p>
-                    </div>
-                    <div className="bg-orange-50 dark:bg-orange-900/10 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
-                      <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{attendanceSummary.late || 0}</p>
-                      <p className="text-xs text-muted-foreground">Late</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground text-center pt-4 border-t">Full date-wise attendance is managed in the Attendance module.</p>
-                </div>
-              ) : (
-                <EmptyState
-                  icon={Calendar}
-                  title="No Attendance Data"
-                  description="No attendance records found for this student."
-                />
-              )}
-            </CardContent>
-          </Card>
+                  ) : (
+                    <EmptyState
+                      icon={Calendar}
+                      title="No Attendance Data"
+                      description="No attendance records found for this student."
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
+            
+            {!loadingDiniyat && !loadingSchool && diniyatAttendanceSummary === null && schoolAttendanceSummary === null && (
+              <div className="col-span-1 md:col-span-2">
+                <Card>
+                  <CardContent className="pt-6">
+                    <EmptyState
+                      icon={Calendar}
+                      title="No Attendance Data"
+                      description="No attendance records found for this student."
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         {/* 7. HOSTEL TAB */}

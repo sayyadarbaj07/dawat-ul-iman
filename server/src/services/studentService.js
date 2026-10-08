@@ -142,7 +142,31 @@ class StudentService {
 
     if (status) filter.status = status;
     if (className) filter.className = className;
-    if (classId) filter.classId = classId;
+    if (classId) {
+      if (typeof classId === 'object' && classId.$in) {
+        const classes = await Class.find({ _id: { $in: classId.$in } }).lean();
+        const schoolClassIds = classes.filter(c => c.department === 'school').map(c => c._id);
+        const otherClassIds = classes.filter(c => c.department !== 'school').map(c => c._id);
+        
+        const classConditions = [];
+        if (schoolClassIds.length > 0) classConditions.push({ schoolClassId: { $in: schoolClassIds } });
+        if (otherClassIds.length > 0) classConditions.push({ classId: { $in: otherClassIds } });
+        
+        if (classConditions.length === 1) {
+          Object.assign(filter, classConditions[0]);
+        } else if (classConditions.length > 1) {
+          filter.$and = filter.$and || [];
+          filter.$and.push({ $or: classConditions });
+        }
+      } else {
+        const selectedClass = await Class.findById(classId).lean();
+        if (selectedClass && selectedClass.department === "school") {
+          filter.schoolClassId = classId;
+        } else {
+          filter.classId = classId;
+        }
+      }
+    }
     if (residential !== undefined)
       filter.residential = residential === "true" || residential === true;
 

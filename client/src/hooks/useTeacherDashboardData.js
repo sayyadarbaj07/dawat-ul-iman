@@ -62,8 +62,13 @@ export function useTeacherDashboardData(user) {
             const className = classDoc ? classDoc.fullName : `Class ${classId.toString().substring(0,6)}...`;
 
             const classStudents = students.filter(s => {
-              const studentClassId = s.classId && typeof s.classId === "object" ? s.classId._id : s.classId;
-              return String(studentClassId) === String(classId) && s.status !== "inactive";
+              if (classDoc && classDoc.department === "school") {
+                const sClassId = s.schoolClassId && typeof s.schoolClassId === "object" ? s.schoolClassId._id : s.schoolClassId;
+                return String(sClassId) === String(classId) && s.status !== "inactive";
+              } else {
+                const studentClassId = s.classId && typeof s.classId === "object" ? s.classId._id : s.classId;
+                return String(studentClassId) === String(classId) && s.status !== "inactive";
+              }
             });
             
             classStudents.forEach(s => {
@@ -84,9 +89,13 @@ export function useTeacherDashboardData(user) {
             if (isPending) pendingAttendanceCount++;
 
             // Resolve teaching assignments for this class
-            const assignments = teacher.teachingAssignments
+            let assignments = teacher.teachingAssignments
               ?.filter(a => String(a.classId) === String(classId))
               .map(a => a.subjectId) || [];
+
+            if (assignments.length === 0 && teacher.subject) {
+              assignments = [teacher.subject];
+            }
 
             assignedClasses.push({
               _id: classId,

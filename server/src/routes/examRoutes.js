@@ -17,7 +17,7 @@ router.route("/:examId/map-class")
 
 router.route("/:id")
   .put(authorize("admin", "teacher"), examController.updateExam)
-  .delete(authorize("admin", "teacher"), examController.deleteExam);
+  .delete(authorize("admin"), examController.deleteExam);
 
 router.route("/results")
   .get(examController.getAllExamResults);

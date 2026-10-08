@@ -150,8 +150,45 @@ exports.getStudentAttendanceSummary = async (req, res) => {
     // Note: Parent IDOR is implicitly deferred to existing relationship logic if it exists,
     // otherwise they cannot access another student. If a parent is linked, they should pass through
     // specific parent endpoints. Here we block blatant misuse if necessary, but keep it simple.
+    const { classId } = req.query;
+    let query = { userId: studentId, userType: "Student" };
+
+    if (classId) {
+      if (!mongoose.Types.ObjectId.isValid(classId)) {
+        return sendError(res, 400, "Invalid classId format");
+      }
+      query.classId = classId;
+
+      // Ensure student actually belongs to this class (either Diniyat or School)
+      const Student = require("../models/studentModel");
+      const student = await Student.findById(studentId).lean();
+      if (!student) {
+         return sendError(res, 404, "Student not found");
+      }
+      
+      const isDiniyatClass = student.classId && student.classId.toString() === classId;
+      const isSchoolClass = student.schoolClassId && student.schoolClassId.toString() === classId;
+
+      if (!isDiniyatClass && !isSchoolClass) {
+        return sendError(res, 400, "Student does not belong to the requested class");
+      }
+
+      // If user is a teacher, verify they have access to this specific class
+      if (req.user.role === "teacher") {
+        const { verifyTeacherClassAccess } = require("../middleware/authMiddleware");
+        const hasAccess = await verifyTeacherClassAccess(req.user, isDiniyatClass ? classId : null, null, isSchoolClass ? classId : null);
+        if (!hasAccess) {
+          return sendError(res, 403, "Not authorized to view attendance for this class");
+        }
+      }
+    } else {
+      if (req.user.role === "teacher") {
+         return sendError(res, 400, "classId is required for teachers to fetch attendance");
+      }
+    }
     
-    const records = await Attendance.find({ userId: studentId, userType: "Student" }).sort({ date: -1 });
+    const records = await Attendance.find(query).sort({ date: -1 });
+    console.log("ATTENDANCE QUERY:", query, "RECORDS:", records.length);
     
     let present = 0, absent = 0, late = 0, leave = 0;
     records.forEach(r => {
