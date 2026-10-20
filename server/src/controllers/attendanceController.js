@@ -147,6 +147,7 @@ exports.getStudentAttendanceSummary = async (req, res) => {
     if (req.user.role === "student" && req.user._id.toString() !== studentId) {
       return sendError(res, 403, "Not authorized to view this student's attendance");
     }
+<<<<<<< Updated upstream
     // Note: Parent IDOR is implicitly deferred to existing relationship logic if it exists,
     // otherwise they cannot access another student. If a parent is linked, they should pass through
     // specific parent endpoints. Here we block blatant misuse if necessary, but keep it simple.
@@ -189,18 +190,19 @@ exports.getStudentAttendanceSummary = async (req, res) => {
     
     const records = await Attendance.find(query).sort({ date: -1 });
     console.log("ATTENDANCE QUERY:", query, "RECORDS:", records.length);
+=======
     
-    let present = 0, absent = 0, late = 0, leave = 0;
-    records.forEach(r => {
-      if (r.status === "Present") present++;
-      else if (r.status === "Absent") absent++;
-      else if (r.status === "Late") late++;
-      else if (r.status === "Leave") leave++;
-    });
+    const data = await attendanceService.getStudentAttendanceForPDF(studentId, req.query);
+>>>>>>> Stashed changes
+    
+    // Ensure backwards compatibility with StudentProfile.jsx
+    data.summary.total = data.totalWorkingDays;
+    data.summary.leave = (data.records || []).filter(r => r.status === "Leave").length;
 
-    return sendSuccess(res, 200, "Student attendance summary fetched successfully", { records, summary: { present, absent, late, leave, total: records.length } });
+    return sendSuccess(res, 200, "Student attendance summary fetched successfully", data);
   } catch (error) {
-    return sendError(res, 500, "Failed to fetch student attendance", error);
+    const statusCode = error.status || 500;
+    return sendError(res, statusCode, error.message || "Failed to fetch student attendance", error);
   }
 };
 

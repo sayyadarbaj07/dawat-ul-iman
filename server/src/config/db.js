@@ -7,7 +7,8 @@ const connectDB = async () => {
   try {
     mongoose.set("strictQuery", false);
     await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
       autoIndex: true,
     });
 

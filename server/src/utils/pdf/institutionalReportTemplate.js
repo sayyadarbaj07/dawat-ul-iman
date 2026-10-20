@@ -67,20 +67,14 @@ function drawInstitutionalHeader(doc, isUrdu) {
   // Draw Urdu Text RTL
   doc.fillColor("#c8105e"); // Match magenta tone for Urdu Title
   urduPdfHelper.drawTextRTL(doc, "جامعہ", doc.page.width - innerMargin - 10, innerMargin + 5, { font: "AslamFont", fontSize: 20, align: "right" });
-  urduPdfHelper.drawTextRTL(doc, "دعوت الایمان", doc.page.width - innerMargin - 10, innerMargin + 20, { font: "AslamFont", fontSize: 30, align: "right" });
+  urduPdfHelper.drawTextRTL(doc, "دعوۃ الایمان", doc.page.width - innerMargin - 10, innerMargin + 20, { font: "AslamFont", fontSize: 30, align: "right" });
 
   doc.fillColor("#000000"); // Address black
   urduPdfHelper.drawTextRTL(doc, "چہ مینار مسجد، روشن پورہ، حضرت بالے پیر بیڑ (مہاراشٹر)", doc.page.width - innerMargin - 10, innerMargin + 55, { font: "UrduFont", fontSize: 10, align: "right" });
-  urduPdfHelper.drawTextRTL(doc, "431122 (MS)", doc.page.width - innerMargin - 10, innerMargin + 70, { font: "Helvetica", fontSize: 9, align: "right" });
-
-  // No and Date
-  const metaY = innerMargin + 95;
-  doc.font("Helvetica").fontSize(10);
-  doc.text("No.: ________________", innerMargin + 10, metaY);
-  doc.text("Date: ________________", doc.page.width - innerMargin - 130, metaY);
+  doc.font("Helvetica").fontSize(9).text("431122 (MS)", doc.page.width - innerMargin - 160, innerMargin + 70, { width: 150, align: "right" });
 
   // Separator Line
-  const lineY = metaY + 15;
+  const lineY = innerMargin + 88;
   doc.moveTo(innerMargin, lineY)
      .lineTo(doc.page.width - innerMargin, lineY)
      .lineWidth(1.5)
@@ -88,7 +82,7 @@ function drawInstitutionalHeader(doc, isUrdu) {
      .stroke();
 
   // Move cursor below header
-  doc.y = lineY + 20;
+  doc.y = lineY + 16;
   doc.fillColor("#000000"); // Reset fill
   doc.x = innerMargin + 10;
 }

@@ -21,7 +21,7 @@ import { FileEdit, CalendarDays, Plus, CheckCircle2, XCircle, Trash2 } from "luc
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { formatLocalizedDate, formatLocalizedNumber, formatLocalizedPercent, getLocalizedStudentName } from "@/utils/localizationUtils";
-import { examApi, studentApi, classApi, teacherApi } from "@/lib/api";
+import { examApi, studentApi, classApi, teacherApi, curriculumApi } from "@/lib/api";
 import { CLASS_TREE, getAllClassesFlat } from "@/lib/classTree";
 import { useToast } from "@/hooks/use-toast";
 
@@ -38,6 +38,16 @@ export default function Exams() {
   
   // Create Exam
   const [isAddExamOpen, setIsAddExamOpen] = useState(false);
+  const [isSubmittingExam, setIsSubmittingExam] = useState(false);
+
+  const getTodayDateStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const [examForm, setExamForm] = useState({
     examType: "Monthly",
     customExamType: "",
@@ -47,8 +57,10 @@ export default function Exams() {
     subjects: "",
     maxMarks: 100,
     passingMarks: 33,
-    date: "",
+    date: getTodayDateStr(),
   });
+  const [availableSubjectsForClass, setAvailableSubjectsForClass] = useState([]);
+  const [isLoadingClassSubjects, setIsLoadingClassSubjects] = useState(false);
 
   // Enter Marks
   const [selectedExamIdMarks, setSelectedExamIdMarks] = useState("");
@@ -164,25 +176,104 @@ export default function Exams() {
     }
   };
 
+  const handleClassChangeInForm = async (selectedClassId) => {
+    setExamForm(prev => ({ ...prev, classId: selectedClassId, subjects: "" }));
+    setAvailableSubjectsForClass([]);
+
+    if (!selectedClassId) return;
+
+    setIsLoadingClassSubjects(true);
+    try {
+      // 1. Fetch curriculums for this class
+      const currRes = await curriculumApi.list({ classId: selectedClassId });
+      const currSubjects = (currRes?.data || []).map(c => c.subject).filter(Boolean);
+
+      // 2. Also check existing exams for this classId to collect unique subject names
+      const classExams = exams.filter(e => e.classId && String(e.classId) === String(selectedClassId));
+      const examSubjects = classExams.flatMap(e => e.subjects || []);
+
+      // Combine & deduplicate
+      const combined = Array.from(new Set([...currSubjects, ...examSubjects].map(s => s.trim()))).filter(Boolean);
+      setAvailableSubjectsForClass(combined);
+
+      // Pre-fill subjects with all subjects found for this class
+      if (combined.length > 0) {
+        setExamForm(prev => ({ ...prev, subjects: combined.join(", ") }));
+      }
+    } catch (err) {
+      console.error("Failed to load class subjects:", err);
+    } finally {
+      setIsLoadingClassSubjects(false);
+    }
+  };
+
+  const toggleSubjectInForm = (subjectToToggle) => {
+    setExamForm(prev => {
+      const currentList = (prev.subjects || "")
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      let updatedList;
+      if (currentList.some(s => s.toLowerCase() === subjectToToggle.toLowerCase())) {
+        updatedList = currentList.filter(s => s.toLowerCase() !== subjectToToggle.toLowerCase());
+      } else {
+        updatedList = [...currentList, subjectToToggle];
+      }
+      return { ...prev, subjects: updatedList.join(", ") };
+    });
+  };
+
+  const handleSelectAllSubjects = () => {
+    setExamForm(prev => ({ ...prev, subjects: availableSubjectsForClass.join(", ") }));
+  };
+
+  const handleClearAllSubjects = () => {
+    setExamForm(prev => ({ ...prev, subjects: "" }));
+  };
+
+  const handleAddSubjectFromDropdown = (subjectName) => {
+    if (!subjectName) return;
+    setExamForm(prev => {
+      const currentList = (prev.subjects || "")
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+      if (!currentList.some(s => s.toLowerCase() === subjectName.toLowerCase())) {
+        const updatedList = [...currentList, subjectName];
+        return { ...prev, subjects: updatedList.join(", ") };
+      }
+      return prev;
+    });
+  };
+
   const handleCreateExam = async (e) => {
     e.preventDefault();
+    if (isSubmittingExam) return;
+
     try {
-      const subjectArray = examForm.subjects.split(",").map(s => s.trim()).filter(Boolean);
-      if (subjectArray.length === 0) return alert(tr("exams", "pleaseEnterSubject"));
+      const subjectArray = (examForm.subjects || "").split(",").map(s => s.trim()).filter(Boolean);
+      if (subjectArray.length === 0) return alert(tr("exams", "pleaseEnterSubject") || "Please select/enter at least one subject.");
 
       const finalExamType = examForm.examType === "Other" ? examForm.customExamType : examForm.examType;
       if (examForm.examType === "Other" && !finalExamType.trim()) {
-        return alert(tr("exams", "pleaseEnterCustomExamType"));
+        return alert(tr("exams", "pleaseEnterCustomExamType") || "Please enter custom exam type.");
       }
 
       if (!examForm.classId) {
         return alert("Please select a class");
       }
 
+      if (!examForm.date) {
+        return alert("Please select an exam date");
+      }
+
+      setIsSubmittingExam(true);
+
       const payload = {
-        name: examForm.examName ? `${examForm.examName} ${finalExamType}` : finalExamType,
+        name: examForm.examName ? `${examForm.examName} (${finalExamType})` : `${finalExamType} Exam`,
         examType: finalExamType,
-        examName: examForm.examName,
+        examName: examForm.examName || finalExamType,
         academicYear: examForm.academicYear,
         classId: examForm.classId,
         subjects: subjectArray,
@@ -193,11 +284,30 @@ export default function Exams() {
 
       await examApi.createExam(payload);
       setIsAddExamOpen(false);
-      setExamForm({ ...examForm, examName: "", customExamType: "", customStudentClassSub: "", subjects: "", date: "" });
+      setExamForm({
+        examType: "Monthly",
+        customExamType: "",
+        examName: "",
+        academicYear: new Date().getFullYear().toString(),
+        classId: "",
+        subjects: "",
+        maxMarks: 100,
+        passingMarks: 33,
+        date: getTodayDateStr(),
+      });
+      setAvailableSubjectsForClass([]);
       loadExams();
     } catch (err) {
-      console.error(err);
-      alert(tr("exams", "failedToCreateExam"));
+      console.error("Exam creation error:", err);
+      const errMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        tr("exams", "failedToCreateExam") ||
+        "Failed to create exam";
+      alert(errMsg);
+    } finally {
+      setIsSubmittingExam(false);
     }
   };
 
@@ -400,13 +510,13 @@ export default function Exams() {
                      <DialogDescription>{tr("exams", "addNewExamToSchedule")}</DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleCreateExam} className="space-y-4 py-4">
-                    <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Select Class <span className="text-red-500">*</span></Label>
                         <select
-                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                           value={examForm.classId}
-                          onChange={(e) => setExamForm({ ...examForm, classId: e.target.value })}
+                          onChange={(e) => handleClassChangeInForm(e.target.value)}
                           required
                         >
                           <option value="">-- Choose Class --</option>
@@ -415,15 +525,135 @@ export default function Exams() {
                           ))}
                         </select>
                       </div>
+
+                      <div className="space-y-2">
+                        <Label>Exam Type <span className="text-red-500">*</span></Label>
+                        <select
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                          value={examForm.examType}
+                          onChange={(e) => setExamForm(prev => ({ ...prev, examType: e.target.value }))}
+                          required
+                        >
+                          <option value="Monthly">Monthly (ماهانہ / मंथली)</option>
+                          <option value="Half-Yearly">Half-Yearly (شش ماہی / हाफ इयरली)</option>
+                          <option value="Yearly">Yearly (سالانہ / इयरली)</option>
+                          <option value="Quarterly">Quarterly (سہ ماہی / तीन माही)</option>
+                          <option value="Other">Other / Custom</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {examForm.examType === "Other" && (
+                      <div className="space-y-2">
+                        <Label>Custom Exam Type <span className="text-red-500">*</span></Label>
+                        <Input
+                          required
+                          placeholder="e.g. Weekly Test, Unit Test 1"
+                          value={examForm.customExamType}
+                          onChange={(e) => setExamForm(prev => ({ ...prev, customExamType: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Academic Year <span className="text-red-500">*</span></Label>
+                        <Input
+                          required
+                          placeholder="e.g. 2026"
+                          value={examForm.academicYear}
+                          onChange={(e) => setExamForm(prev => ({ ...prev, academicYear: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Exam Title / Name (Optional)</Label>
+                        <Input
+                          placeholder="e.g. Term 1 Exam"
+                          value={examForm.examName}
+                          onChange={(e) => setExamForm(prev => ({ ...prev, examName: e.target.value }))}
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Subjects (Comma Separated)</Label>
+                      <div className="flex items-center justify-between">
+                        <Label>Subjects (Comma Separated) <span className="text-red-500">*</span></Label>
+                        {availableSubjectsForClass.length > 0 && (
+                          <div className="flex gap-2 text-xs">
+                            <button
+                              type="button"
+                              onClick={handleSelectAllSubjects}
+                              className="text-primary hover:underline font-medium"
+                            >
+                              Select All
+                            </button>
+                            <span className="text-muted-foreground">|</span>
+                            <button
+                              type="button"
+                              onClick={handleClearAllSubjects}
+                              className="text-muted-foreground hover:underline"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {isLoadingClassSubjects ? (
+                        <p className="text-xs text-muted-foreground animate-pulse">Loading class subjects...</p>
+                      ) : availableSubjectsForClass.length > 0 ? (
+                        <div className="space-y-2 p-3 bg-muted/30 rounded-md border">
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            <span className="text-xs font-semibold text-muted-foreground mr-1">Class Subjects:</span>
+                            {availableSubjectsForClass.map(subj => {
+                              const isSelected = examForm.subjects
+                                .split(",")
+                                .map(s => s.trim().toLowerCase())
+                                .includes(subj.toLowerCase());
+                              return (
+                                <Badge
+                                  key={subj}
+                                  variant={isSelected ? "default" : "outline"}
+                                  className={`cursor-pointer transition-colors text-xs ${
+                                    isSelected
+                                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                                      : "hover:bg-muted text-muted-foreground"
+                                  }`}
+                                  onClick={() => toggleSubjectInForm(subj)}
+                                >
+                                  {isSelected ? "✓ " : "+ "}{subj}
+                                </Badge>
+                              );
+                            })}
+                          </div>
+
+                          <div className="pt-1">
+                            <select
+                              className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs shadow-sm"
+                              value=""
+                              onChange={(e) => {
+                                handleAddSubjectFromDropdown(e.target.value);
+                              }}
+                            >
+                              <option value="">-- Add Subject from Class Dropdown --</option>
+                              {availableSubjectsForClass.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      ) : examForm.classId ? (
+                        <p className="text-xs text-amber-600">
+                          No pre-configured curriculum subjects found for this class. You can type subjects manually below.
+                        </p>
+                      ) : null}
+
                       <Input
                         required
                         placeholder="e.g. Quran, Hadith, Fiqh"
                         value={examForm.subjects}
-                        onChange={(e) => setExamForm({ ...examForm, subjects: e.target.value })}
+                        onChange={(e) => setExamForm(prev => ({ ...prev, subjects: e.target.value }))}
                       />
                     </div>
 
@@ -433,7 +663,7 @@ export default function Exams() {
                         <Input
                           required type="number" min="1"
                           value={examForm.maxMarks}
-                          onChange={(e) => setExamForm({ ...examForm, maxMarks: e.target.value })}
+                          onChange={(e) => setExamForm(prev => ({ ...prev, maxMarks: e.target.value }))}
                         />
                       </div>
                       <div className="space-y-2">
@@ -441,7 +671,7 @@ export default function Exams() {
                         <Input
                           required type="number" min="0"
                           value={examForm.passingMarks}
-                          onChange={(e) => setExamForm({ ...examForm, passingMarks: e.target.value })}
+                          onChange={(e) => setExamForm(prev => ({ ...prev, passingMarks: e.target.value }))}
                         />
                       </div>
                       <div className="space-y-2">
@@ -449,16 +679,18 @@ export default function Exams() {
                         <Input
                           type="date" required
                           value={examForm.date}
-                          onChange={(e) => setExamForm({ ...examForm, date: e.target.value })}
+                          onChange={(e) => setExamForm(prev => ({ ...prev, date: e.target.value }))}
                         />
                       </div>
                     </div>
 
                     <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setIsAddExamOpen(false)}>
+                      <Button type="button" variant="outline" onClick={() => setIsAddExamOpen(false)} disabled={isSubmittingExam}>
                         Cancel
                       </Button>
-                      <Button type="submit">Save Exam</Button>
+                      <Button type="submit" disabled={isSubmittingExam}>
+                        {isSubmittingExam ? "Saving..." : "Save Exam"}
+                      </Button>
                     </DialogFooter>
                   </form>
                 </DialogContent>

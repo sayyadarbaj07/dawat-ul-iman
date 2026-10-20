@@ -1,8 +1,8 @@
 const Student = require("../models/studentModel");
-
 const Class = require("../models/classModel");
 const ClassRollCounter = require("../models/classRollCounterModel");
 const AdmissionCounter = require("../models/admissionCounterModel");
+const { transliterateUrduToEnglish, ARABIC_RE } = require("../utils/transliteration");
 
 class StudentService {
   async _getNextAdmissionNumber() {
@@ -68,6 +68,15 @@ class StudentService {
         error.name = "ValidationError";
         throw error;
       }
+    }
+    
+    if (payload.name && ARABIC_RE.test(payload.name)) {
+      if (!payload.nameUrdu) payload.nameUrdu = payload.name;
+      payload.name = transliterateUrduToEnglish(payload.name);
+    }
+    if (payload.fatherName && ARABIC_RE.test(payload.fatherName)) {
+      if (!payload.fatherNameUrdu) payload.fatherNameUrdu = payload.fatherName;
+      payload.fatherName = transliterateUrduToEnglish(payload.fatherName);
     }
     
     payload.admissionNumber = await this._getNextAdmissionNumber();
@@ -223,6 +232,15 @@ class StudentService {
     // SECURITY: Prevent tampering with auto-generated identifiers
     delete payload.rollNumber;
     delete payload.admissionNumber;
+
+    if (payload.name && ARABIC_RE.test(payload.name)) {
+      if (!payload.nameUrdu) payload.nameUrdu = payload.name;
+      payload.name = transliterateUrduToEnglish(payload.name);
+    }
+    if (payload.fatherName && ARABIC_RE.test(payload.fatherName)) {
+      if (!payload.fatherNameUrdu) payload.fatherNameUrdu = payload.fatherName;
+      payload.fatherName = transliterateUrduToEnglish(payload.fatherName);
+    }
 
     return Student.findByIdAndUpdate(id, payload, {
       new: true,

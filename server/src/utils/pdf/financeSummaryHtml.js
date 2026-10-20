@@ -308,17 +308,12 @@ async function generateFinanceSummaryHTML(options) {
 
             <div class="header-right">
               <p class="jamia-ur">جامعہ</p>
-              <p class="dawat-ur">دعوت الایمان</p>
+              <p class="dawat-ur">دعوۃ الایمان</p>
               <div class="header-sub-ur">چہ مینار مسجد، روشن پورہ، حضرت بالے پیر بیڑ (مہاراشٹر)</div>
               <div class="header-address-ur">431122 (MS)</div>
             </div>
           </div>
 
-          <div class="meta-row">
-            <div>No.: ________________</div>
-            <div>Date: ________________</div>
-          </div>
-          
           <div class="divider"></div>
 
           <!-- Body -->

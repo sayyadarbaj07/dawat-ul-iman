@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/select";
 import { Filter, Printer, Download } from "lucide-react";
 import { studentApi } from "@/lib/api/student";
+import { useLanguage } from "@/context/LanguageContext";
+import { getLocalizedStudentName } from "@/utils/localizationUtils";
 
 export function ReportFilters({ 
   config = {}, 
@@ -32,6 +34,7 @@ export function ReportFilters({
   generateLabel = "Generate Report",
   availableClasses = ["all"]
 }) {
+  const { language } = useLanguage();
   const CLASS_LABELS = {
     all: "All Classes",
     diniyat: "Diniyat",
@@ -56,27 +59,31 @@ export function ReportFilters({
   const [loadingExams, setLoadingExams] = useState(false);
 
   useEffect(() => {
-    if ((config.showStudent || config.showExamType) && filters.class && filters.class !== "all") {
-        if (config.showStudent) {
-            setStudents([]);  // clear stale list immediately
-            setLoadingStudents(true);
-            studentApi.list({ classId: filters.class, limit: 1000 })
-                .then(res => setStudents(res.data?.data || res.data || []))
-                .catch(err => console.error("Failed to load students", err))
-                .finally(() => setLoadingStudents(false));
+    if (config.showStudent) {
+        setStudents([]);  // clear stale list immediately
+        setLoadingStudents(true);
+        const params = { limit: 1000, status: "active" };
+        if (filters.class && filters.class !== "all") {
+            params.classId = filters.class;
         }
-        if (config.showExamType) {
-            setExams([]);
-            setLoadingExams(true);
-            import("@/lib/api/exam").then(({ examApi }) => {
-                examApi.listExams({ classId: filters.class })
-                    .then(res => setExams(res.data || res || []))
-                    .catch(err => console.error("Failed to load exams", err))
-                    .finally(() => setLoadingExams(false));
-            });
-        }
+        studentApi.list(params)
+            .then(res => setStudents(res.data?.data || res.data || []))
+            .catch(err => console.error("Failed to load students", err))
+            .finally(() => setLoadingStudents(false));
     } else {
         setStudents([]);
+    }
+
+    if (config.showExamType && filters.class && filters.class !== "all") {
+        setExams([]);
+        setLoadingExams(true);
+        import("@/lib/api/exam").then(({ examApi }) => {
+            examApi.listExams({ classId: filters.class })
+                .then(res => setExams(res.data || res || []))
+                .catch(err => console.error("Failed to load exams", err))
+                .finally(() => setLoadingExams(false));
+        });
+    } else {
         setExams([]);
     }
   }, [filters.class, config.showStudent, config.showExamType]);
@@ -223,23 +230,31 @@ export function ReportFilters({
                 <Select 
                     value={filters.studentId || undefined} 
                     onValueChange={(val) => handleChange("studentId", val)}
-                    disabled={!filters.class || filters.class === "all" || loadingStudents}
+                    disabled={loadingStudents}
                 >
                     <SelectTrigger>
                         <SelectValue placeholder={
                             loadingStudents
                                 ? "Loading students…"
-                                : (!filters.class || filters.class === "all")
-                                    ? "Select a class first"
-                                    : students.length === 0
-                                        ? "No students in class"
-                                        : "Select Student"
+                                : students.length === 0
+                                    ? (filters.class && filters.class !== "all" ? "No students in this class" : "No students found")
+                                    : (config.studentOptional ? "All Students (or select one)" : "Select Student")
                         } />
                     </SelectTrigger>
                     <SelectContent>
-                        {(Array.isArray(students) ? students : []).map(s => (
+                        {config.studentOptional && (
+                            <SelectItem value="all">All Students (Whole Class)</SelectItem>
+                        )}
+                        {(Array.isArray(students) ? students : [])
+                          .sort((a, b) => {
+                            const numA = parseInt(a.rollNumber, 10);
+                            const numB = parseInt(b.rollNumber, 10);
+                            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                            return (a.name || "").localeCompare(b.name || "");
+                          })
+                          .map(s => (
                             <SelectItem key={s._id} value={s._id}>
-                                {s.name}{s.rollNumber ? ` — Roll ${s.rollNumber}` : ""}
+                                {getLocalizedStudentName(s, language)}{s.rollNumber ? ` — Roll ${s.rollNumber}` : ""}
                             </SelectItem>
                         ))}
                     </SelectContent>
@@ -352,8 +367,8 @@ export function ReportFilters({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onExport('en')}>English PDF</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onExport('ur')}>Urdu PDF (اردو)</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onExport('pdf', 'en')}>English PDF</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onExport('pdf', 'ur')}>Urdu PDF (اردو)</DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}

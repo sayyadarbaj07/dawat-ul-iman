@@ -1,10 +1,38 @@
+const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
+
+/**
+ * Mirrors bracket pairs for RTL rendering when text contains Arabic/Urdu characters.
+ * OpenType 'rtla' shaping in fontkit swaps the glyph visual placement, so input '('
+ * needs to be paired with ')' to appear correctly oriented on page.
+ */
+function mirrorBrackets(text) {
+    if (!text) return "";
+    const str = String(text);
+    if (!ARABIC_RE.test(str)) return str;
+    return str.replace(/[()\[\]{}«»‹›]/g, (ch) => {
+        switch (ch) {
+            case '(': return ')';
+            case ')': return '(';
+            case '[': return ']';
+            case ']': return '[';
+            case '{': return '}';
+            case '}': return '{';
+            case '«': return '»';
+            case '»': return '«';
+            case '‹': return '›';
+            case '›': return '‹';
+            default: return ch;
+        }
+    });
+}
+
 /**
  * Processes text (Urdu/English mixed) for PDFKit.
- * Removes double-processing and relies on native PDFKit OpenType features.
+ * Handles bracket mirroring for Arabic/Urdu text.
  */
 function processUrduText(text) {
     if (!text) return "";
-    return text;
+    return mirrorBrackets(text);
 }
 
 /**
@@ -12,15 +40,21 @@ function processUrduText(text) {
  * Automatically aligns to the right inside the specified width, ensuring no clipping.
  */
 function drawTextRTL(doc, text, x, y, options = {}) {
+    if (text === undefined || text === null) return;
+    const raw = String(text);
+    if (!raw && raw !== "0") return;
+
+    const str = mirrorBrackets(raw);
+    const hasArabic = ARABIC_RE.test(str);
+
     if (options.font) doc.font(options.font);
     if (options.fontSize) doc.fontSize(options.fontSize);
+    if (options.color) doc.fillColor(options.color);
     
-    // Merge provided features with 'rtla' (Right-To-Left Arabic native shaping)
-    const features = options.features ? [...options.features, 'rtla'] : ['rtla'];
-    
-    // For pure coordinate-based old calls (e.g. `drawTextRTL(doc, text, rightX, y, options)`), 
-    // where they passed `rightX` instead of `x` and no width, we have to simulate alignment.
-    // However, new width-aware calls will pass `width` and standard `x`.
+    // Only apply 'rtla' if the text has Arabic characters or explicitly requested
+    const features = options.features 
+        ? (hasArabic && !options.features.includes('rtla') ? [...options.features, 'rtla'] : options.features)
+        : (hasArabic ? ['rtla'] : []);
     
     if (options.width) {
         // Safe, width-aware rendering
@@ -29,14 +63,14 @@ function drawTextRTL(doc, text, x, y, options = {}) {
             features, 
             ...options 
         };
-        doc.text(text, x, y, textOpts);
+        doc.text(str, x, y, textOpts);
     } else {
         // Backwards compatibility for fixed-coordinate callers that passed rightX
         let textWidth = 0;
         try {
-            textWidth = doc.widthOfString(text, { features });
+            textWidth = doc.widthOfString(str, { features });
         } catch (e) {
-            textWidth = text.length * ((options.fontSize || 12) * 0.4);
+            textWidth = str.length * ((options.fontSize || 12) * 0.4);
         }
         const startX = x - textWidth; // Here `x` was `rightX` in old signature
         
@@ -45,11 +79,13 @@ function drawTextRTL(doc, text, x, y, options = {}) {
             features, 
             ...options 
         };
-        doc.text(text, startX, y, textOpts);
+        delete textOpts.align; // Avoid double-alignment offset when startX is already right-calculated
+        doc.text(str, startX, y, textOpts);
     }
 }
 
 module.exports = {
     processUrduText,
-    drawTextRTL
+    drawTextRTL,
+    mirrorBrackets
 };

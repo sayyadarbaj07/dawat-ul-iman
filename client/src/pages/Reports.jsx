@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/ui/BackButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/context/LanguageContext";
 import { getLocalizedStudentName, formatLocalizedPercent, formatLocalizedNumber } from "@/utils/localizationUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -26,7 +27,7 @@ import { ReportFilters } from "@/components/reports/ReportFilters";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { reportApi } from "@/lib/api/report";
 import { pdfApi } from "@/lib/api/pdf";
-import { teacherApi, classApi } from "@/lib/api";
+import { teacherApi, classApi, attendanceApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 
@@ -52,14 +53,14 @@ export default function Reports() {
     { id: "student_marksheet", category: "students", title: tr("reports", "studentMarksheet"), desc: tr("reports", "studentMarksheetDesc"), icon: FileSpreadsheet, config: { showClass: true, showStudent: true, showExamType: true } },
     { id: "student_list", category: "students", title: tr("reports", "studentListReport"), desc: tr("reports", "studentListReportDesc"), icon: Users, config: { showClass: true } },
     { id: "weak_students", category: "students", title: tr("reports", "weakStudentsReport"), desc: tr("reports", "weakStudentsReportDesc"), icon: TrendingDown, config: { showClass: true } },
-    { id: "student_attendance", category: "students", title: tr("reports", "studentAttendanceReport"), desc: tr("reports", "studentAttendanceReportDesc"), icon: CalendarCheck, config: { showClass: true, showStudent: true, showDateRange: true } },
+    { id: "student_attendance", categories: ["attendance", "students"], category: "attendance", title: tr("reports", "studentAttendanceReport"), desc: tr("reports", "studentAttendanceReportDesc"), icon: CalendarCheck, config: { showClass: true, showStudent: true, showDateRange: true } },
     // Result Reports
     { id: "class_result", category: "results", title: tr("reports", "classResult"), desc: tr("reports", "classResultDesc"), icon: Users, config: { showClass: true, showExamType: true } },
     { id: "class_marksheets", category: "results", title: "Class Marksheets", desc: "Generate marksheets for all students in a class", icon: BookOpen, config: { showClass: true, showExamType: true } },
     { id: "yearly_result", category: "results", title: "Yearly Result", desc: "Generate yearly result for a specific student", icon: Award, config: { showClass: true, showStudent: true } },
     { id: "academic_history", category: "results", title: "Academic History", desc: "Generate academic history for a specific student", icon: BookOpen, config: { showClass: true, showStudent: true } },
     // Attendance Reports
-    { id: "class_attendance", category: "attendance", title: tr("reports", "dailyAttendance"), desc: tr("reports", "dailyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showDateRange: true } },
+    { id: "class_attendance", categories: ["attendance"], category: "attendance", title: tr("reports", "dailyAttendance"), desc: tr("reports", "dailyAttendanceDesc"), icon: CalendarCheck, config: { showClass: true, showStudent: true, showDateRange: true, studentOptional: true } },
     // Finance Reports
     { id: "finance_summary", category: "finance", title: tr("reports", "dailyFinance"), desc: tr("reports", "dailyFinanceDesc"), icon: Wallet, config: { showDateRange: true } },
     { id: "income_report", category: "finance", title: tr("reports", "incomeReport"), desc: tr("reports", "incomeReportDesc"), icon: TrendingDown, config: { showDateRange: true, showCategory: true } },
@@ -135,6 +136,10 @@ export default function Reports() {
   const buildSubtitle = (report, f) => {
     const parts = [];
     const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    if (reportData?.student) {
+      const studentName = getLocalizedStudentName(reportData.student, language);
+      parts.push(`Student: ${studentName}${reportData.student.rollNumber ? ` (Roll: ${reportData.student.rollNumber})` : ""}`);
+    }
     if (report.config.showClass && f.class) {
       const clsObj = assignedClasses.find(c => c.id === f.class);
       const clsName = clsObj ? clsObj.name : f.class;
@@ -191,13 +196,47 @@ export default function Reports() {
           } finally {
               setIsLoading(false);
           }
+      } else if (
+          selectedReport?.id === "student_attendance" || 
+          (selectedReport?.id === "class_attendance" && filters.studentId && filters.studentId !== "all")
+      ) {
+          if (!filters.studentId || filters.studentId === "all") {
+              toast({ title: "Missing Student", description: "Please select a Student to view attendance.", variant: "destructive" });
+              return;
+          }
+          setIsLoading(true);
+          try {
+              const res = await attendanceApi.getStudentSummary(filters.studentId, {
+                  startDate: filters.startDate,
+                  endDate: filters.endDate,
+                  month: filters.month,
+                  year: filters.year
+              });
+              setReportData(res.data);
+              toast({ title: tr("common", "success"), description: tr("reports", "generate") });
+          } catch (error) {
+              toast({ title: tr("common", "error"), description: error.message || "Failed to load student attendance", variant: "destructive" });
+          } finally {
+              setIsLoading(false);
+          }
       } else {
-          // For most PDF-based reports, "Generate" acts as "Export PDF" because there is no separate on-screen preview yet
+          // For whole class attendance or other reports without screen preview, trigger export
           handleExport();
       }
   };
 
-  const handleExport = (type = 'pdf', language = 'en') => {
+  const handleExport = (typeOrLang = 'pdf', maybeLang) => {
+      let type = 'pdf';
+      let exportLang = language || 'en';
+
+      if (typeOrLang === 'en' || typeOrLang === 'ur') {
+          exportLang = typeOrLang;
+          type = 'pdf';
+      } else {
+          type = typeOrLang || 'pdf';
+          exportLang = maybeLang || language || 'en';
+      }
+
       if (type === 'excel') {
           toast({ title: "Notice", description: "Excel export not supported." });
           return;
@@ -207,7 +246,7 @@ export default function Reports() {
       const txType = filters.type;
 
       // Validation for student reports
-      if (selectedReport?.config?.showStudent && !studentId) {
+      if (selectedReport?.config?.showStudent && !selectedReport?.config?.studentOptional && (!studentId || studentId === "all")) {
           toast({ title: "Missing Filter", description: "Please select a Student.", variant: "destructive" });
           return;
       }
@@ -220,32 +259,36 @@ export default function Reports() {
 
       // PDF Exports Mapping
       if (selectedReport?.id === "weak_students") {
-          downloadPdf(pdfApi.getWeakStudentsReport({ ...filters, language }), `Weak_Students_Report_${language}.pdf`);
+          downloadPdf(pdfApi.getWeakStudentsReport({ ...filters, language: exportLang }), `Weak_Students_Report_${exportLang}.pdf`);
       } 
       else if (selectedReport?.id === "student_marksheet") {
-          downloadPdf(pdfApi.getStudentReportCard(studentId, examId || examType, language), `Marksheet_${studentId}_${language}.pdf`);
+          downloadPdf(pdfApi.getStudentReportCard(studentId, examId || examType, exportLang), `Marksheet_${studentId}_${exportLang}.pdf`);
       }
       else if (selectedReport?.id === "yearly_result") {
-          downloadPdf(pdfApi.getYearlyResult(studentId, language), `Yearly_Result_${studentId}_${language}.pdf`);
+          downloadPdf(pdfApi.getYearlyResult(studentId, exportLang), `Yearly_Result_${studentId}_${exportLang}.pdf`);
       }
       else if (selectedReport?.id === "academic_history") {
-          downloadPdf(pdfApi.getAcademicHistory(studentId, language), `Academic_History_${studentId}_${language}.pdf`);
+          downloadPdf(pdfApi.getAcademicHistory(studentId, exportLang), `Academic_History_${studentId}_${exportLang}.pdf`);
       }
       else if (selectedReport?.id === "class_result") {
-          downloadPdf(pdfApi.getClassResult(classId, examId, examType, language), `Class_Result_${classId}_${language}.pdf`);
+          downloadPdf(pdfApi.getClassResult(classId, examId, examType, exportLang), `Class_Result_${classId}_${exportLang}.pdf`);
       }
       else if (selectedReport?.id === "class_marksheets") {
-          downloadPdf(pdfApi.getClassMarksheets(classId, examId, examType, language), `Class_Marksheets_${classId}_${language}.pdf`);
+          downloadPdf(pdfApi.getClassMarksheets(classId, examId, examType, exportLang), `Class_Marksheets_${classId}_${exportLang}.pdf`);
       }
       else if (selectedReport?.id === "student_attendance") {
-          downloadPdf(pdfApi.getStudentAttendanceReport(studentId, { ...filters, language }), `Student_Attendance_${studentId}_${language}.pdf`);
+          downloadPdf(pdfApi.getStudentAttendanceReport(studentId, { ...filters, language: exportLang }), `Student_Attendance_${studentId}_${exportLang}.pdf`);
       } 
       else if (selectedReport?.id === "class_attendance") {
-          downloadPdf(pdfApi.getClassAttendanceReport({ classId, startDate, endDate, language }), `Class_Attendance_${language}.pdf`);
+          if (studentId && studentId !== "all") {
+              downloadPdf(pdfApi.getStudentAttendanceReport(studentId, { ...filters, language: exportLang }), `Student_Attendance_${studentId}_${exportLang}.pdf`);
+          } else {
+              downloadPdf(pdfApi.getClassAttendanceReport({ classId, startDate, endDate, language: exportLang }), `Class_Attendance_${exportLang}.pdf`);
+          }
       }
       else if (selectedReport?.category === "finance") {
           // Build finance params explicitly — never serialize undefined/null as query strings
-          const financeParams = { language };
+          const financeParams = { language: exportLang };
           if (startDate) financeParams.startDate = startDate;
           if (endDate) financeParams.endDate = endDate;
 
@@ -266,10 +309,10 @@ export default function Reports() {
               financeParams.category = finalCategory;
           }
 
-          downloadPdf(pdfApi.getFinanceSummary(financeParams), `Finance_${selectedReport.id}_${language}.pdf`);
+          downloadPdf(pdfApi.getFinanceSummary(financeParams), `Finance_${selectedReport.id}_${exportLang}.pdf`);
       } 
       else if (selectedReport?.id === "student_list") {
-          downloadPdf(pdfApi.getStudentListReport(classId, language), `Student_List_${classId || "All"}_${language}.pdf`);
+          downloadPdf(pdfApi.getStudentListReport(classId, exportLang), `Student_List_${classId || "All"}_${exportLang}.pdf`);
       }
       else {
           window.print();
@@ -278,6 +321,45 @@ export default function Reports() {
 
   const handlePrint = () => {
       handleExport();
+  };
+
+  const formatDateDisplay = (dateStr) => {
+    if (!dateStr) return "—";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString(language === "ur" ? "ur-PK" : "en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatDayName = (dateStr) => {
+    if (!dateStr) return "—";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString(language === "ur" ? "ur-PK" : "en-US", { weekday: "short" });
+    } catch {
+      return "—";
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    switch ((status || "").toLowerCase()) {
+      case "present":
+        return <Badge variant="soft-success">{language === "ur" ? "حاضر (Present)" : "Present"}</Badge>;
+      case "absent":
+        return <Badge variant="soft-danger">{language === "ur" ? "غیر حاضر (Absent)" : "Absent"}</Badge>;
+      case "late":
+        return <Badge variant="soft-warning">{language === "ur" ? "تاخیر (Late)" : "Late"}</Badge>;
+      case "leave":
+        return <Badge variant="soft-info">{language === "ur" ? "رخصت (Leave)" : "Leave"}</Badge>;
+      default:
+        return <Badge variant="outline">{status || "—"}</Badge>;
+    }
   };
 
   const renderReportMenu = () => (
@@ -294,11 +376,11 @@ export default function Reports() {
         {REPORT_CATEGORIES.map(category => (
             <TabsContent key={category.id} value={category.id}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {ALL_REPORTS.filter(r => r.category === category.id).map(report => (
+                    {ALL_REPORTS.filter(r => r.category === category.id || (Array.isArray(r.categories) && r.categories.includes(category.id))).map(report => (
                         <Card 
                             key={report.id} 
                             className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-md group"
-                            onClick={() => setSelectedReport(report)}
+                            onClick={() => { setSelectedReport(report); setReportData(null); }}
                         >
                             <CardHeader className="p-4 flex flex-row items-start gap-4 space-y-0">
                                 <div className="p-2.5 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors">
@@ -323,7 +405,7 @@ export default function Reports() {
       <div className="space-y-4">
           <BackButton 
             className="mb-2 print-hidden pl-0" 
-            onClick={() => setSelectedReport(null)}
+            onClick={() => { setSelectedReport(null); setReportData(null); }}
             label="Back to Report Center"
           />
           
@@ -341,7 +423,7 @@ export default function Reports() {
               onExport={handleExport}
               availableClasses={assignedClasses}
               loading={isLoading}
-              generateLabel={selectedReport.id === "student_attendance" ? "Generate PDF" : "Generate Report"}
+              generateLabel="Generate Report"
           />
 
           <ReportLayout 
@@ -389,14 +471,100 @@ export default function Reports() {
                           </TableBody>
                       </Table>
                   </div>
-              ) : selectedReport.id === "student_attendance" ? (
-                  <div className="flex items-center justify-center h-full min-h-[300px] border-2 border-dashed border-green-100 rounded-lg bg-green-50/30">
-                      <div className="text-center text-gray-600 space-y-2">
-                          <CalendarCheck className="w-12 h-12 mx-auto text-primary/40" />
-                          <h3 className="text-base font-semibold">Ready to Generate PDF</h3>
-                          <p className="text-sm">
-                              Select a student and period above, then click <strong>Export</strong> to open the attendance report as a PDF.
-                          </p>
+              ) : (selectedReport.id === "student_attendance" || selectedReport.id === "class_attendance") && reportData?.summary ? (
+                  <div className="space-y-6">
+                      {reportData.student && (
+                          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex flex-wrap items-center justify-between gap-4">
+                              <div>
+                                  <h3 className="text-lg font-bold text-foreground">
+                                      {getLocalizedStudentName(reportData.student, language)}
+                                  </h3>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                      {reportData.student.rollNumber ? `Roll No: ${reportData.student.rollNumber}  |  ` : ""}
+                                      Class: {reportData.student.className || filters.class || "—"}
+                                  </p>
+                              </div>
+                              {reportData.periodLabel && (
+                                  <Badge variant="outline" className="text-xs font-medium">
+                                      {reportData.periodLabel}
+                                  </Badge>
+                              )}
+                          </div>
+                      )}
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                          <Card className="p-3 text-center border-border/60 bg-muted/20">
+                              <p className="text-xs text-muted-foreground uppercase font-medium">Total Days</p>
+                              <p className="text-2xl font-bold mt-1">{formatLocalizedNumber(reportData.totalWorkingDays ?? reportData.summary.total ?? 0, language)}</p>
+                          </Card>
+                          <Card className="p-3 text-center border-green-200 bg-green-50/40 dark:bg-green-950/20">
+                              <p className="text-xs text-green-700 dark:text-green-400 uppercase font-medium">Present</p>
+                              <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{formatLocalizedNumber(reportData.summary.present || 0, language)}</p>
+                          </Card>
+                          <Card className="p-3 text-center border-red-200 bg-red-50/40 dark:bg-red-950/20">
+                              <p className="text-xs text-red-700 dark:text-red-400 uppercase font-medium">Absent</p>
+                              <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{formatLocalizedNumber(reportData.summary.absent || 0, language)}</p>
+                          </Card>
+                          <Card className="p-3 text-center border-amber-200 bg-amber-50/40 dark:bg-amber-950/20">
+                              <p className="text-xs text-amber-700 dark:text-amber-400 uppercase font-medium">Late / Leave</p>
+                              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">{formatLocalizedNumber((reportData.summary.late || 0) + (reportData.summary.leave || 0), language)}</p>
+                          </Card>
+                          <Card className="p-3 text-center border-primary/20 bg-primary/5">
+                              <p className="text-xs text-primary uppercase font-medium">Attendance Rate</p>
+                              <p className="text-2xl font-bold text-primary mt-1">{formatLocalizedPercent(reportData.summary.percentage || 0, language)}</p>
+                          </Card>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-md border border-border/50">
+                          <Table className="min-w-[650px]">
+                              <TableHeader className="bg-muted/40">
+                                  <TableRow className="hover:bg-transparent border-b-border/60">
+                                      <TableHead className="w-[70px] text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sr. No</TableHead>
+                                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Date</TableHead>
+                                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Day</TableHead>
+                                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
+                                      <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Remarks</TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {(reportData.records || []).map((rec, idx) => (
+                                      <TableRow key={rec._id || idx} className="hover:bg-muted/40 transition-colors duration-200">
+                                          <TableCell className="font-mono text-xs text-muted-foreground">{idx + 1}</TableCell>
+                                          <TableCell className="font-medium text-sm">{formatDateDisplay(rec.date)}</TableCell>
+                                          <TableCell className="text-sm text-muted-foreground">{formatDayName(rec.date)}</TableCell>
+                                          <TableCell className="text-sm">{getStatusBadge(rec.status)}</TableCell>
+                                          <TableCell className="text-sm text-muted-foreground">{rec.remarks || "—"}</TableCell>
+                                      </TableRow>
+                                  ))}
+                                  {(!reportData.records || reportData.records.length === 0) && (
+                                      <TableRow>
+                                          <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                              No attendance records found for this student in the selected period.
+                                          </TableCell>
+                                      </TableRow>
+                                  )}
+                              </TableBody>
+                          </Table>
+                      </div>
+                  </div>
+              ) : selectedReport.id === "student_attendance" || selectedReport.id === "class_attendance" ? (
+                  <div className="flex flex-col items-center justify-center h-full min-h-[300px] border-2 border-dashed border-primary/20 rounded-lg bg-primary/5 p-6 text-center">
+                      <CalendarCheck className="w-12 h-12 text-primary mb-3 opacity-60" />
+                      <h3 className="text-base font-semibold text-gray-800">
+                          {language === "ur" ? "طالب علم کی حاضری کا پیش منظر" : "Student Attendance Preview"}
+                      </h3>
+                      <p className="text-sm text-muted-foreground max-w-md mt-1">
+                          {language === "ur"
+                              ? "اوپر دی گئی فہرست سے کلاس اور طالب علم منتخب کریں، پھر اسکرین پر حاضری دیکھنے کے لیے 'Generate Report' پر کلک کریں۔"
+                              : "Select a Class and Student above, then click Generate Report to view day-wise attendance and statistics on screen."
+                          }
+                      </p>
+                      <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
+                          <span>{language === "ur" ? "یا پی ڈی ایف ڈاؤن لوڈ کرنے کے لیے" : "Or use"}</span>
+                          <span className="font-semibold px-2 py-0.5 bg-background rounded border text-foreground">
+                              {language === "ur" ? "Export PDF" : "Export PDF"}
+                          </span>
+                          <span>{language === "ur" ? "پر کلک کریں۔" : "to download English or Urdu PDF directly."}</span>
                       </div>
                   </div>
               ) : (

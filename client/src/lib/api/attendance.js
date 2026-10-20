@@ -28,10 +28,19 @@ export const attendanceApi = {
     return request(url);
   },
   
+<<<<<<< Updated upstream
   getStudentSummary: (studentId, classId) => {
     let url = `/attendance/student/${studentId}`;
     if (classId) url += `?classId=${classId}`;
     return request(url);
+=======
+  getStudentSummary: (studentId, filters = {}) => {
+    const clean = Object.fromEntries(
+      Object.entries(filters).filter(([_, v]) => v !== undefined && v !== null && v !== "")
+    );
+    const query = new URLSearchParams(clean).toString();
+    return request(`/attendance/student/${studentId}${query ? `?${query}` : ""}`);
+>>>>>>> Stashed changes
   },
   
   getTeacherSummary: (teacherId) => {

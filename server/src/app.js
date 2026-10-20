@@ -65,17 +65,24 @@ app.use(
 
 app.use(compression());
 
-// 2. Strict CORS Whitelist
 const allowedOrigins = [
   process.env.CLIENT_URL || "http://localhost:5173",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
   "http://localhost:3000",
+  "http://127.0.0.1:3000",
   "https://dawat-ul-iman-git-main-arbajs-projects-fc7dac77.vercel.app",
   "https://dawat-ul-iman.vercel.app"
 ];
 
 app.use(cors({ 
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      (process.env.NODE_ENV !== "production" &&
+        (origin.includes("localhost") || origin.includes("127.0.0.1")))
+    ) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

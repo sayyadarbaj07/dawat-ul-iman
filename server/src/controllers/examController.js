@@ -91,6 +91,19 @@ exports.createExam = async (req, res) => {
       }
     }
 
+    if (!req.body.date) {
+      return sendError(res, 400, "Exam date is required.");
+    }
+    const parsedDate = new Date(req.body.date);
+    if (isNaN(parsedDate.getTime())) {
+      return sendError(res, 400, "Invalid exam date.");
+    }
+    req.body.date = parsedDate;
+
+    if (!req.body.subjects || !Array.isArray(req.body.subjects) || req.body.subjects.length === 0) {
+      return sendError(res, 400, "At least one subject is required.");
+    }
+
     // Proactive Duplicate Check
     let duplicateQuery = { name: req.body.name, academicYear: req.body.academicYear };
     if (req.body.classId) {
@@ -124,10 +137,11 @@ exports.createExam = async (req, res) => {
 
     return sendSuccess(res, 201, "Exam created successfully", exam);
   } catch (error) {
+    console.error("[createExam Error]:", error);
     if (error.code === 11000) {
       return sendError(res, 400, "An exam with this name already exists for this class in this academic year.");
     }
-    return sendError(res, 500, "Failed to create exam", error);
+    return sendError(res, 500, error.message || "Failed to create exam", error);
   }
 };
 

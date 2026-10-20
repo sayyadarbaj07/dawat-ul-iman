@@ -13,6 +13,7 @@ const studentSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     nameUrdu: { type: String, trim: true, default: "" },
     fatherName: { type: String, required: true, trim: true },
+    fatherNameUrdu: { type: String, trim: true, default: "" },
     motherName: { type: String, trim: true, default: "" },
     className: {
       type: String,
