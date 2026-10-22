@@ -1,6 +1,7 @@
 const Attendance = require("../models/attendanceModel");
 const attendanceService = require("../services/attendanceService");
 const mongoose = require("mongoose");
+const Student = require("../models/studentModel");
 const Teacher = require("../models/teacherModel");
 const Class = require("../models/classModel");
 
@@ -147,21 +148,13 @@ exports.getStudentAttendanceSummary = async (req, res) => {
     if (req.user.role === "student" && req.user._id.toString() !== studentId) {
       return sendError(res, 403, "Not authorized to view this student's attendance");
     }
-<<<<<<< Updated upstream
-    // Note: Parent IDOR is implicitly deferred to existing relationship logic if it exists,
-    // otherwise they cannot access another student. If a parent is linked, they should pass through
-    // specific parent endpoints. Here we block blatant misuse if necessary, but keep it simple.
     const { classId } = req.query;
-    let query = { userId: studentId, userType: "Student" };
-
     if (classId) {
       if (!mongoose.Types.ObjectId.isValid(classId)) {
         return sendError(res, 400, "Invalid classId format");
       }
-      query.classId = classId;
 
       // Ensure student actually belongs to this class (either Diniyat or School)
-      const Student = require("../models/studentModel");
       const student = await Student.findById(studentId).lean();
       if (!student) {
          return sendError(res, 404, "Student not found");
@@ -187,14 +180,9 @@ exports.getStudentAttendanceSummary = async (req, res) => {
          return sendError(res, 400, "classId is required for teachers to fetch attendance");
       }
     }
-    
-    const records = await Attendance.find(query).sort({ date: -1 });
-    console.log("ATTENDANCE QUERY:", query, "RECORDS:", records.length);
-=======
-    
+
     const data = await attendanceService.getStudentAttendanceForPDF(studentId, req.query);
->>>>>>> Stashed changes
-    
+
     // Ensure backwards compatibility with StudentProfile.jsx
     data.summary.total = data.totalWorkingDays;
     data.summary.leave = (data.records || []).filter(r => r.status === "Leave").length;
@@ -329,4 +317,3 @@ exports.getClassAttendance = async (req, res) => {
     return sendError(res, 500, "Failed to fetch class attendance", error);
   }
 };
-

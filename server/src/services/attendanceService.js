@@ -317,7 +317,7 @@ const saveBatchAttendance = async (date, records, reqUser, classId) => {
  * @returns {Object}         - { student, records, summary, totalWorkingDays, periodLabel }
  */
 const getStudentAttendanceForPDF = async (studentId, filters) => {
-  const { month, year, startDate, endDate } = filters;
+  const { month, year, startDate, endDate, classId } = filters;
 
   // Fetch student (lean — read-only)
   const student = await Student.findById(studentId).lean();
@@ -331,7 +331,10 @@ const getStudentAttendanceForPDF = async (studentId, filters) => {
   const studentMatchQuery = { userType: "Student", userId: student._id };
   // Build parallel query for class-wide working-day count
   const classMatchQuery  = { userType: "Student" };
-  if (student.classId) {
+  if (classId) {
+    studentMatchQuery.classId = classId;
+    classMatchQuery.classId = classId;
+  } else if (student.classId) {
     classMatchQuery.classId = student.classId;
   } else if (student.className) {
     classMatchQuery.classId = { $exists: false };
