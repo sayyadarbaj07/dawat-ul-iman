@@ -130,10 +130,16 @@ function applyInstitutionalTemplate(doc, options = {}) {
 
   // Automatically draw on any subsequently added pages
   doc.on('pageAdded', () => {
-    drawContinuationHeader(doc);
+    if (options.standalonePages) {
+      drawInstitutionalHeader(doc, isUrdu);
+    } else {
+      drawContinuationHeader(doc);
+    }
   });
 }
 
 module.exports = {
-  applyInstitutionalTemplate
+  applyInstitutionalTemplate,
+  drawInstitutionalHeader,
+  drawContinuationHeader
 };

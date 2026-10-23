@@ -16,6 +16,7 @@ const financeSummaryHtml = require("../utils/pdf/financeSummaryHtml");
 const { toUrduDigits } = require("../utils/pdf/digitLocalization");
 const numberToWords = require("../utils/pdf/numberToWords");
 const { applyInstitutionalTemplate } = require("../utils/pdf/institutionalReportTemplate");
+const { drawStudentMarksheet } = require("../utils/pdf/marksheetRenderer");
 const {
   getLocalizedStudentName,
   getLocalizedFatherName,
@@ -147,20 +148,28 @@ const generatePDF = (res, title, generateContent, filters = null, options = {}) 
       align: "center" 
     });
 
-    const subY = titleY + 32;
-    doc.font("Helvetica").fontSize(9).fillColor("#333333").text(`Generated On: ${new Date().toLocaleDateString()}`, 50, subY);
+    if (options.hideSubHeader) {
+      doc.y = titleY + 30;
+    } else {
+      const subY = titleY + 32;
+      doc.font("Helvetica").fontSize(9).fillColor("#333333").text(`Generated On: ${new Date().toLocaleDateString()}`, 50, subY);
 
-    const yearStr = `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
-    urduPdfHelper.drawTextRTL(doc, `:${URDU_LABELS.academicYear}`, 550, subY, { font: "UrduFont", fontSize: 10 });
-    doc.font("Helvetica").fontSize(9).fillColor("#333333").text(yearStr, 420, subY + 2, { width: 75, align: "right" });
+      const yearStr = `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
+      urduPdfHelper.drawTextRTL(doc, `:${URDU_LABELS.academicYear}`, 550, subY, { font: "UrduFont", fontSize: 10 });
+      doc.font("Helvetica").fontSize(9).fillColor("#333333").text(yearStr, 420, subY + 2, { width: 75, align: "right" });
 
-    doc.y = subY + 25;
+      doc.y = subY + 25;
+    }
   } else {
     doc.y = titleY;
     doc.fontSize(16).font("Helvetica-Bold").fillColor("#000000").text(title, { align: "center" });
-    doc.fontSize(9).font("Helvetica").text(`Academic Year: ${new Date().getFullYear()}-${new Date().getFullYear() + 1}`, 50, doc.y, { align: "left" });
-    doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 50, doc.y, { align: "right" });
-    doc.moveDown(0.5);
+    if (options.hideSubHeader) {
+      doc.y = titleY + 30;
+    } else {
+      doc.fontSize(9).font("Helvetica").text(`Academic Year: ${new Date().getFullYear()}-${new Date().getFullYear() + 1}`, 50, doc.y, { align: "left" });
+      doc.text(`Generated On: ${new Date().toLocaleDateString()}`, 50, doc.y, { align: "right" });
+      doc.moveDown(0.5);
+    }
   }
 
 
@@ -594,139 +603,18 @@ exports.generateStudentReportCard = async (req, res) => {
 
     const examResults = await ExamResult.find({ examId: exam._id, studentId: student._id });
 
-    // Calculate marks
-    let obtainedMarks = 0;
-    let hasFailed = false;
-    let subjectMarks = {};
-    exam.subjects.forEach(sub => { subjectMarks[sub] = null; });
-
-    examResults.forEach(r => {
-      if (exam.subjects.includes(r.subject)) {
-        if (r.marks === -1) {
-          subjectMarks[r.subject] = "Absent";
-          hasFailed = true;
-        } else {
-          subjectMarks[r.subject] = r.marks;
-          obtainedMarks += r.marks;
-          if (r.marks < exam.passingMarks) hasFailed = true;
-        }
-      }
-    });
-
-    const totalMarks = exam.subjects.length * exam.maxMarks;
-    const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
-    
-    let isAbsentInAny = false;
-    exam.subjects.forEach(sub => {
-      if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
-        isAbsentInAny = true;
-      }
-    });
-    const calcRes = calculateResult({
-      marks: obtainedMarks,
-      maxMarks: totalMarks,
-      passingMarks: isAbsentInAny ? totalMarks + 1 : (exam.passingMarks * exam.subjects.length)
-    });
-    let grade = isAbsentInAny ? "F" : calcRes.grade;
-    hasFailed = isAbsentInAny ? true : !calcRes.passed;
-
     const isUrdu = language === 'ur';
     const reportTitle = isUrdu ? URDU_LABELS.reportCard : "Student Marksheet";
     generatePDF(res, reportTitle, (doc) => {
-      const RIGHT_MARGIN = 550;
-      const LEFT_MARGIN = 50;
-
-      const nameVal = getLocalizedStudentName(student, language);
-      const classVal = getLocalizedClassName(student.classId || student.schoolClassId || student.studentClass || student.className, language);
-
-      if (isUrdu) {
-        urduPdfHelper.drawTextRTL(doc, URDU_LABELS.profile, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 14 });
-        doc.moveDown(0.5);
-        
-        urduPdfHelper.drawTextRTL(doc, `${nameVal} :${URDU_LABELS.name}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-        urduPdfHelper.drawTextRTL(doc, `${student.rollNumber || "—"} :${URDU_LABELS.rollNumber}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-        urduPdfHelper.drawTextRTL(doc, `${classVal} :${URDU_LABELS.className}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-        urduPdfHelper.drawTextRTL(doc, `${exam.academicYear} :${URDU_LABELS.academicYear}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-        doc.moveDown();
-
-        urduPdfHelper.drawTextRTL(doc, URDU_LABELS.examDetails, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 14 });
-        doc.moveDown(0.5);
-        
-        urduPdfHelper.drawTextRTL(doc, `${exam.name || exam.examName || "Unnamed Exam"} :${URDU_LABELS.examName}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-        urduPdfHelper.drawTextRTL(doc, `${exam.examType} :${URDU_LABELS.examType}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-        doc.moveDown();
-      } else {
-        doc.fontSize(14).font("Helvetica-Bold").text("STUDENT PROFILE", { underline: true });
-        doc.moveDown(0.5);
-        doc.fontSize(10).font("Helvetica");
-        doc.text(`Name: ${nameVal}`);
-        doc.text(`Roll Number: ${student.rollNumber || "—"}`);
-        doc.text(`Class: ${classVal}`);
-        doc.text(`Academic Year: ${exam.academicYear}`);
-        doc.moveDown();
-
-        doc.fontSize(14).font("Helvetica-Bold").text("EXAM DETAILS", { underline: true });
-        doc.moveDown(0.5);
-        doc.fontSize(10).font("Helvetica");
-        doc.text(`Exam Name: ${exam.name || exam.examName || "Unnamed Exam"}`);
-        doc.text(`Exam Type: ${exam.examType}`);
-        doc.moveDown();
-      }
-
-      // Subjects Table Header
-      const tableTop = doc.y;
-      
-      if (isUrdu) {
-        doc.font("UrduFont").fontSize(12);
-        urduPdfHelper.drawTextRTL(doc, URDU_LABELS.subject, RIGHT_MARGIN, tableTop);
-        urduPdfHelper.drawTextRTL(doc, URDU_LABELS.maxMarks, 300, tableTop);
-        urduPdfHelper.drawTextRTL(doc, URDU_LABELS.obtainedMarks, 150, tableTop);
-        doc.moveTo(LEFT_MARGIN, tableTop + 20).lineTo(RIGHT_MARGIN, tableTop + 20).stroke();
-        
-        let y = tableTop + 30;
-        doc.font("UrduFont");
-        
-        exam.subjects.forEach(sub => {
-          if (y > 700) { doc.addPage(); y = 50; }
-          urduPdfHelper.drawTextRTL(doc, sub, RIGHT_MARGIN, y);
-          urduPdfHelper.drawTextRTL(doc, exam.maxMarks.toString(), 300, y);
-          const m = subjectMarks[sub];
-          const mStr = m === null || m === "Absent" ? URDU_LABELS.absent : m.toString();
-          urduPdfHelper.drawTextRTL(doc, mStr, 150, y);
-          y += 25;
-        });
-        
-        doc.moveTo(LEFT_MARGIN, y).lineTo(RIGHT_MARGIN, y).stroke();
-        y += 10;
-        
-        doc.font("UrduFont").fontSize(12);
-        const totalUrdu = `${totalMarks} :${URDU_LABELS.totalMarks}   |   ${obtainedMarks} :${URDU_LABELS.obtainedMarks}   |   ${percentage.toFixed(2)}% :${URDU_LABELS.percentage}   |   ${grade} :${URDU_LABELS.grade}   |   ${hasFailed ? URDU_LABELS.fail : URDU_LABELS.pass} :${URDU_LABELS.status}`;
-        urduPdfHelper.drawTextRTL(doc, totalUrdu, RIGHT_MARGIN, y);
-      } else {
-        doc.font("Helvetica-Bold").fontSize(10);
-        doc.text("Subject", LEFT_MARGIN, tableTop);
-        doc.text("Max Marks", 250, tableTop);
-        doc.text("Obtained", 400, tableTop);
-        doc.moveTo(LEFT_MARGIN, tableTop + 15).lineTo(RIGHT_MARGIN, tableTop + 15).stroke();
-        
-        let y = tableTop + 20;
-        doc.font("Helvetica");
-
-        exam.subjects.forEach(sub => {
-          if (y > 700) { doc.addPage(); y = 50; }
-          doc.text(sub, LEFT_MARGIN, y);
-          doc.text(exam.maxMarks.toString(), 250, y);
-          const m = subjectMarks[sub];
-          doc.text(m === null || m === "Absent" ? "Absent" : m.toString(), 400, y);
-          y += 20;
-        });
-
-        doc.moveTo(LEFT_MARGIN, y).lineTo(RIGHT_MARGIN, y).stroke();
-        y += 10;
-        doc.font("Helvetica-Bold");
-        doc.text(`Total Marks: ${totalMarks}  |  Obtained: ${obtainedMarks}  |  Percentage: ${percentage.toFixed(2)}%  |  Grade: ${grade}  |  Result: ${hasFailed ? 'FAIL' : 'PASS'}`, LEFT_MARGIN, y);
-      }
-    }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle: reportTitle });
+      drawStudentMarksheet(doc, {
+        student,
+        exam,
+        results: examResults,
+        language,
+        academicYear: exam.academicYear,
+        startY: Math.max(doc.y || 0, 185)
+      });
+    }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle: reportTitle, hideSubHeader: true });
   } catch (error) {
     res.status(500).json({ message: "Error generating PDF", error: error.message });
   }
@@ -969,143 +857,23 @@ exports.generateClassMarksheetsPDF = async (req, res) => {
 
     generatePDF(res, reportTitle, (doc) => {
       let isFirstPage = true;
-      const RIGHT_MARGIN = 550;
-      const LEFT_MARGIN = 50;
-
       students.forEach((student) => {
         if (!isFirstPage) {
           doc.addPage();
         }
-        isFirstPage = false;
-
         const studentResults = results.filter(r => String(r.studentId) === String(student._id));
-        
-        let obtainedMarks = 0;
-        let hasFailed = false;
-        let subjectMarks = {};
-        exam.subjects.forEach(sub => { subjectMarks[sub] = null; });
-
-        studentResults.forEach(r => {
-          if (exam.subjects.includes(r.subject)) {
-            if (r.marks === -1) {
-              subjectMarks[r.subject] = "Absent";
-              hasFailed = true;
-            } else {
-              subjectMarks[r.subject] = r.marks;
-              obtainedMarks += r.marks;
-              if (r.marks < exam.passingMarks) hasFailed = true;
-            }
-          }
+        drawStudentMarksheet(doc, {
+          student,
+          exam,
+          results: studentResults,
+          language,
+          academicYear: exam.academicYear,
+          startY: Math.max(doc.y || 0, 185),
+          drawTitle: !isFirstPage
         });
-
-        const totalMarks = exam.subjects.length * exam.maxMarks;
-        const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
-        
-        let isAbsentInAny = false;
-        exam.subjects.forEach(sub => {
-          if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
-            isAbsentInAny = true;
-          }
-        });
-        const calcRes = calculateResult({
-          marks: obtainedMarks,
-          maxMarks: totalMarks,
-          passingMarks: isAbsentInAny ? totalMarks + 1 : (exam.passingMarks * exam.subjects.length)
-        });
-        let grade = isAbsentInAny ? "F" : calcRes.grade;
-        hasFailed = isAbsentInAny ? true : !calcRes.passed;
-
-        const nameVal = getLocalizedStudentName(student, language);
-        const classVal = getLocalizedClassName(student.classId || student.schoolClassId || student.studentClass || student.className, language);
-
-        if (isUrdu) {
-          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.profile, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 14 });
-          doc.moveDown(0.5);
-          
-          urduPdfHelper.drawTextRTL(doc, `${nameVal} :${URDU_LABELS.name}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-          urduPdfHelper.drawTextRTL(doc, `${student.rollNumber || "—"} :${URDU_LABELS.rollNumber}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-          urduPdfHelper.drawTextRTL(doc, `${classVal} :${URDU_LABELS.className}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-          urduPdfHelper.drawTextRTL(doc, `${exam.academicYear} :${URDU_LABELS.academicYear}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-          doc.moveDown();
-
-          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.examDetails, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 14 });
-          doc.moveDown(0.5);
-          
-          urduPdfHelper.drawTextRTL(doc, `${exam.name || exam.examName || "Unnamed Exam"} :${URDU_LABELS.examName}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-          urduPdfHelper.drawTextRTL(doc, `${exam.examType} :${URDU_LABELS.examType}`, RIGHT_MARGIN, doc.y, { font: "UrduFont", fontSize: 12 });
-          doc.moveDown();
-        } else {
-          doc.fontSize(14).font("Helvetica-Bold").text("STUDENT PROFILE", { underline: true });
-          doc.moveDown(0.5);
-          doc.fontSize(10).font("Helvetica");
-          doc.text(`Name: ${nameVal}`);
-          doc.text(`Roll Number: ${student.rollNumber || "—"}`);
-          doc.text(`Class: ${classVal}`);
-          doc.text(`Academic Year: ${exam.academicYear}`);
-          doc.moveDown();
-
-          doc.fontSize(14).font("Helvetica-Bold").text("EXAM DETAILS", { underline: true });
-          doc.moveDown(0.5);
-          doc.fontSize(10).font("Helvetica");
-          doc.text(`Exam Name: ${exam.name || exam.examName || "Unnamed Exam"}`);
-          doc.text(`Exam Type: ${exam.examType}`);
-          doc.moveDown();
-        }
-
-        const tableTop = doc.y;
-        
-        if (isUrdu) {
-          doc.font("UrduFont").fontSize(12);
-          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.subject, RIGHT_MARGIN, tableTop);
-          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.maxMarks, 300, tableTop);
-          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.obtainedMarks, 150, tableTop);
-          doc.moveTo(LEFT_MARGIN, tableTop + 20).lineTo(RIGHT_MARGIN, tableTop + 20).stroke();
-          
-          let y = tableTop + 30;
-          doc.font("UrduFont");
-          
-          exam.subjects.forEach(sub => {
-            if (y > 700) { doc.addPage(); y = 50; }
-            urduPdfHelper.drawTextRTL(doc, sub, RIGHT_MARGIN, y);
-            urduPdfHelper.drawTextRTL(doc, exam.maxMarks.toString(), 300, y);
-            const m = subjectMarks[sub];
-            const mStr = m === null || m === "Absent" ? URDU_LABELS.absent : m.toString();
-            urduPdfHelper.drawTextRTL(doc, mStr, 150, y);
-            y += 25;
-          });
-          
-          doc.moveTo(LEFT_MARGIN, y).lineTo(RIGHT_MARGIN, y).stroke();
-          y += 10;
-          
-          doc.font("UrduFont").fontSize(12);
-          const totalUrdu = `${totalMarks} :${URDU_LABELS.totalMarks}   |   ${obtainedMarks} :${URDU_LABELS.obtainedMarks}   |   ${percentage.toFixed(2)}% :${URDU_LABELS.percentage}   |   ${grade} :${URDU_LABELS.grade}   |   ${hasFailed ? URDU_LABELS.fail : URDU_LABELS.pass} :${URDU_LABELS.status}`;
-          urduPdfHelper.drawTextRTL(doc, totalUrdu, RIGHT_MARGIN, y);
-        } else {
-          doc.font("Helvetica-Bold").fontSize(10);
-          doc.text("Subject", LEFT_MARGIN, tableTop);
-          doc.text("Max Marks", 250, tableTop);
-          doc.text("Obtained", 400, tableTop);
-          doc.moveTo(LEFT_MARGIN, tableTop + 15).lineTo(RIGHT_MARGIN, tableTop + 15).stroke();
-          
-          let y = tableTop + 20;
-          doc.font("Helvetica");
-
-          exam.subjects.forEach(sub => {
-            if (y > 700) { doc.addPage(); y = 50; }
-            doc.text(sub, LEFT_MARGIN, y);
-            doc.text(exam.maxMarks.toString(), 250, y);
-            const m = subjectMarks[sub];
-            doc.text(m === null || m === "Absent" ? "Absent" : m.toString(), 400, y);
-            y += 20;
-          });
-
-          doc.moveTo(LEFT_MARGIN, y).lineTo(RIGHT_MARGIN, y).stroke();
-          y += 10;
-          doc.font("Helvetica-Bold");
-          doc.text(`Total Marks: ${totalMarks}  |  Obtained: ${obtainedMarks}  |  Percentage: ${percentage.toFixed(2)}%  |  Grade: ${grade}  |  Result: ${hasFailed ? 'FAIL' : 'PASS'}`, LEFT_MARGIN, y);
-        }
+        isFirstPage = false;
       });
-    }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle: reportTitle });
+    }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle: reportTitle, standalonePages: true, hideSubHeader: true });
   } catch (error) {
     res.status(500).json({ message: "Error generating class marksheets PDF", error: error.message });
   }
