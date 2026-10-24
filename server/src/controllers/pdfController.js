@@ -1,4 +1,4 @@
-﻿const PDFDocument = require("pdfkit");
+const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
 const Student = require("../models/studentModel");
@@ -137,17 +137,17 @@ function resolvePdfLanguage(rawLanguage) {
 // PDF generation utility
 const generatePDF = (res, title, generateContent, filters = null, options = {}) => {
   const doc = new PDFDocument({ margin: 50 });
-  
+
   res.setHeader("Content-Type", "application/pdf");
   const asciiTitle = (title || "report").replace(/[^\x20-\x7E]/g, "").trim().replace(/\s+/g, "_") || "report";
   const encodedTitle = encodeURIComponent((title || "report").replace(/\s+/g, "_"));
   res.setHeader("Content-Disposition", `attachment; filename="${asciiTitle}.pdf"; filename*=UTF-8''${encodedTitle}.pdf`);
-  
+
   // Apply Institutional Template
   applyInstitutionalTemplate(doc, options);
-  
+
   doc.pipe(res);
-  
+
   const isUrdu = options.language === 'ur';
 
   // Always register Urdu font so any report can display Urdu student names/details without mojibake
@@ -163,11 +163,11 @@ const generatePDF = (res, title, generateContent, filters = null, options = {}) 
   // Title rendering directly below the header
   if (isUrdu) {
     const uTitle = options.translatedTitle || title;
-    urduPdfHelper.drawTextRTL(doc, uTitle, 50, titleY, { 
-      font: "UrduFont", 
-      fontSize: 18, 
-      width: 500, 
-      align: "center" 
+    urduPdfHelper.drawTextRTL(doc, uTitle, 50, titleY, {
+      font: "UrduFont",
+      fontSize: 18,
+      width: 500,
+      align: "center"
     });
 
     if (options.hideSubHeader) {
@@ -222,9 +222,9 @@ const generatePDF = (res, title, generateContent, filters = null, options = {}) 
     doc.moveDown();
   }
 
-  
+
   generateContent(doc);
-  
+
   doc.end();
 };
 
@@ -268,7 +268,7 @@ exports.generateStudentIdCard = async (req, res) => {
 
     // Top Header Banner
     doc.rect(2, 2, 239, 36).fill('#047857');
-    
+
     // Logo
     const logoPath = path.join(__dirname, "../../../client/public/logo1.jpeg");
     if (fs.existsSync(logoPath)) {
@@ -292,7 +292,7 @@ exports.generateStudentIdCard = async (req, res) => {
     const photoY = 48;
     const photoWidth = 60;
     const photoHeight = 75;
-    
+
     // Draw photo border
     doc.rect(photoX, photoY, photoWidth, photoHeight).lineWidth(1).strokeColor('#ccc').stroke();
 
@@ -304,7 +304,7 @@ exports.generateStudentIdCard = async (req, res) => {
       } else if (!path.isAbsolute(student.photo)) {
         photoFsPath = path.join(__dirname, "../../public", student.photo);
       }
-      
+
       if (fs.existsSync(photoFsPath)) {
         doc.image(photoFsPath, photoX, photoY, { width: photoWidth, height: photoHeight });
       } else {
@@ -337,28 +337,28 @@ exports.generateStudentIdCard = async (req, res) => {
       doc.fontSize(11).font(fontBold);
       urduPdfHelper.drawTextRTL(doc, nameStr, 230, currentY);
       currentY += 18;
-      
+
       doc.fontSize(9).font(fontRegular);
       urduPdfHelper.drawTextRTL(doc, `${classNameStr} :کلاس`, 230, currentY);
       currentY += yStep;
-      
+
       if (rollNoStr) {
-          doc.font(fontRegular);
-          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.rollNo + ":", 230, currentY);
-          urduPdfHelper.drawTextRTL(doc, toUrduDigits(rollNoStr), 230 - 80, currentY);
-          currentY += yStep;
-        }
-      
+        doc.font(fontRegular);
+        urduPdfHelper.drawTextRTL(doc, URDU_LABELS.rollNo + ":", 230, currentY);
+        urduPdfHelper.drawTextRTL(doc, toUrduDigits(rollNoStr), 230 - 80, currentY);
+        currentY += yStep;
+      }
+
       if (admNoStr) {
-          doc.font(fontRegular);
-          urduPdfHelper.drawTextRTL(doc, URDU_LABELS.admissionNo + ":", 230, currentY);
-          urduPdfHelper.drawTextRTL(doc, toUrduDigits(admNoStr), 230 - 80, currentY);
-        }
+        doc.font(fontRegular);
+        urduPdfHelper.drawTextRTL(doc, URDU_LABELS.admissionNo + ":", 230, currentY);
+        urduPdfHelper.drawTextRTL(doc, toUrduDigits(admNoStr), 230 - 80, currentY);
+      }
     } else {
       doc.fontSize(11).font(fontBold);
       doc.text(nameStr, labelX, currentY, { width: 150 });
       currentY += 18;
-      
+
       doc.fontSize(9).font(fontRegular);
       doc.text(`Class: ${classNameStr}`, labelX, currentY, { width: 150 });
       currentY += yStep;
@@ -368,7 +368,7 @@ exports.generateStudentIdCard = async (req, res) => {
         doc.font(fontBold).text(rollNoStr, labelX + 45, currentY);
         currentY += yStep;
       }
-      
+
       if (admNoStr) {
         doc.font(fontRegular).text("Adm No:", labelX, currentY);
         doc.font(fontBold).text(admNoStr, labelX + 45, currentY);
@@ -394,12 +394,12 @@ exports.generateTeacherSalarySlip = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(salaryId)) {
       return res.status(400).json({ message: "Invalid Salary ID" });
     }
-    
+
     // RBAC/IDOR Validation is handled inside the controller here
     // since PDF routes use generic protect without specific Teacher auth.
     // Actually, we'll verify it right away.
     const salary = await TeacherSalary.findById(salaryId).populate("teacherId", "name nameUrdu teacherId designation department joiningDate").lean();
-    
+
     if (!salary) {
       return res.status(404).json({ message: "Salary record not found" });
     }
@@ -411,7 +411,7 @@ exports.generateTeacherSalarySlip = async (req, res) => {
         // Let's explicitly query Teacher if populated doesn't have userId
         const teacherRec = await Teacher.findOne({ userId: req.user._id }).lean();
         if (!teacherRec || teacherRec._id.toString() !== salary.teacherId._id.toString()) {
-           return res.status(403).json({ message: "Unauthorized to view this salary slip" });
+          return res.status(403).json({ message: "Unauthorized to view this salary slip" });
         }
       }
     } else if (req.user.role !== "admin") {
@@ -422,39 +422,39 @@ exports.generateTeacherSalarySlip = async (req, res) => {
     const language = resolvePdfLanguage(req.query.language);
     const isUrdu = language === "ur";
 
-    const title = salary.status === "Paid" 
+    const title = salary.status === "Paid"
       ? (isUrdu ? URDU_LABELS.teacherSalarySlip : "Teacher Salary Slip")
       : (isUrdu ? URDU_LABELS.salaryCalculationBreakdown : "Salary Calculation Breakdown");
 
     generatePDF(res, `Teacher_Salary_${salary.teacherId.name.replace(/\s+/g, '_')}_${salary.month}_${salary.year}`, (doc) => {
       const fontRegular = isUrdu ? "UrduFont" : PDF_FONT_PATHS.english;
       const fontBold = isUrdu ? "UrduFont" : PDF_FONT_PATHS.englishBold;
-      
+
       const teacherName = getLocalizedTeacherName(salary.teacherId, language);
       const salaryPeriodStr = `${salary.month}/${salary.year}`;
 
       const drawRow = (label, value, y, alignLeft = false) => {
-         // Background row alternating is nice, but keeping it simple and structural.
-         if (isUrdu) {
-             doc.font(fontRegular).fontSize(14);
-             urduPdfHelper.drawTextRTL(doc, label, 500, y, { font: fontBold, fontSize: 14 });
-             // values might be LTR, but we'll draw them strictly positioned.
-             doc.font(PDF_FONT_PATHS.english).fontSize(12);
-             doc.text(String(value), 100, y, { width: 250, align: "right" });
-         } else {
-             doc.font(fontBold).fontSize(10).text(label, 50, y, { width: 150 });
-             doc.font(fontRegular).fontSize(10).text(String(value), 200, y, { width: 300 });
-         }
+        // Background row alternating is nice, but keeping it simple and structural.
+        if (isUrdu) {
+          doc.font(fontRegular).fontSize(14);
+          urduPdfHelper.drawTextRTL(doc, label, 500, y, { font: fontBold, fontSize: 14 });
+          // values might be LTR, but we'll draw them strictly positioned.
+          doc.font(PDF_FONT_PATHS.english).fontSize(12);
+          doc.text(String(value), 100, y, { width: 250, align: "right" });
+        } else {
+          doc.font(fontBold).fontSize(10).text(label, 50, y, { width: 150 });
+          doc.font(fontRegular).fontSize(10).text(String(value), 200, y, { width: 300 });
+        }
       };
 
       const drawSectionHeader = (text, y) => {
         doc.rect(50, y, 500, 24).fill("#047857");
         doc.fillColor("white");
         if (isUrdu) {
-           doc.font(fontBold).fontSize(16);
-           urduPdfHelper.drawTextRTL(doc, text, 540, y + 2, { font: fontBold, fontSize: 16, color: 'white' });
+          doc.font(fontBold).fontSize(16);
+          urduPdfHelper.drawTextRTL(doc, text, 540, y + 2, { font: fontBold, fontSize: 16, color: 'white' });
         } else {
-           doc.font(fontBold).fontSize(12).text(text, 60, y + 4);
+          doc.font(fontBold).fontSize(12).text(text, 60, y + 4);
         }
         doc.fillColor("black");
       };
@@ -464,7 +464,7 @@ exports.generateTeacherSalarySlip = async (req, res) => {
       // TEACHER INFORMATION
       drawSectionHeader(isUrdu ? URDU_LABELS.name : "Teacher Information", yPos);
       yPos += 30;
-      
+
       drawRow(isUrdu ? URDU_LABELS.name : "Name", teacherName, yPos);
       yPos += 20;
       drawRow(isUrdu ? URDU_LABELS.teacherId : "Teacher ID", salary.teacherId.teacherId || "Î“Ã‡Ã¶", yPos);
@@ -473,11 +473,11 @@ exports.generateTeacherSalarySlip = async (req, res) => {
       yPos += 20;
       drawRow(isUrdu ? URDU_LABELS.department : "Department", salary.teacherId.department || "Î“Ã‡Ã¶", yPos);
       yPos += 20;
-      
+
       const joiningDateStr = salary.teacherId.joiningDate ? new Date(salary.teacherId.joiningDate).toLocaleDateString() : "Î“Ã‡Ã¶";
       drawRow(isUrdu ? URDU_LABELS.joiningDate : "Joining Date", joiningDateStr, yPos);
       yPos += 20;
-      
+
       drawRow(isUrdu ? URDU_LABELS.salaryPeriod : "Salary Period", salaryPeriodStr, yPos);
       yPos += 35;
 
@@ -518,8 +518,8 @@ exports.generateTeacherSalarySlip = async (req, res) => {
 
       // CHECK IF NEW PAGE NEEDED
       if (yPos > 600) {
-          doc.addPage();
-          yPos = 50;
+        doc.addPage();
+        yPos = 50;
       }
 
       // NET SALARY
@@ -527,57 +527,57 @@ exports.generateTeacherSalarySlip = async (req, res) => {
       yPos += 30;
       doc.font(fontBold).fontSize(14);
       if (isUrdu) {
-         doc.text(String(salary.payableSalary || 0), 50, yPos, { width: 500, align: "center" });
+        doc.text(String(salary.payableSalary || 0), 50, yPos, { width: 500, align: "center" });
       } else {
-         doc.text(String(salary.payableSalary || 0), 50, yPos, { width: 500, align: "center" });
+        doc.text(String(salary.payableSalary || 0), 50, yPos, { width: 500, align: "center" });
       }
       yPos += 35;
 
       // PAYMENT INFORMATION
       drawSectionHeader(isUrdu ? URDU_LABELS.paymentInformation : "Payment Information", yPos);
       yPos += 30;
-      
+
       const statusStr = salary.status === "Paid" ? (isUrdu ? URDU_LABELS.paid : "Paid") : (isUrdu ? URDU_LABELS.draft : "Draft");
       drawRow(isUrdu ? URDU_LABELS.status : "Status", statusStr, yPos);
       yPos += 20;
 
       if (salary.status === "Paid") {
-          const pDate = salary.paymentDate ? new Date(salary.paymentDate).toLocaleDateString() : "Î“Ã‡Ã¶";
-          drawRow(isUrdu ? URDU_LABELS.paymentDate : "Payment Date", pDate, yPos);
+        const pDate = salary.paymentDate ? new Date(salary.paymentDate).toLocaleDateString() : "Î“Ã‡Ã¶";
+        drawRow(isUrdu ? URDU_LABELS.paymentDate : "Payment Date", pDate, yPos);
+        yPos += 20;
+        drawRow(isUrdu ? URDU_LABELS.paymentMethod : "Payment Method", salary.paymentMethod || "Î“Ã‡Ã¶", yPos);
+        yPos += 20;
+        drawRow(isUrdu ? URDU_LABELS.paymentReference : "Payment Reference", salary.paymentReference || "Î“Ã‡Ã¶", yPos);
+        yPos += 20;
+        if (salary.financeTransactionId) {
+          drawRow(isUrdu ? URDU_LABELS.financeTransactionID : "Finance Transaction ID", String(salary.financeTransactionId), yPos);
           yPos += 20;
-          drawRow(isUrdu ? URDU_LABELS.paymentMethod : "Payment Method", salary.paymentMethod || "Î“Ã‡Ã¶", yPos);
-          yPos += 20;
-          drawRow(isUrdu ? URDU_LABELS.paymentReference : "Payment Reference", salary.paymentReference || "Î“Ã‡Ã¶", yPos);
-          yPos += 20;
-          if (salary.financeTransactionId) {
-             drawRow(isUrdu ? URDU_LABELS.financeTransactionID : "Finance Transaction ID", String(salary.financeTransactionId), yPos);
-             yPos += 20;
-          }
+        }
       } else {
-          drawRow(isUrdu ? URDU_LABELS.paymentDate : "Payment Date", "Î“Ã‡Ã¶", yPos);
-          yPos += 20;
-          drawRow(isUrdu ? URDU_LABELS.paymentMethod : "Payment Method", "Î“Ã‡Ã¶", yPos);
-          yPos += 20;
+        drawRow(isUrdu ? URDU_LABELS.paymentDate : "Payment Date", "Î“Ã‡Ã¶", yPos);
+        yPos += 20;
+        drawRow(isUrdu ? URDU_LABELS.paymentMethod : "Payment Method", "Î“Ã‡Ã¶", yPos);
+        yPos += 20;
       }
-      
+
       if (salary.remarks) {
-          drawRow(isUrdu ? URDU_LABELS.remarks : "Remarks", salary.remarks, yPos);
-          yPos += 20;
+        drawRow(isUrdu ? URDU_LABELS.remarks : "Remarks", salary.remarks, yPos);
+        yPos += 20;
       }
 
       yPos += 60;
       // SIGNATURE
       if (yPos > 680) {
-          doc.addPage();
-          yPos = 50;
+        doc.addPage();
+        yPos = 50;
       }
 
       doc.moveTo(400, yPos).lineTo(550, yPos).stroke();
       if (isUrdu) {
-         doc.font(fontRegular).fontSize(10);
-         urduPdfHelper.drawTextRTL(doc, URDU_LABELS.authorizedSignature, 550, yPos + 5, { font: fontRegular, fontSize: 10, align: "center" });
+        doc.font(fontRegular).fontSize(10);
+        urduPdfHelper.drawTextRTL(doc, URDU_LABELS.authorizedSignature, 550, yPos + 5, { font: fontRegular, fontSize: 10, align: "center" });
       } else {
-         doc.font(fontRegular).fontSize(10).text("Authorized Signature", 400, yPos + 5, { width: 150, align: "center" });
+        doc.font(fontRegular).fontSize(10).text("Authorized Signature", 400, yPos + 5, { width: 150, align: "center" });
       }
 
     }, null, { language, translatedTitle: title });
@@ -585,7 +585,7 @@ exports.generateTeacherSalarySlip = async (req, res) => {
   } catch (error) {
     console.error("Teacher Salary Slip PDF Error:", error);
     if (error.name === "CastError") {
-       return res.status(400).json({ message: "Invalid Salary ID" });
+      return res.status(400).json({ message: "Invalid Salary ID" });
     }
     res.status(500).json({ message: "Failed to generate Salary Slip PDF", error: error.message });
   }
@@ -605,20 +605,22 @@ exports.generateStudentReportCard = async (req, res) => {
 
     let exam;
     if (examIdParam.match(/^[0-9a-fA-F]{24}$/)) {
-        exam = await Exam.findById(examIdParam).populate("classId");
+      exam = await Exam.findById(examIdParam).populate("classId");
     } else {
-        // It's an examType like 'monthly', find the latest for this class
-        let examQuery = { examType: examIdParam };
-        const classOr = [];
-        if (student.classId) {
-          classOr.push({ classId: student.classId._id || student.classId });
-          if (student.classId.name) classOr.push({ class: student.classId.name });
-          if (student.classId.fullName) classOr.push({ class: student.classId.fullName });
-        }
-        if (student.studentClass) classOr.push({ class: student.studentClass });
-        if (student.className) classOr.push({ class: student.className });
-        if (classOr.length > 0) examQuery.$or = classOr;
-        exam = await Exam.findOne(examQuery).populate("classId").sort({ createdAt: -1 });
+      // It's an examType like 'monthly', find the latest for this class
+      let examQuery = {
+        examType: { $regex: new RegExp(`^${examIdParam}$`, "i") }
+      };
+      const classOr = [];
+      if (student.classId) {
+        classOr.push({ classId: student.classId._id || student.classId });
+        if (student.classId.name) classOr.push({ class: student.classId.name });
+        if (student.classId.fullName) classOr.push({ class: student.classId.fullName });
+      }
+      if (student.studentClass) classOr.push({ class: student.studentClass });
+      if (student.className) classOr.push({ class: student.className });
+      if (classOr.length > 0) examQuery.$or = classOr;
+      exam = await Exam.findOne(examQuery).populate("classId").sort({ createdAt: -1 });
     }
 
     if (!exam) return res.status(404).json({ message: "Exam not found" });
@@ -647,11 +649,13 @@ exports.generateClassResultPDF = async (req, res) => {
     const language = resolvePdfLanguage(req.query.language);
     const isUrdu = language === "ur";
     let exam;
-    
+
     if (examId) {
       exam = await Exam.findById(examId);
     } else if (className && examType) {
-      let examQuery = { examType };
+      let examQuery = {
+        examType: { $regex: new RegExp(`^${examType}$`, "i") }
+      };
       if (className.match(/^[0-9a-fA-F]{24}$/)) {
         const mongoose = require("mongoose");
         examQuery.$or = [{ classId: new mongoose.Types.ObjectId(className) }, { class: className }];
@@ -668,15 +672,21 @@ exports.generateClassResultPDF = async (req, res) => {
       return res.status(403).json({ message: "You are not authorized to export results for this class" });
     }
 
-    const query = {
-      $or: [{ studentClass: exam.class }, { className: exam.class }]
-    };
-    if (exam.classId) {
-      query.$or.push({ classId: exam.classId });
+    const studentConditions = [];
+    const targetClassId = exam.classId?._id || exam.classId || (className && className.match(/^[0-9a-fA-F]{24}$/) ? className : null);
+    if (targetClassId) {
+      studentConditions.push({ classId: targetClassId });
+      studentConditions.push({ schoolClassId: targetClassId });
     }
+    const targetClassName = exam.class || (className && !className.match(/^[0-9a-fA-F]{24}$/) ? className : null);
+    if (targetClassName) {
+      studentConditions.push({ studentClass: targetClassName });
+      studentConditions.push({ className: targetClassName });
+    }
+    const query = studentConditions.length > 0 ? { $or: studentConditions } : {};
     const students = await Student.find(query).lean();
 
-    const results = await ExamResult.find({ examId }).lean();
+    const results = await ExamResult.find({ examId: exam._id }).lean();
 
     const calculated = students.map(student => {
       const studentResults = results.filter(r => String(r.studentId) === String(student._id));
@@ -700,7 +710,7 @@ exports.generateClassResultPDF = async (req, res) => {
 
       const totalMarks = exam.subjects.length * exam.maxMarks;
       const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
-      
+
       let isAbsentInAny = false;
       exam.subjects.forEach(sub => {
         if (subjectMarks[sub] === null || subjectMarks[sub] === "Absent") {
@@ -714,8 +724,8 @@ exports.generateClassResultPDF = async (req, res) => {
       });
       let grade = isAbsentInAny ? "F" : calcRes.grade;
       hasFailed = isAbsentInAny ? true : !calcRes.passed;
-      
-      
+
+
 
       return {
         rollNumber: student.rollNumber,
@@ -744,7 +754,7 @@ exports.generateClassResultPDF = async (req, res) => {
         }
         const RIGHT_MARGIN = 550;
         const LEFT_MARGIN = 50;
-        
+
         doc.fontSize(12).font("UrduFont");
         urduPdfHelper.drawTextRTL(doc, `${exam.name || exam.examName || "Unnamed"} (${exam.examType}) :${URDU_LABELS.examName}`, RIGHT_MARGIN, doc.y);
         urduPdfHelper.drawTextRTL(doc, `${exam.academicYear} :${URDU_LABELS.academicYear}`, RIGHT_MARGIN, doc.y);
@@ -758,11 +768,11 @@ exports.generateClassResultPDF = async (req, res) => {
         urduPdfHelper.drawTextRTL(doc, URDU_LABELS.percentage, 180, tableTop);
         urduPdfHelper.drawTextRTL(doc, URDU_LABELS.grade, 120, tableTop);
         urduPdfHelper.drawTextRTL(doc, URDU_LABELS.status, LEFT_MARGIN, tableTop);
-        
+
         doc.moveTo(LEFT_MARGIN, tableTop + 20).lineTo(RIGHT_MARGIN, tableTop + 20).stroke();
 
         let y = tableTop + 25;
-        
+
         calculated.forEach(c => {
           if (y > 700) {
             doc.addPage();
@@ -774,12 +784,12 @@ exports.generateClassResultPDF = async (req, res) => {
           doc.text(`${c.obtainedMarks}/${c.totalMarks}`, 220, y);
           doc.text(c.percentage, 160, y);
           doc.text(c.grade, 100, y);
-          
+
           doc.font("UrduFont");
           const statusStr = c.status === "Pass" ? URDU_LABELS.pass : URDU_LABELS.fail;
           urduPdfHelper.drawTextRTL(doc, statusStr, LEFT_MARGIN + 30, y);
           urduPdfHelper.drawTextRTL(doc, c.name, RIGHT_MARGIN - 60, y);
-          
+
           y += 20;
         });
 
@@ -833,19 +843,28 @@ exports.generateClassResultPDF = async (req, res) => {
 
 exports.generateClassMarksheetsPDF = async (req, res) => {
   try {
-    const { class: className, examType } = req.query;
+    const { examId, class: className, examType } = req.query;
     const language = resolvePdfLanguage(req.query.language);
     const isUrdu = language === "ur";
-    if (!className || !examType) return res.status(400).json({ message: "class and examType are required" });
 
-    let examQuery = { examType };
-    if (className.match(/^[0-9a-fA-F]{24}$/)) {
-      const mongoose = require("mongoose");
-      examQuery.$or = [{ classId: new mongoose.Types.ObjectId(className) }, { class: className }];
+    let exam;
+    if (examId) {
+      exam = await Exam.findById(examId);
+    } else if (className && examType) {
+      let examQuery = {
+        examType: { $regex: new RegExp(`^${examType}$`, "i") }
+      };
+      if (className.match(/^[0-9a-fA-F]{24}$/)) {
+        const mongoose = require("mongoose");
+        examQuery.$or = [{ classId: new mongoose.Types.ObjectId(className) }, { class: className }];
+      } else {
+        examQuery.class = className;
+      }
+      exam = await Exam.findOne(examQuery).sort({ createdAt: -1 });
     } else {
-      examQuery.class = className;
+      return res.status(400).json({ message: "class and examType (or examId) are required" });
     }
-    const exam = await Exam.findOne(examQuery).sort({ createdAt: -1 });
+
     if (!exam) return res.status(404).json({ message: "Exam not found" });
 
     const hasAccess = await verifyTeacherClassAccess(req.user, exam.classId, exam.class);
@@ -853,12 +872,18 @@ exports.generateClassMarksheetsPDF = async (req, res) => {
       return res.status(403).json({ message: "You are not authorized to export results for this class" });
     }
 
-    const query = {
-      $or: [{ studentClass: exam.class }, { className: exam.class }]
-    };
-    if (exam.classId) {
-      query.$or.push({ classId: exam.classId._id || exam.classId });
+    const studentConditions = [];
+    const targetClassId = exam.classId?._id || exam.classId || (className && className.match(/^[0-9a-fA-F]{24}$/) ? className : null);
+    if (targetClassId) {
+      studentConditions.push({ classId: targetClassId });
+      studentConditions.push({ schoolClassId: targetClassId });
     }
+    const targetClassName = exam.class || (className && !className.match(/^[0-9a-fA-F]{24}$/) ? className : null);
+    if (targetClassName) {
+      studentConditions.push({ studentClass: targetClassName });
+      studentConditions.push({ className: targetClassName });
+    }
+    const query = studentConditions.length > 0 ? { $or: studentConditions } : {};
     const students = await Student.find(query).populate("classId").populate("schoolClassId").lean();
 
     if (students.length === 0) {
@@ -874,7 +899,7 @@ exports.generateClassMarksheetsPDF = async (req, res) => {
     });
 
     const results = await ExamResult.find({ examId: exam._id }).lean();
-    const classNameDisplay = getLocalizedClassName(exam.classId || exam.class, language);
+    const classNameDisplay = getLocalizedClassName(exam.classId || exam.class || className, language);
     const reportTitle = isUrdu ? `${URDU_LABELS.reportCard} - ${classNameDisplay}` : `Student Marksheets - ${classNameDisplay}`;
 
     generatePDF(res, reportTitle, (doc) => {
@@ -903,440 +928,440 @@ exports.generateClassMarksheetsPDF = async (req, res) => {
 
 
 exports.generateFinanceSummaryPuppeteerTest = async (req, res) => {
-    try {
-      const { startDate, endDate, academicYear, status, type } = req.query;
-      const language = resolvePdfLanguage(req.query.language);
-      
-      let filter = { status: "Completed" };
-      if (status) filter.status = status;
-      if (type) filter.type = type;
-      if (academicYear) filter.academicYear = academicYear;
-      
-      let dateStr = "All Time";
-      if (startDate && endDate) {
-          filter.date = {
-              $gte: new Date(startDate),
-              $lte: new Date(endDate)
-          };
-          dateStr = `${startDate} to ${endDate}`;
-      }
-  
-      const transactions = await Transaction.find(filter)
-        .populate("recordedBy", "name")
-        .sort({ date: -1 })
-        .lean();
-      
-      let totalIncome = 0;
-      let totalExpense = 0;
-  
-      transactions.forEach(tx => {
-        if (tx.type === "income") totalIncome += tx.amount;
-        if (tx.type === "expense") totalExpense += tx.amount;
-      });
-  
-      const currentBalance = totalIncome - totalExpense;
-  
-      await financeSummaryHtml.generateFinanceSummaryHTMLPDF(res, {
-        transactions,
-        dateStr,
-        academicYear,
-        totalIncome,
-        totalExpense,
-        currentBalance,
-        language,
-        URDU_LABELS
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Error generating Finance PDF", error: error.message });
+  try {
+    const { startDate, endDate, academicYear, status, type } = req.query;
+    const language = resolvePdfLanguage(req.query.language);
+
+    let filter = { status: "Completed" };
+    if (status) filter.status = status;
+    if (type) filter.type = type;
+    if (academicYear) filter.academicYear = academicYear;
+
+    let dateStr = "All Time";
+    if (startDate && endDate) {
+      filter.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+      dateStr = `${startDate} to ${endDate}`;
     }
+
+    const transactions = await Transaction.find(filter)
+      .populate("recordedBy", "name")
+      .sort({ date: -1 })
+      .lean();
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    transactions.forEach(tx => {
+      if (tx.type === "income") totalIncome += tx.amount;
+      if (tx.type === "expense") totalExpense += tx.amount;
+    });
+
+    const currentBalance = totalIncome - totalExpense;
+
+    await financeSummaryHtml.generateFinanceSummaryHTMLPDF(res, {
+      transactions,
+      dateStr,
+      academicYear,
+      totalIncome,
+      totalExpense,
+      currentBalance,
+      language,
+      URDU_LABELS
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error generating Finance PDF", error: error.message });
+  }
 };
 
 exports.generateFinanceSummary = async (req, res) => {
-    try {
-      const { startDate, endDate, academicYear, status, type, category } = req.query;
-      const language = resolvePdfLanguage(req.query.language);
-      const isUrdu = language === 'ur';
-  
-      let filter = { status: "Completed" };
-      if (status && status !== "all") filter.status = status;
-      if (type && type !== "all") filter.type = type;
-      if (academicYear && academicYear !== "all") filter.academicYear = academicYear;
-      if (category && category !== "all") filter.category = category;
-      
-      const formatTxDate = (d) => {
-        if (!d) return "-";
-        const dateObj = new Date(d);
-        return `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
+  try {
+    const { startDate, endDate, academicYear, status, type, category } = req.query;
+    const language = resolvePdfLanguage(req.query.language);
+    const isUrdu = language === 'ur';
+
+    let filter = { status: "Completed" };
+    if (status && status !== "all") filter.status = status;
+    if (type && type !== "all") filter.type = type;
+    if (academicYear && academicYear !== "all") filter.academicYear = academicYear;
+    if (category && category !== "all") filter.category = category;
+
+    const formatTxDate = (d) => {
+      if (!d) return "-";
+      const dateObj = new Date(d);
+      return `${String(dateObj.getDate()).padStart(2, "0")}/${String(dateObj.getMonth() + 1).padStart(2, "0")}/${dateObj.getFullYear()}`;
+    };
+
+    let dateRangeVal = isUrdu ? "مکمل ریکارڈ" : "All Time";
+    if (startDate && endDate) {
+      filter.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
       };
+      dateRangeVal = `${formatTxDate(startDate)} - ${formatTxDate(endDate)}`;
+    } else if (startDate) {
+      filter.date = { $gte: new Date(startDate) };
+      dateRangeVal = isUrdu ? `${formatTxDate(startDate)} کے بعد` : `After ${formatTxDate(startDate)}`;
+    } else if (endDate) {
+      filter.date = { $lte: new Date(endDate) };
+      dateRangeVal = isUrdu ? `${formatTxDate(endDate)} تک` : `Up to ${formatTxDate(endDate)}`;
+    }
 
-      let dateRangeVal = isUrdu ? "مکمل ریکارڈ" : "All Time";
-      if (startDate && endDate) {
-          filter.date = {
-              $gte: new Date(startDate),
-              $lte: new Date(endDate)
-          };
-          dateRangeVal = `${formatTxDate(startDate)} - ${formatTxDate(endDate)}`;
-      } else if (startDate) {
-          filter.date = { $gte: new Date(startDate) };
-          dateRangeVal = isUrdu ? `${formatTxDate(startDate)} کے بعد` : `After ${formatTxDate(startDate)}`;
-      } else if (endDate) {
-          filter.date = { $lte: new Date(endDate) };
-          dateRangeVal = isUrdu ? `${formatTxDate(endDate)} تک` : `Up to ${formatTxDate(endDate)}`;
+    const transactions = await Transaction.find(filter)
+      .populate("recordedBy", "name")
+      .sort({ date: -1 })
+      .lean();
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    transactions.forEach(tx => {
+      if (tx.type === "income") totalIncome += (Number(tx.amount) || 0);
+      if (tx.type === "expense") totalExpense += (Number(tx.amount) || 0);
+    });
+
+    const currentBalance = totalIncome - totalExpense;
+
+    // Determine Report Title
+    let reportTitle = isUrdu ? "روزانہ مالی رپورٹ" : "Daily Finance Report";
+    if (type === "income") {
+      reportTitle = isUrdu ? "آمدنی کی رپورٹ" : "Income Report";
+    } else if (type === "expense") {
+      reportTitle = isUrdu ? "اخراجات کی رپورٹ" : "Expense Report";
+    } else if (category && category !== "all") {
+      const catName = isUrdu ? (CATEGORY_URDU_MAP[category] || category) : category;
+      reportTitle = isUrdu ? `${catName} رپورٹ` : `${catName} Report`;
+    }
+
+    generatePDF(res, reportTitle, (doc) => {
+      const LEFT_MARGIN = 40;
+      const RIGHT_MARGIN = doc.page.width - 40;
+      const USABLE_WIDTH = RIGHT_MARGIN - LEFT_MARGIN;
+
+      if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
+        doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
+      } else {
+        doc.registerFont("UrduFont", "Helvetica");
       }
-  
-      const transactions = await Transaction.find(filter)
-        .populate("recordedBy", "name")
-        .sort({ date: -1 })
-        .lean();
-      
-      let totalIncome = 0;
-      let totalExpense = 0;
-  
-      transactions.forEach(tx => {
-        if (tx.type === "income") totalIncome += (Number(tx.amount) || 0);
-        if (tx.type === "expense") totalExpense += (Number(tx.amount) || 0);
-      });
-  
-      const currentBalance = totalIncome - totalExpense;
 
-      // Determine Report Title
-      let reportTitle = isUrdu ? "روزانہ مالی رپورٹ" : "Daily Finance Report";
-      if (type === "income") {
-        reportTitle = isUrdu ? "آمدنی کی رپورٹ" : "Income Report";
-      } else if (type === "expense") {
-        reportTitle = isUrdu ? "اخراجات کی رپورٹ" : "Expense Report";
-      } else if (category && category !== "all") {
-        const catName = isUrdu ? (CATEGORY_URDU_MAP[category] || category) : category;
-        reportTitle = isUrdu ? `${catName} رپورٹ` : `${catName} Report`;
-      }
-  
-      generatePDF(res, reportTitle, (doc) => {
-        const LEFT_MARGIN = 40;
-        const RIGHT_MARGIN = doc.page.width - 40;
-        const USABLE_WIDTH = RIGHT_MARGIN - LEFT_MARGIN;
+      // Title is already cleanly rendered by generatePDF directly below header.
+      // Metadata Subheader
+      const metaY = Math.max(doc.y || 0, 172);
+      const todayStr = formatTxDate(new Date());
+      const displayYear = academicYear || String(new Date().getFullYear()) + '-' + String(new Date().getFullYear() + 1);
 
-        if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
-          doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
+      if (isUrdu) {
+        // Left: Generated Date
+        doc.font("Helvetica").fontSize(8.5).fillColor("#475569");
+        doc.text("Generated On: " + todayStr, LEFT_MARGIN, metaY + 2);
+
+        // Center: Financial Year
+        const yrLabel = "مالیاتی سال:";
+        doc.font("UrduFont").fontSize(10);
+        const yrLabelW = doc.widthOfString(yrLabel, { features: ['rtla'] });
+        doc.font("Helvetica").fontSize(9);
+        const yrValW = doc.widthOfString(displayYear);
+        const centerBlockX = (doc.page.width / 2) + ((yrLabelW + yrValW + 6) / 2);
+        urduPdfHelper.drawTextRTL(doc, yrLabel, centerBlockX, metaY, { font: "UrduFont", fontSize: 10, color: "#334155" });
+        doc.font("Helvetica").fontSize(9).fillColor("#334155").text(displayYear, centerBlockX - yrLabelW - yrValW - 4, metaY + 2, { lineBreak: false });
+
+        // Right: Date Range / Period
+        const hasUrduDateRange = /[؀-ۿݐ-ݿࢠ-ࣿ]/.test(dateRangeVal);
+        if (hasUrduDateRange) {
+          urduPdfHelper.drawTextRTL(doc, "مدت: " + dateRangeVal, RIGHT_MARGIN, metaY, { font: "UrduFont", fontSize: 10, color: "#334155" });
         } else {
-          doc.registerFont("UrduFont", "Helvetica");
-        }
-
-        // Title is already cleanly rendered by generatePDF directly below header.
-        // Metadata Subheader
-        const metaY = Math.max(doc.y || 0, 172);
-        const todayStr = formatTxDate(new Date());
-        const displayYear = academicYear || String(new Date().getFullYear()) + '-' + String(new Date().getFullYear() + 1);
-
-        if (isUrdu) {
-          // Left: Generated Date
-          doc.font("Helvetica").fontSize(8.5).fillColor("#475569");
-          doc.text("Generated On: " + todayStr, LEFT_MARGIN, metaY + 2);
-
-          // Center: Financial Year
-          const yrLabel = "مالیاتی سال:";
+          const drLabel = "مدت:";
           doc.font("UrduFont").fontSize(10);
-          const yrLabelW = doc.widthOfString(yrLabel, { features: ['rtla'] });
-          doc.font("Helvetica").fontSize(9);
-          const yrValW = doc.widthOfString(displayYear);
-          const centerBlockX = (doc.page.width / 2) + ((yrLabelW + yrValW + 6) / 2);
-          urduPdfHelper.drawTextRTL(doc, yrLabel, centerBlockX, metaY, { font: "UrduFont", fontSize: 10, color: "#334155" });
-          doc.font("Helvetica").fontSize(9).fillColor("#334155").text(displayYear, centerBlockX - yrLabelW - yrValW - 4, metaY + 2, { lineBreak: false });
-
-          // Right: Date Range / Period
-          const hasUrduDateRange = /[؀-ۿݐ-ݿࢠ-ࣿ]/.test(dateRangeVal);
-          if (hasUrduDateRange) {
-            urduPdfHelper.drawTextRTL(doc, "مدت: " + dateRangeVal, RIGHT_MARGIN, metaY, { font: "UrduFont", fontSize: 10, color: "#334155" });
-          } else {
-            const drLabel = "مدت:";
-            doc.font("UrduFont").fontSize(10);
-            const drLabelW = doc.widthOfString(drLabel, { features: ['rtla'] });
-            doc.font("Helvetica").fontSize(8.5);
-            const drValW = doc.widthOfString(dateRangeVal);
-            urduPdfHelper.drawTextRTL(doc, drLabel, RIGHT_MARGIN, metaY, { font: "UrduFont", fontSize: 10, color: "#334155" });
-            doc.font("Helvetica").fontSize(8.5).fillColor("#334155").text(dateRangeVal, RIGHT_MARGIN - drLabelW - drValW - 4, metaY + 2, { lineBreak: false });
-          }
-        } else {
-          doc.font("Helvetica").fontSize(8.5).fillColor("#475569");
-          doc.text(`Generated On: ${todayStr}`, LEFT_MARGIN, metaY);
-          doc.text(`Academic Year: ${displayYear}`, doc.page.width / 2 - 50, metaY);
-          doc.text(`Period: ${dateRangeVal}`, RIGHT_MARGIN - 160, metaY, { width: 160, align: "right" });
+          const drLabelW = doc.widthOfString(drLabel, { features: ['rtla'] });
+          doc.font("Helvetica").fontSize(8.5);
+          const drValW = doc.widthOfString(dateRangeVal);
+          urduPdfHelper.drawTextRTL(doc, drLabel, RIGHT_MARGIN, metaY, { font: "UrduFont", fontSize: 10, color: "#334155" });
+          doc.font("Helvetica").fontSize(8.5).fillColor("#334155").text(dateRangeVal, RIGHT_MARGIN - drLabelW - drValW - 4, metaY + 2, { lineBreak: false });
         }
+      } else {
+        doc.font("Helvetica").fontSize(8.5).fillColor("#475569");
+        doc.text(`Generated On: ${todayStr}`, LEFT_MARGIN, metaY);
+        doc.text(`Academic Year: ${displayYear}`, doc.page.width / 2 - 50, metaY);
+        doc.text(`Period: ${dateRangeVal}`, RIGHT_MARGIN - 160, metaY, { width: 160, align: "right" });
+      }
 
-        // Horizontal separator under metadata
-        doc.moveTo(LEFT_MARGIN, metaY + 18).lineTo(RIGHT_MARGIN, metaY + 18).lineWidth(0.5).strokeColor("#cbd5e1").stroke();
+      // Horizontal separator under metadata
+      doc.moveTo(LEFT_MARGIN, metaY + 18).lineTo(RIGHT_MARGIN, metaY + 18).lineWidth(0.5).strokeColor("#cbd5e1").stroke();
 
-        // 3 Executive Summary Metric Cards
-        const cardY = metaY + 24;
-        const cardSpacing = 12;
-        const cardWidth = (USABLE_WIDTH - (cardSpacing * 2)) / 3;
-        const cardHeight = 44;
+      // 3 Executive Summary Metric Cards
+      const cardY = metaY + 24;
+      const cardSpacing = 12;
+      const cardWidth = (USABLE_WIDTH - (cardSpacing * 2)) / 3;
+      const cardHeight = 44;
 
-        function drawMetricCard(x, y, w, h, bg, border, label, labelColor, val, valColor) {
-          doc.rect(x, y, w, h).fillColor(bg).fill();
-          doc.rect(x, y, w, h).lineWidth(1).strokeColor(border).stroke();
-          
-          if (isUrdu) {
-            urduPdfHelper.drawTextRTL(doc, label, x, y + 5, {
-              font: "UrduFont",
-              fontSize: 11,
-              width: w,
-              align: "center",
-              color: labelColor
-            });
-          } else {
-            doc.font("Helvetica-Bold").fontSize(10).fillColor(labelColor).text(label, x, y + 7, { width: w, align: "center" });
-          }
-
-          doc.font("Helvetica-Bold").fontSize(13).fillColor(valColor);
-          doc.text(val, x, y + 24, { width: w, align: "center" });
-        }
-
-        const balColor = currentBalance >= 0 ? "#15803d" : "#dc2626";
-        const balSign = currentBalance >= 0 ? "+" : "-";
+      function drawMetricCard(x, y, w, h, bg, border, label, labelColor, val, valColor) {
+        doc.rect(x, y, w, h).fillColor(bg).fill();
+        doc.rect(x, y, w, h).lineWidth(1).strokeColor(border).stroke();
 
         if (isUrdu) {
-          // Card 1 (Right): Total Income (آمدنی)
-          const card1X = LEFT_MARGIN + (cardWidth * 2) + (cardSpacing * 2);
-          drawMetricCard(card1X, cardY, cardWidth, cardHeight, "#f0fdf4", "#86efac", "کل آمدنی", "#166534", `Rs ${totalIncome.toLocaleString()}`, "#15803d");
-
-          // Card 2 (Center): Total Expense (اخراجات)
-          const card2X = LEFT_MARGIN + cardWidth + cardSpacing;
-          drawMetricCard(card2X, cardY, cardWidth, cardHeight, "#fef2f2", "#fca5a5", "کل اخراجات", "#991b1b", `Rs ${totalExpense.toLocaleString()}`, "#dc2626");
-
-          // Card 3 (Left): Balance (میزان)
-          const card3X = LEFT_MARGIN;
-          drawMetricCard(card3X, cardY, cardWidth, cardHeight, "#f8fafc", "#cbd5e1", "میزان (بقایا)", "#1e293b", `${balSign} Rs ${Math.abs(currentBalance).toLocaleString()}`, balColor);
+          urduPdfHelper.drawTextRTL(doc, label, x, y + 5, {
+            font: "UrduFont",
+            fontSize: 11,
+            width: w,
+            align: "center",
+            color: labelColor
+          });
         } else {
-          const card1X = LEFT_MARGIN;
-          drawMetricCard(card1X, cardY, cardWidth, cardHeight, "#f0fdf4", "#86efac", "Total Income", "#166534", `Rs ${totalIncome.toLocaleString()}`, "#15803d");
-
-          const card2X = LEFT_MARGIN + cardWidth + cardSpacing;
-          drawMetricCard(card2X, cardY, cardWidth, cardHeight, "#fef2f2", "#fca5a5", "Total Expense", "#991b1b", `Rs ${totalExpense.toLocaleString()}`, "#dc2626");
-
-          const card3X = LEFT_MARGIN + (cardWidth * 2) + (cardSpacing * 2);
-          drawMetricCard(card3X, cardY, cardWidth, cardHeight, "#f8fafc", "#cbd5e1", "Net Balance", "#1e293b", `${balSign} Rs ${Math.abs(currentBalance).toLocaleString()}`, balColor);
+          doc.font("Helvetica-Bold").fontSize(10).fillColor(labelColor).text(label, x, y + 7, { width: w, align: "center" });
         }
 
-        // Table Setup
-        let tableTopY = cardY + cardHeight + 16;
-        const colDateW = 80;
-        const colDescW = 215;
-        const colCatW = 80;
-        const colModeW = 60;
-        const colAmtW = 80;
+        doc.font("Helvetica-Bold").fontSize(13).fillColor(valColor);
+        doc.text(val, x, y + 24, { width: w, align: "center" });
+      }
 
-        // Urdu RTL Coordinates
-        const urAmtX = LEFT_MARGIN;
-        const urModeX = urAmtX + colAmtW;
-        const urCatX = urModeX + colModeW;
-        const urDescX = urCatX + colCatW;
-        const urDateX = urDescX + colDescW;
+      const balColor = currentBalance >= 0 ? "#15803d" : "#dc2626";
+      const balSign = currentBalance >= 0 ? "+" : "-";
 
-        // English LTR Coordinates
-        const enDateX = LEFT_MARGIN;
-        const enDescX = enDateX + colDateW;
-        const enCatX = enDescX + colDescW;
-        const enModeX = enCatX + colCatW;
-        const enAmtX = enModeX + colModeW;
+      if (isUrdu) {
+        // Card 1 (Right): Total Income (آمدنی)
+        const card1X = LEFT_MARGIN + (cardWidth * 2) + (cardSpacing * 2);
+        drawMetricCard(card1X, cardY, cardWidth, cardHeight, "#f0fdf4", "#86efac", "کل آمدنی", "#166534", `Rs ${totalIncome.toLocaleString()}`, "#15803d");
 
-        function drawTableHeader(y) {
-          const headerHeight = 22;
-          doc.rect(LEFT_MARGIN, y, USABLE_WIDTH, headerHeight).fillColor("#047857").fill();
-          
-          if (isUrdu) {
-            doc.fontSize(10.5);
-            urduPdfHelper.drawTextRTL(doc, "تاریخ", urDateX, y + 3, { font: "UrduFont", width: colDateW, align: "center", color: "#ffffff" });
-            urduPdfHelper.drawTextRTL(doc, "تفصیل", urDescX, y + 3, { font: "UrduFont", width: colDescW - 10, align: "right", color: "#ffffff" });
-            urduPdfHelper.drawTextRTL(doc, "زمرہ", urCatX, y + 3, { font: "UrduFont", width: colCatW, align: "center", color: "#ffffff" });
-            urduPdfHelper.drawTextRTL(doc, "طریقہ", urModeX, y + 3, { font: "UrduFont", width: colModeW, align: "center", color: "#ffffff" });
-            urduPdfHelper.drawTextRTL(doc, "رقم", urAmtX, y + 3, { font: "UrduFont", width: colAmtW, align: "center", color: "#ffffff" });
-          } else {
-            doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#ffffff");
-            doc.text("Date", enDateX, y + 6, { width: colDateW, align: "center" });
-            doc.text("Description", enDescX + 10, y + 6, { width: colDescW - 10, align: "left" });
-            doc.text("Category", enCatX, y + 6, { width: colCatW, align: "center" });
-            doc.text("Mode", enModeX, y + 6, { width: colModeW, align: "center" });
-            doc.text("Amount", enAmtX, y + 6, { width: colAmtW - 10, align: "right" });
-          }
-          doc.rect(LEFT_MARGIN, y, USABLE_WIDTH, headerHeight).lineWidth(1).strokeColor("#047857").stroke();
-        }
+        // Card 2 (Center): Total Expense (اخراجات)
+        const card2X = LEFT_MARGIN + cardWidth + cardSpacing;
+        drawMetricCard(card2X, cardY, cardWidth, cardHeight, "#fef2f2", "#fca5a5", "کل اخراجات", "#991b1b", `Rs ${totalExpense.toLocaleString()}`, "#dc2626");
 
-        drawTableHeader(tableTopY);
+        // Card 3 (Left): Balance (میزان)
+        const card3X = LEFT_MARGIN;
+        drawMetricCard(card3X, cardY, cardWidth, cardHeight, "#f8fafc", "#cbd5e1", "میزان (بقایا)", "#1e293b", `${balSign} Rs ${Math.abs(currentBalance).toLocaleString()}`, balColor);
+      } else {
+        const card1X = LEFT_MARGIN;
+        drawMetricCard(card1X, cardY, cardWidth, cardHeight, "#f0fdf4", "#86efac", "Total Income", "#166534", `Rs ${totalIncome.toLocaleString()}`, "#15803d");
 
-        let currentY = tableTopY + 22;
+        const card2X = LEFT_MARGIN + cardWidth + cardSpacing;
+        drawMetricCard(card2X, cardY, cardWidth, cardHeight, "#fef2f2", "#fca5a5", "Total Expense", "#991b1b", `Rs ${totalExpense.toLocaleString()}`, "#dc2626");
 
-        if (transactions.length === 0) {
-          const emptyH = 40;
-          doc.rect(LEFT_MARGIN, currentY, USABLE_WIDTH, emptyH).fillColor("#f8fafc").fill();
-          doc.rect(LEFT_MARGIN, currentY, USABLE_WIDTH, emptyH).lineWidth(0.5).strokeColor("#e2e8f0").stroke();
-          
-          if (isUrdu) {
-            urduPdfHelper.drawTextRTL(doc, "اس مدت میں کوئی ٹرانزیکشن موجود نہیں ہے۔", LEFT_MARGIN, currentY + 12, {
-              font: "UrduFont",
-              fontSize: 12,
-              width: USABLE_WIDTH,
-              align: "center",
-              color: "#64748b"
-            });
-          } else {
-            doc.font("Helvetica").fontSize(10).fillColor("#64748b").text("No transactions found for the selected criteria.", LEFT_MARGIN, currentY + 14, {
-              width: USABLE_WIDTH,
-              align: "center"
-            });
-          }
-          currentY += emptyH;
+        const card3X = LEFT_MARGIN + (cardWidth * 2) + (cardSpacing * 2);
+        drawMetricCard(card3X, cardY, cardWidth, cardHeight, "#f8fafc", "#cbd5e1", "Net Balance", "#1e293b", `${balSign} Rs ${Math.abs(currentBalance).toLocaleString()}`, balColor);
+      }
+
+      // Table Setup
+      let tableTopY = cardY + cardHeight + 16;
+      const colDateW = 80;
+      const colDescW = 215;
+      const colCatW = 80;
+      const colModeW = 60;
+      const colAmtW = 80;
+
+      // Urdu RTL Coordinates
+      const urAmtX = LEFT_MARGIN;
+      const urModeX = urAmtX + colAmtW;
+      const urCatX = urModeX + colModeW;
+      const urDescX = urCatX + colCatW;
+      const urDateX = urDescX + colDescW;
+
+      // English LTR Coordinates
+      const enDateX = LEFT_MARGIN;
+      const enDescX = enDateX + colDateW;
+      const enCatX = enDescX + colDescW;
+      const enModeX = enCatX + colCatW;
+      const enAmtX = enModeX + colModeW;
+
+      function drawTableHeader(y) {
+        const headerHeight = 22;
+        doc.rect(LEFT_MARGIN, y, USABLE_WIDTH, headerHeight).fillColor("#047857").fill();
+
+        if (isUrdu) {
+          doc.fontSize(10.5);
+          urduPdfHelper.drawTextRTL(doc, "تاریخ", urDateX, y + 3, { font: "UrduFont", width: colDateW, align: "center", color: "#ffffff" });
+          urduPdfHelper.drawTextRTL(doc, "تفصیل", urDescX, y + 3, { font: "UrduFont", width: colDescW - 10, align: "right", color: "#ffffff" });
+          urduPdfHelper.drawTextRTL(doc, "زمرہ", urCatX, y + 3, { font: "UrduFont", width: colCatW, align: "center", color: "#ffffff" });
+          urduPdfHelper.drawTextRTL(doc, "طریقہ", urModeX, y + 3, { font: "UrduFont", width: colModeW, align: "center", color: "#ffffff" });
+          urduPdfHelper.drawTextRTL(doc, "رقم", urAmtX, y + 3, { font: "UrduFont", width: colAmtW, align: "center", color: "#ffffff" });
         } else {
-          transactions.forEach((tx, idx) => {
-            const rawDesc = tx.description || "-";
-            const isUrduDesc = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(rawDesc);
-            
-            // Measure row height needed for description
-            doc.font(isUrduDesc ? "UrduFont" : "Helvetica").fontSize(10);
-            const descH = doc.heightOfString(rawDesc, { width: colDescW - 14 }) || 15;
-            const rowHeight = Math.max(descH + 6, 22);
+          doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#ffffff");
+          doc.text("Date", enDateX, y + 6, { width: colDateW, align: "center" });
+          doc.text("Description", enDescX + 10, y + 6, { width: colDescW - 10, align: "left" });
+          doc.text("Category", enCatX, y + 6, { width: colCatW, align: "center" });
+          doc.text("Mode", enModeX, y + 6, { width: colModeW, align: "center" });
+          doc.text("Amount", enAmtX, y + 6, { width: colAmtW - 10, align: "right" });
+        }
+        doc.rect(LEFT_MARGIN, y, USABLE_WIDTH, headerHeight).lineWidth(1).strokeColor("#047857").stroke();
+      }
 
-            // Pagination check
-            if (currentY + rowHeight > doc.page.height - 60) {
-              doc.addPage();
-              currentY = 85; // Clean margin below continuation header
-              drawTableHeader(currentY);
-              currentY += 22;
-            }
+      drawTableHeader(tableTopY);
 
-            // Alternating row background
-            if (idx % 2 === 1) {
-              doc.rect(LEFT_MARGIN, currentY, USABLE_WIDTH, rowHeight).fillColor("#f8fafc").fill();
-            }
+      let currentY = tableTopY + 22;
 
-            // Row separator line
-            doc.moveTo(LEFT_MARGIN, currentY + rowHeight)
-               .lineTo(RIGHT_MARGIN, currentY + rowHeight)
-               .lineWidth(0.5)
-               .strokeColor("#e2e8f0")
-               .stroke();
+      if (transactions.length === 0) {
+        const emptyH = 40;
+        doc.rect(LEFT_MARGIN, currentY, USABLE_WIDTH, emptyH).fillColor("#f8fafc").fill();
+        doc.rect(LEFT_MARGIN, currentY, USABLE_WIDTH, emptyH).lineWidth(0.5).strokeColor("#e2e8f0").stroke();
 
-            const dateFormatted = formatTxDate(tx.date);
-            const sign = tx.type === "income" ? "+" : "-";
-            const amtColor = tx.type === "income" ? "#15803d" : "#dc2626";
-            const amtText = `${sign} Rs ${(Number(tx.amount) || 0).toLocaleString()}`;
-
-            if (isUrdu) {
-              // 1. Date (Col 1 - Rightmost)
-              doc.font("Helvetica").fontSize(8.5).fillColor("#334155");
-              doc.text(dateFormatted, urDateX, currentY + 5, { width: colDateW, align: "center" });
-
-              // 2. Description (Col 2)
-              if (isUrduDesc) {
-                urduPdfHelper.drawTextRTL(doc, rawDesc, urDescX, currentY + 3, {
-                  font: "UrduFont",
-                  fontSize: 10,
-                  width: colDescW - 10,
-                  align: "right",
-                  color: "#0f172a"
-                });
-              } else {
-                doc.font("Helvetica").fontSize(9).fillColor("#0f172a");
-                doc.text(rawDesc, urDescX, currentY + 5, { width: colDescW - 10, align: "right" });
-              }
-
-              // 3. Category (Col 3)
-              const rawCat = tx.category || "-";
-              const catUrdu = CATEGORY_URDU_MAP[rawCat] || rawCat;
-              const isUrduCat = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(catUrdu);
-              if (isUrduCat) {
-                urduPdfHelper.drawTextRTL(doc, catUrdu, urCatX, currentY + 3, {
-                  font: "UrduFont",
-                  fontSize: 9.5,
-                  width: colCatW,
-                  align: "center",
-                  color: "#475569"
-                });
-              } else {
-                doc.font("Helvetica").fontSize(8.5).fillColor("#475569");
-                doc.text(catUrdu, urCatX, currentY + 5, { width: colCatW, align: "center" });
-              }
-
-              // 4. Payment Mode (Col 4)
-              const rawMode = tx.paymentMode || "Cash";
-              const modeUrdu = MODE_URDU_MAP[rawMode] || rawMode;
-              const isUrduMode = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(modeUrdu);
-              if (isUrduMode) {
-                urduPdfHelper.drawTextRTL(doc, modeUrdu, urModeX, currentY + 3, {
-                  font: "UrduFont",
-                  fontSize: 9.5,
-                  width: colModeW,
-                  align: "center",
-                  color: "#475569"
-                });
-              } else {
-                doc.font("Helvetica").fontSize(8.5).fillColor("#475569");
-                doc.text(modeUrdu, urModeX, currentY + 5, { width: colModeW, align: "center" });
-              }
-
-              // 5. Amount (Col 5 - Leftmost)
-              doc.font("Helvetica-Bold").fontSize(9.5).fillColor(amtColor);
-              doc.text(amtText, urAmtX, currentY + 5, { width: colAmtW - 10, align: "right" });
-            } else {
-              // English LTR
-              doc.font("Helvetica").fontSize(8.5).fillColor("#334155");
-              doc.text(dateFormatted, enDateX, currentY + 5, { width: colDateW, align: "center" });
-
-              if (isUrduDesc) {
-                urduPdfHelper.drawTextRTL(doc, rawDesc, enDescX + 10, currentY + 3, {
-                  font: "UrduFont",
-                  fontSize: 10,
-                  width: colDescW - 10,
-                  align: "right",
-                  color: "#0f172a"
-                });
-              } else {
-                doc.font("Helvetica").fontSize(9).fillColor("#0f172a");
-                doc.text(rawDesc, enDescX + 10, currentY + 5, { width: colDescW - 10, align: "left" });
-              }
-
-              doc.font("Helvetica").fontSize(8.5).fillColor("#475569");
-              doc.text(tx.category || "-", enCatX, currentY + 5, { width: colCatW, align: "center" });
-              doc.text(tx.paymentMode || "Cash", enModeX, currentY + 5, { width: colModeW, align: "center" });
-
-              doc.font("Helvetica-Bold").fontSize(9.5).fillColor(amtColor);
-              doc.text(amtText, enAmtX, currentY + 5, { width: colAmtW - 10, align: "right" });
-            }
-
-            currentY += rowHeight;
+        if (isUrdu) {
+          urduPdfHelper.drawTextRTL(doc, "اس مدت میں کوئی ٹرانزیکشن موجود نہیں ہے۔", LEFT_MARGIN, currentY + 12, {
+            font: "UrduFont",
+            fontSize: 12,
+            width: USABLE_WIDTH,
+            align: "center",
+            color: "#64748b"
+          });
+        } else {
+          doc.font("Helvetica").fontSize(10).fillColor("#64748b").text("No transactions found for the selected criteria.", LEFT_MARGIN, currentY + 14, {
+            width: USABLE_WIDTH,
+            align: "center"
           });
         }
+        currentY += emptyH;
+      } else {
+        transactions.forEach((tx, idx) => {
+          const rawDesc = tx.description || "-";
+          const isUrduDesc = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(rawDesc);
 
-        // Table outer border
-        doc.rect(LEFT_MARGIN, tableTopY, USABLE_WIDTH, currentY - tableTopY).lineWidth(0.8).strokeColor("#cbd5e1").stroke();
+          // Measure row height needed for description
+          doc.font(isUrduDesc ? "UrduFont" : "Helvetica").fontSize(10);
+          const descH = doc.heightOfString(rawDesc, { width: colDescW - 14 }) || 15;
+          const rowHeight = Math.max(descH + 6, 22);
 
-        // Footer summary
-        currentY += 12;
-        if (isUrdu) {
-          const countLabel = "کل ٹرانزیکشنز:";
-          const countVal = `${transactions.length}`;
-          doc.font("UrduFont").fontSize(10);
-          const countLabelW = doc.widthOfString(countLabel, { features: ['rtla'] });
-          doc.font("Helvetica-Bold").fontSize(9.5);
-          const countValW = doc.widthOfString(countVal);
-          urduPdfHelper.drawTextRTL(doc, countLabel, RIGHT_MARGIN, currentY, { font: "UrduFont", fontSize: 10, color: "#64748b" });
-          doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#047857").text(countVal, RIGHT_MARGIN - countLabelW - countValW - 4, currentY + 2, { lineBreak: false });
-        } else {
-          doc.font("Helvetica").fontSize(9).fillColor("#64748b").text(`Total Transactions: ${transactions.length}`, LEFT_MARGIN, currentY);
-        }
-      }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle: reportTitle, hideSubHeader: true });
-    } catch (error) {
-      console.error("Error generating Finance PDF:", error);
-      res.status(500).json({ message: "Error generating Finance PDF", error: error.message });
-    }
-  };
+          // Pagination check
+          if (currentY + rowHeight > doc.page.height - 60) {
+            doc.addPage();
+            currentY = 85; // Clean margin below continuation header
+            drawTableHeader(currentY);
+            currentY += 22;
+          }
 
-  exports.generateFeeReceiptPDF = async (req, res) => {
+          // Alternating row background
+          if (idx % 2 === 1) {
+            doc.rect(LEFT_MARGIN, currentY, USABLE_WIDTH, rowHeight).fillColor("#f8fafc").fill();
+          }
+
+          // Row separator line
+          doc.moveTo(LEFT_MARGIN, currentY + rowHeight)
+            .lineTo(RIGHT_MARGIN, currentY + rowHeight)
+            .lineWidth(0.5)
+            .strokeColor("#e2e8f0")
+            .stroke();
+
+          const dateFormatted = formatTxDate(tx.date);
+          const sign = tx.type === "income" ? "+" : "-";
+          const amtColor = tx.type === "income" ? "#15803d" : "#dc2626";
+          const amtText = `${sign} Rs ${(Number(tx.amount) || 0).toLocaleString()}`;
+
+          if (isUrdu) {
+            // 1. Date (Col 1 - Rightmost)
+            doc.font("Helvetica").fontSize(8.5).fillColor("#334155");
+            doc.text(dateFormatted, urDateX, currentY + 5, { width: colDateW, align: "center" });
+
+            // 2. Description (Col 2)
+            if (isUrduDesc) {
+              urduPdfHelper.drawTextRTL(doc, rawDesc, urDescX, currentY + 3, {
+                font: "UrduFont",
+                fontSize: 10,
+                width: colDescW - 10,
+                align: "right",
+                color: "#0f172a"
+              });
+            } else {
+              doc.font("Helvetica").fontSize(9).fillColor("#0f172a");
+              doc.text(rawDesc, urDescX, currentY + 5, { width: colDescW - 10, align: "right" });
+            }
+
+            // 3. Category (Col 3)
+            const rawCat = tx.category || "-";
+            const catUrdu = CATEGORY_URDU_MAP[rawCat] || rawCat;
+            const isUrduCat = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(catUrdu);
+            if (isUrduCat) {
+              urduPdfHelper.drawTextRTL(doc, catUrdu, urCatX, currentY + 3, {
+                font: "UrduFont",
+                fontSize: 9.5,
+                width: colCatW,
+                align: "center",
+                color: "#475569"
+              });
+            } else {
+              doc.font("Helvetica").fontSize(8.5).fillColor("#475569");
+              doc.text(catUrdu, urCatX, currentY + 5, { width: colCatW, align: "center" });
+            }
+
+            // 4. Payment Mode (Col 4)
+            const rawMode = tx.paymentMode || "Cash";
+            const modeUrdu = MODE_URDU_MAP[rawMode] || rawMode;
+            const isUrduMode = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(modeUrdu);
+            if (isUrduMode) {
+              urduPdfHelper.drawTextRTL(doc, modeUrdu, urModeX, currentY + 3, {
+                font: "UrduFont",
+                fontSize: 9.5,
+                width: colModeW,
+                align: "center",
+                color: "#475569"
+              });
+            } else {
+              doc.font("Helvetica").fontSize(8.5).fillColor("#475569");
+              doc.text(modeUrdu, urModeX, currentY + 5, { width: colModeW, align: "center" });
+            }
+
+            // 5. Amount (Col 5 - Leftmost)
+            doc.font("Helvetica-Bold").fontSize(9.5).fillColor(amtColor);
+            doc.text(amtText, urAmtX, currentY + 5, { width: colAmtW - 10, align: "right" });
+          } else {
+            // English LTR
+            doc.font("Helvetica").fontSize(8.5).fillColor("#334155");
+            doc.text(dateFormatted, enDateX, currentY + 5, { width: colDateW, align: "center" });
+
+            if (isUrduDesc) {
+              urduPdfHelper.drawTextRTL(doc, rawDesc, enDescX + 10, currentY + 3, {
+                font: "UrduFont",
+                fontSize: 10,
+                width: colDescW - 10,
+                align: "right",
+                color: "#0f172a"
+              });
+            } else {
+              doc.font("Helvetica").fontSize(9).fillColor("#0f172a");
+              doc.text(rawDesc, enDescX + 10, currentY + 5, { width: colDescW - 10, align: "left" });
+            }
+
+            doc.font("Helvetica").fontSize(8.5).fillColor("#475569");
+            doc.text(tx.category || "-", enCatX, currentY + 5, { width: colCatW, align: "center" });
+            doc.text(tx.paymentMode || "Cash", enModeX, currentY + 5, { width: colModeW, align: "center" });
+
+            doc.font("Helvetica-Bold").fontSize(9.5).fillColor(amtColor);
+            doc.text(amtText, enAmtX, currentY + 5, { width: colAmtW - 10, align: "right" });
+          }
+
+          currentY += rowHeight;
+        });
+      }
+
+      // Table outer border
+      doc.rect(LEFT_MARGIN, tableTopY, USABLE_WIDTH, currentY - tableTopY).lineWidth(0.8).strokeColor("#cbd5e1").stroke();
+
+      // Footer summary
+      currentY += 12;
+      if (isUrdu) {
+        const countLabel = "کل ٹرانزیکشنز:";
+        const countVal = `${transactions.length}`;
+        doc.font("UrduFont").fontSize(10);
+        const countLabelW = doc.widthOfString(countLabel, { features: ['rtla'] });
+        doc.font("Helvetica-Bold").fontSize(9.5);
+        const countValW = doc.widthOfString(countVal);
+        urduPdfHelper.drawTextRTL(doc, countLabel, RIGHT_MARGIN, currentY, { font: "UrduFont", fontSize: 10, color: "#64748b" });
+        doc.font("Helvetica-Bold").fontSize(9.5).fillColor("#047857").text(countVal, RIGHT_MARGIN - countLabelW - countValW - 4, currentY + 2, { lineBreak: false });
+      } else {
+        doc.font("Helvetica").fontSize(9).fillColor("#64748b").text(`Total Transactions: ${transactions.length}`, LEFT_MARGIN, currentY);
+      }
+    }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle: reportTitle, hideSubHeader: true });
+  } catch (error) {
+    console.error("Error generating Finance PDF:", error);
+    res.status(500).json({ message: "Error generating Finance PDF", error: error.message });
+  }
+};
+
+exports.generateFeeReceiptPDF = async (req, res) => {
   try {
     const language = resolvePdfLanguage(req.query.language);
     // If language is 'ur' or explicitly requested, use Urdu words; otherwise use English words
     const isUrduWords = req.query.words === "ur" || language === "ur";
-    
+
     const tx = await Transaction.findById(req.params.id)
       .populate("recordedBy", "name")
       .populate("referenceId")
@@ -1347,7 +1372,7 @@ exports.generateFinanceSummary = async (req, res) => {
       return res.status(404).json({ message: "Transaction not found" });
     }
 
-    const doc = new PDFDocument({ 
+    const doc = new PDFDocument({
       size: [600, 315],
       margin: 0,
       autoFirstPage: true
@@ -1368,13 +1393,13 @@ exports.generateFinanceSummary = async (req, res) => {
 
     const w = 600;
     const h = 315;
-    
+
     // Draw Ornate Border (Double blue line)
     doc.lineWidth(3).strokeColor("#1e3a8a");
     doc.rect(10, 10, w - 20, h - 20).stroke();
     doc.lineWidth(1).strokeColor("#1e3a8a");
     doc.rect(14, 14, w - 28, h - 28).stroke();
-    
+
     // Inner decorative corner arcs
     doc.lineWidth(0.8).strokeColor("#1e3a8a");
     doc.path("M 20 20 Q 32 20 32 32").stroke();
@@ -1388,11 +1413,11 @@ exports.generateFinanceSummary = async (req, res) => {
     // LEFT Header
     doc.fontSize(12).font(englishBold).fillColor("#1e3a8a").text("JAMIA", 25, 24);
     doc.fontSize(22).font(englishBold).fillColor("#be185d").text("DAWAT-UL-EIMAN", 25, 38);
-    
+
     doc.fontSize(7).font(englishFont).fillColor("#1e293b");
     doc.text("6 Minar Masjid, Roshanpura, Hazrat Balepeer, Beed", 25, 65, { lineBreak: false });
     doc.text("431122 (MS), : 8446124215 / 9011115313 / 8999020106", 25, 75, { lineBreak: false });
-    
+
     // Top Registration text
     doc.fontSize(7.5).font(englishBold).fillColor("#334155");
     doc.text("Reg.No.: F-0027800(BED)", 155, 25, { lineBreak: false });
@@ -1400,7 +1425,7 @@ exports.generateFinanceSummary = async (req, res) => {
     // RIGHT Header (Urdu)
     doc.fillColor("#059669");
     urduPdfHelper.drawTextRTL(doc, "جامعہ دعوۃ الایمان", 575, 12, { font: urduFont, fontSize: 36 });
-    
+
     doc.fillColor("#1e293b");
     urduPdfHelper.drawTextRTL(doc, "چھ مینار مسجد، روشن پورہ، حضرت بالے پیر بیڑ(مہاراشٹر)", 575, 68, { font: urduFont, fontSize: 14 });
 
@@ -1414,7 +1439,7 @@ exports.generateFinanceSummary = async (req, res) => {
     doc.font(englishBold).fontSize(10).fillColor("#0f172a");
     const receiptNo = tx.receiptId || tx._id.toString().slice(-6).toUpperCase();
     doc.text(`No.: ${receiptNo}`, 25, 105, { lineBreak: false });
-    
+
     const d = new Date(tx.date);
     const dateStr = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
     doc.text(`Date: ${dateStr}`, 470, 105, { lineBreak: false });
@@ -1489,9 +1514,9 @@ exports.generateFinanceSummary = async (req, res) => {
     doc.fillColor("#0f172a");
     urduPdfHelper.drawTextRTL(doc, nameLabel, 575, 122, { font: urduFont, fontSize: 18 });
     if (personName) {
-      urduPdfHelper.drawTextRTL(doc, personName, 460, 122, { 
-        font: urduFont, 
-        fontSize: personName.length > 35 ? 13 : 16 
+      urduPdfHelper.drawTextRTL(doc, personName, 460, 122, {
+        font: urduFont,
+        fontSize: personName.length > 35 ? 13 : 16
       });
     }
 
@@ -1572,7 +1597,7 @@ exports.generateWeakStudentsReport = async (req, res) => {
     const { class: className } = req.query;
     const language = resolvePdfLanguage(req.query.language);
     const isUrdu = language === 'ur';
-    
+
     const initialMatch = { status: "active" };
     if (className && className !== "all") {
       initialMatch.$or = [{ studentClass: className }, { className: className }];
@@ -1636,7 +1661,7 @@ exports.generateWeakStudentsReport = async (req, res) => {
 
     generatePDF(res, "Weak Students Report", (doc) => {
       let y = doc.y;
-      
+
       if (isUrdu) {
         if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
           doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
@@ -1646,9 +1671,9 @@ exports.generateWeakStudentsReport = async (req, res) => {
 
         const fontRegular = "UrduFont";
         const fontBold = "UrduFont";
-        
+
         doc.fontSize(10).font(fontBold);
-        
+
         urduPdfHelper.drawTextRTL(doc, "نمبر شمار", 550, y);
         urduPdfHelper.drawTextRTL(doc, "آئی ڈی", 515, y);
         urduPdfHelper.drawTextRTL(doc, "نام", 460, y);
@@ -1657,11 +1682,11 @@ exports.generateWeakStudentsReport = async (req, res) => {
         urduPdfHelper.drawTextRTL(doc, "حاضری فیصد", 225, y);
         urduPdfHelper.drawTextRTL(doc, "فیل مضامین", 165, y);
         urduPdfHelper.drawTextRTL(doc, "وجہ", 100, y);
-        
+
         doc.moveTo(50, y + 15).lineTo(550, y + 15).stroke();
-        
+
         y += 20;
-        
+
         if (weakStudents.length === 0) {
           doc.font(fontRegular);
           urduPdfHelper.drawTextRTL(doc, "منتخب کردہ معیار کے لیے کوئی کمزور طالب علم نہیں ملا۔", 300, y);
@@ -1673,22 +1698,22 @@ exports.generateWeakStudentsReport = async (req, res) => {
             doc.addPage();
             y = 50;
           }
-          
+
           doc.font("Helvetica");
           doc.text((index + 1).toString(), 550 - 20, y);
           doc.text((student.studentId || "N/A"), 515 - 40, y);
-          
+
           const urduName = getLocalizedStudentName(student, 'ur');
           const urduClass = getLocalizedClassName(student.className, 'ur');
           doc.font(fontRegular);
           urduPdfHelper.drawTextRTL(doc, urduName, 460, y);
           urduPdfHelper.drawTextRTL(doc, urduClass, 350, y);
-          
+
           doc.font("Helvetica");
           doc.text((student.averageMarks || 0).toString() + "%", 280 - 30, y);
           doc.text((student.attendancePercent || 0).toString() + "%", 225 - 30, y);
           doc.text((student.failedSubjectsCount || 0).toString(), 165 - 20, y);
-          
+
           // Map reasons
           const reasonsMap = {
             "Low Attendance": "حاضری کم",
@@ -1696,10 +1721,10 @@ exports.generateWeakStudentsReport = async (req, res) => {
             "Failed Subj": "مضامین میں فیل"
           };
           const translatedReasons = (student.reasons || []).map(r => reasonsMap[r] || r).join("، ");
-          
+
           doc.font(fontRegular);
           urduPdfHelper.drawTextRTL(doc, translatedReasons, 100, y);
-          
+
           y += 15;
         });
 
@@ -1713,12 +1738,12 @@ exports.generateWeakStudentsReport = async (req, res) => {
         doc.text("Attend", 330, y, { width: 45 });
         doc.text("Fail", 375, y, { width: 30 });
         doc.text("Reason", 405, y, { width: 145 });
-        
+
         doc.moveTo(50, y + 15).lineTo(550, y + 15).stroke();
-        
+
         y += 20;
         doc.font("Helvetica");
-        
+
         if (weakStudents.length === 0) {
           doc.text("No weak students found for the selected criteria.", 50, y, { align: "center" });
           return;
@@ -1729,7 +1754,7 @@ exports.generateWeakStudentsReport = async (req, res) => {
             doc.addPage();
             y = 50;
           }
-          
+
           const enName = getLocalizedStudentName(student, 'en');
           const enClass = getLocalizedClassName(student.className, 'en');
 
@@ -1741,7 +1766,7 @@ exports.generateWeakStudentsReport = async (req, res) => {
           doc.text((student.attendancePercent || 0).toString() + "%", 330, y, { width: 45 });
           doc.text((student.failedSubjectsCount || 0).toString(), 375, y, { width: 30 });
           doc.text((student.reasons || []).join(", "), 405, y, { width: 145 });
-          
+
           y += 15;
         });
       }
@@ -1756,7 +1781,7 @@ exports.generateClassAttendancePDF = async (req, res) => {
     const { className, classId, month, year, startDate, endDate } = req.query;
     const language = resolvePdfLanguage(req.query.language);
     const isUrdu = language === "ur";
-    
+
     // The class parameter comes from req.query.className.
     // checkClassAccess middleware handles the RBAC before reaching here,
     // but just to be safe, we will leave the middleware check as is in the routes.
@@ -1787,7 +1812,7 @@ exports.generateClassAttendancePDF = async (req, res) => {
       matchQuery.className = cName;
       studentMatchQuery.className = cName;
     }
-    
+
     if (startDate && endDate) {
       matchQuery.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
     } else if (month && year) {
@@ -1802,7 +1827,7 @@ exports.generateClassAttendancePDF = async (req, res) => {
 
     // Fetch all students in the class
     const students = await Student.find(studentMatchQuery).sort({ rollNumber: 1, name: 1 });
-    
+
     // Fetch all relevant attendance records
     const attendanceRecords = await Attendance.find(matchQuery);
 
@@ -1810,7 +1835,7 @@ exports.generateClassAttendancePDF = async (req, res) => {
       let y = doc.y;
       const RIGHT_MARGIN = 550;
       const LEFT_MARGIN = 50;
-      
+
       if (isUrdu) {
         if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
           doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
@@ -1828,12 +1853,12 @@ exports.generateClassAttendancePDF = async (req, res) => {
         urduPdfHelper.drawTextRTL(doc, URDU_LABELS.absent, RIGHT_MARGIN - 330, y);
         urduPdfHelper.drawTextRTL(doc, URDU_LABELS.late, RIGHT_MARGIN - 400, y);
         urduPdfHelper.drawTextRTL(doc, URDU_LABELS.percentage, RIGHT_MARGIN - 460, y);
-        
+
         doc.moveTo(LEFT_MARGIN, y + 15).lineTo(RIGHT_MARGIN, y + 15).stroke();
-        
+
         y += 20;
         doc.font(fontRegular);
-        
+
         if (students.length === 0) {
           urduPdfHelper.drawTextRTL(doc, "اس کلاس میں کوئی طالب علم نہیں ملا۔", RIGHT_MARGIN, y, { align: "center" });
           return;
@@ -1851,9 +1876,9 @@ exports.generateClassAttendancePDF = async (req, res) => {
           const late = studentRecords.filter(r => r.status === "Late").length;
           const attended = present + late;
           const percentage = totalWorkingDays > 0 ? Math.round((attended / totalWorkingDays) * 100) : 0;
-          
+
           const nameVal = getLocalizedStudentName(student, 'ur');
-          
+
           urduPdfHelper.drawTextRTL(doc, (student.rollNumber || "-").toString(), RIGHT_MARGIN, y);
           urduPdfHelper.drawTextRTL(doc, nameVal.substring(0, 30), RIGHT_MARGIN - 40, y);
           urduPdfHelper.drawTextRTL(doc, totalWorkingDays.toString(), RIGHT_MARGIN - 200, y);
@@ -1861,7 +1886,7 @@ exports.generateClassAttendancePDF = async (req, res) => {
           urduPdfHelper.drawTextRTL(doc, absent.toString(), RIGHT_MARGIN - 330, y);
           urduPdfHelper.drawTextRTL(doc, late.toString(), RIGHT_MARGIN - 400, y);
           urduPdfHelper.drawTextRTL(doc, `${percentage}%`, RIGHT_MARGIN - 460, y);
-          
+
           y += 15;
         });
 
@@ -1874,12 +1899,12 @@ exports.generateClassAttendancePDF = async (req, res) => {
         doc.text("Absent", 380, y, { width: 60 });
         doc.text("Late", 450, y, { width: 50 });
         doc.text("%", 510, y, { width: 40 });
-        
+
         doc.moveTo(50, y + 15).lineTo(550, y + 15).stroke();
-        
+
         y += 20;
         doc.font("Helvetica");
-        
+
         if (students.length === 0) {
           doc.text("No students found in this class.", 50, y, { align: "center" });
           return;
@@ -1897,7 +1922,7 @@ exports.generateClassAttendancePDF = async (req, res) => {
           const late = studentRecords.filter(r => r.status === "Late").length;
           const attended = present + late;
           const percentage = totalWorkingDays > 0 ? Math.round((attended / totalWorkingDays) * 100) : 0;
-          
+
           const nameVal = getLocalizedStudentName(student, 'en');
           doc.text((student.rollNumber || "-"), 50, y, { width: 40 });
           doc.text(nameVal.substring(0, 30), 90, y, { width: 150 });
@@ -1908,7 +1933,8 @@ exports.generateClassAttendancePDF = async (req, res) => {
           doc.text(`${percentage}%`, 510, y, { width: 40 });
           y += 15;
         });
-      }}, null, { language, translatedTitle: isUrdu ? "کلاس حاضری کا خلاصہ" : "Class Attendance Summary" });
+      }
+    }, null, { language, translatedTitle: isUrdu ? "کلاس حاضری کا خلاصہ" : "Class Attendance Summary" });
 
   } catch (error) {
     res.status(500).json({ message: "Error generating Class Attendance PDF", error: error.message });
@@ -2090,7 +2116,7 @@ exports.generateStudentAttendancePDF = async (req, res) => {
           // â”€â”€ Date-wise table â”€â”€
           if (records.length === 0) {
             doc.font("Helvetica").fontSize(10)
-               .text("No attendance records found.", 50, doc.y, { align: "center" });
+              .text("No attendance records found.", 50, doc.y, { align: "center" });
             return;
           }
 
@@ -2099,9 +2125,9 @@ exports.generateStudentAttendancePDF = async (req, res) => {
           const COL = { date: 50, day: 180, status: 280, remarks: 370 };
 
           doc.font("Helvetica-Bold").fontSize(9);
-          doc.text("Date",    COL.date,    y, { width: 120 });
-          doc.text("Day",     COL.day,     y, { width: 90  });
-          doc.text("Status",  COL.status,  y, { width: 80  });
+          doc.text("Date", COL.date, y, { width: 120 });
+          doc.text("Day", COL.day, y, { width: 90 });
+          doc.text("Status", COL.status, y, { width: 80 });
           doc.text("Remarks", COL.remarks, y, { width: 180 });
           y += 14;
           doc.moveTo(50, y).lineTo(550, y).stroke();
@@ -2115,9 +2141,9 @@ exports.generateStudentAttendancePDF = async (req, res) => {
               doc.addPage();
               y = 50;
               doc.font("Helvetica-Bold").fontSize(9);
-              doc.text("Date",    COL.date,    y, { width: 120 });
-              doc.text("Day",     COL.day,     y, { width: 90  });
-              doc.text("Status",  COL.status,  y, { width: 80  });
+              doc.text("Date", COL.date, y, { width: 120 });
+              doc.text("Day", COL.day, y, { width: 90 });
+              doc.text("Status", COL.status, y, { width: 80 });
               doc.text("Remarks", COL.remarks, y, { width: 180 });
               y += 14;
               doc.moveTo(50, y).lineTo(550, y).stroke();
@@ -2125,18 +2151,18 @@ exports.generateStudentAttendancePDF = async (req, res) => {
               doc.font("Helvetica").fontSize(9);
             }
 
-            const d      = new Date(record.date);
+            const d = new Date(record.date);
             const dateStr = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-            const dayStr  = DAY_NAMES[d.getDay()];
+            const dayStr = DAY_NAMES[d.getDay()];
 
             const statusColors = { Present: "#16a34a", Absent: "#dc2626", Late: "#d97706" };
             doc.fillColor(statusColors[record.status] || "#000000");
 
-            doc.text(dateStr,            COL.date,    y, { width: 120 });
+            doc.text(dateStr, COL.date, y, { width: 120 });
             doc.fillColor("#000000");
-            doc.text(dayStr,             COL.day,     y, { width: 90  });
+            doc.text(dayStr, COL.day, y, { width: 90 });
             doc.fillColor(statusColors[record.status] || "#000000");
-            doc.text(record.status,      COL.status,  y, { width: 80  });
+            doc.text(record.status, COL.status, y, { width: 80 });
             doc.fillColor("#000000");
             doc.text(record.remarks || "", COL.remarks, y, { width: 180 });
 
@@ -2176,12 +2202,12 @@ exports.generateAcademicHistoryPDF = async (req, res) => {
 
     const hasAccess = await verifyTeacherClassAccess(req.user, student.classId, student.studentClass || student.className);
     if (!hasAccess) {
-       return res.status(403).json({ message: "Unauthorized to view this student's history" });
+      return res.status(403).json({ message: "Unauthorized to view this student's history" });
     }
 
     const allExams = await Exam.find().populate("classId").lean();
     const allResults = await ExamResult.find({ studentId: student._id }).lean();
-    
+
     // Group results by exam
     const historyMap = {};
     for (const exam of allExams) {
@@ -2189,7 +2215,7 @@ exports.generateAcademicHistoryPDF = async (req, res) => {
       if (results.length > 0) {
         let obtainedMarks = 0;
         let hasFailed = false;
-        
+
         results.forEach(r => {
           if (r.marks === -1) {
             hasFailed = true;
@@ -2198,10 +2224,10 @@ exports.generateAcademicHistoryPDF = async (req, res) => {
             if (r.marks < exam.passingMarks) hasFailed = true;
           }
         });
-        
+
         const totalMarks = exam.subjects.length * exam.maxMarks;
         const percentage = totalMarks > 0 ? (obtainedMarks / totalMarks) * 100 : 0;
-        
+
         const marksBySubject = {};
         results.forEach(r => { marksBySubject[r.subject] = r.marks; });
         let isAbsentInAny = false;
@@ -2218,7 +2244,7 @@ exports.generateAcademicHistoryPDF = async (req, res) => {
         });
         let grade = isAbsentInAny ? "F" : calcRes.grade;
         hasFailed = isAbsentInAny ? true : !calcRes.passed;
-        
+
         // If they missed a subject
         const subjectsFound = new Set(results.map(r => r.subject));
         exam.subjects.forEach(sub => {
@@ -2281,15 +2307,15 @@ exports.generateAcademicHistoryPDF = async (req, res) => {
       const profileW = TABLE_RIGHT - TABLE_LEFT;
       const profileRows = isUrdu
         ? [
-            [URDU_LABELS.name, nameVal],
-            [URDU_LABELS.rollNumber, student.rollNumber || "â€”"],
-            [URDU_LABELS.className, classVal],
-          ]
+          [URDU_LABELS.name, nameVal],
+          [URDU_LABELS.rollNumber, student.rollNumber || "â€”"],
+          [URDU_LABELS.className, classVal],
+        ]
         : [
-            ["Name", nameVal],
-            ["Roll Number", student.rollNumber || "â€”"],
-            ["Current Class", classVal],
-          ];
+          ["Name", nameVal],
+          ["Roll Number", student.rollNumber || "â€”"],
+          ["Current Class", classVal],
+        ];
       const profileRowH = 24;
       doc.rect(TABLE_LEFT, profileTop, profileW, profileRowH * profileRows.length + 28).fillAndStroke("#f3f7f5", "#9aa5a0");
       drawCell(isUrdu ? URDU_LABELS.profile : "STUDENT PROFILE", TABLE_LEFT, profileTop + 2, profileW, 24, { font: isUrdu ? "UrduFont" : "Helvetica-Bold", size: isUrdu ? 14 : 12, color: "#1e5c47" });
@@ -2385,7 +2411,7 @@ exports.generateYearlyResultPDF = async (req, res) => {
     if (req.user && req.user.role === "teacher") {
       const hasAccess = await verifyTeacherClassAccess(req.user, student.classId, student.studentClass || student.className);
       if (!hasAccess) {
-         return res.status(403).json({ message: "Unauthorized to view this student's result" });
+        return res.status(403).json({ message: "Unauthorized to view this student's result" });
       }
     }
 
@@ -2477,17 +2503,17 @@ exports.generateYearlyResultPDF = async (req, res) => {
       const profileW = TABLE_RIGHT - TABLE_LEFT;
       const profileRows = isUrdu
         ? [
-            [URDU_LABELS.name, nameVal],
-            [URDU_LABELS.rollNumber, student.rollNumber || "\u2014"],
-            [URDU_LABELS.className, classVal],
-            [URDU_LABELS.academicYear, academicYear || "\u2014"],
-          ]
+          [URDU_LABELS.name, nameVal],
+          [URDU_LABELS.rollNumber, student.rollNumber || "\u2014"],
+          [URDU_LABELS.className, classVal],
+          [URDU_LABELS.academicYear, academicYear || "\u2014"],
+        ]
         : [
-            ["Name", nameVal],
-            ["Roll Number", student.rollNumber || "\u2014"],
-            ["Class", classVal],
-            ["Academic Year", academicYear || "\u2014"],
-          ];
+          ["Name", nameVal],
+          ["Roll Number", student.rollNumber || "\u2014"],
+          ["Class", classVal],
+          ["Academic Year", academicYear || "\u2014"],
+        ];
       const profileRowH = 24;
       doc.rect(TABLE_LEFT, profileTop, profileW, profileRowH * profileRows.length + 28).fillAndStroke("#f3f7f5", "#9aa5a0");
       drawCell(isUrdu ? URDU_LABELS.profile : "STUDENT PROFILE", TABLE_LEFT, profileTop + 2, profileW, 24, { font: isUrdu ? "UrduFont" : "Helvetica-Bold", size: isUrdu ? 14 : 12, color: "#1e5c47" });
@@ -2606,19 +2632,19 @@ exports.generateYearlyResultPDF = async (req, res) => {
         const summaryPassed = !hasFailed;
         const summaryValues = isUrdu
           ? [
-              `${URDU_LABELS.totalMarks}: ${totalMarks}`,
-              `${URDU_LABELS.obtainedMarks}: ${obtainedMarks}`,
-              `${percentage.toFixed(2)}%`,
-              `${URDU_LABELS.grade}: ${grade}`,
-              summaryPassed ? URDU_LABELS.pass : URDU_LABELS.fail,
-            ]
+            `${URDU_LABELS.totalMarks}: ${totalMarks}`,
+            `${URDU_LABELS.obtainedMarks}: ${obtainedMarks}`,
+            `${percentage.toFixed(2)}%`,
+            `${URDU_LABELS.grade}: ${grade}`,
+            summaryPassed ? URDU_LABELS.pass : URDU_LABELS.fail,
+          ]
           : [
-              `Total: ${totalMarks}`,
-              `Obtained: ${obtainedMarks}`,
-              `${percentage.toFixed(2)}%`,
-              `Grade: ${grade}`,
-              summaryPassed ? "PASS" : "FAIL",
-            ];
+            `Total: ${totalMarks}`,
+            `Obtained: ${obtainedMarks}`,
+            `${percentage.toFixed(2)}%`,
+            `Grade: ${grade}`,
+            summaryPassed ? "PASS" : "FAIL",
+          ];
 
         subWidths.forEach((w, i) => {
           doc.rect(subColX[i], y, w, HEADER_H).fillAndStroke("#e8f4ef", "#9aa5a0");
@@ -2646,12 +2672,12 @@ exports.generateStudentListPDF = async (req, res) => {
 
     let cId = classId || className;
     let matchQuery = { status: "active" };
-    
+
     if (cId && cId !== "all") {
-        if (cId.match(/^[0-9a-fA-F]{24}$/)) {
-            const mongoose = require("mongoose");
-            matchQuery.classId = new mongoose.Types.ObjectId(cId);
-        }
+      if (cId.match(/^[0-9a-fA-F]{24}$/)) {
+        const mongoose = require("mongoose");
+        matchQuery.classId = new mongoose.Types.ObjectId(cId);
+      }
     }
     const students = await Student.find(matchQuery).populate("classId").lean();
 
@@ -2770,7 +2796,7 @@ exports.generateTeacherIdCard = async (req, res) => {
 
     // Top Header Banner
     doc.rect(2, 2, 239, 36).fill('#047857');
-    
+
     // Logo
     const logoPath = path.join(__dirname, "../../../client/public/logo1.jpeg");
     if (fs.existsSync(logoPath)) {
@@ -2794,7 +2820,7 @@ exports.generateTeacherIdCard = async (req, res) => {
     const photoY = 48;
     const photoWidth = 60;
     const photoHeight = 75;
-    
+
     // Draw photo border
     doc.rect(photoX, photoY, photoWidth, photoHeight).lineWidth(1).strokeColor('#ccc').stroke();
 
@@ -2805,7 +2831,7 @@ exports.generateTeacherIdCard = async (req, res) => {
       } else if (!path.isAbsolute(teacher.photo)) {
         photoFsPath = path.join(__dirname, "../../public", teacher.photo);
       }
-      
+
       if (fs.existsSync(photoFsPath)) {
         doc.image(photoFsPath, photoX, photoY, { width: photoWidth, height: photoHeight });
       } else {
@@ -2865,13 +2891,13 @@ exports.generateTeacherIdCard = async (req, res) => {
         urduPdfHelper.drawTextRTL(doc, "مضامین:", 230, currentY);
         currentY += 12;
         doc.fillColor('black');
-        
+
         // Overflow control: display max 4 lines
         let renderedLines = 0;
         for (let i = 0; i < classesList.length; i++) {
           if (renderedLines >= 4) {
-             urduPdfHelper.drawTextRTL(doc, "...", 230, currentY);
-             break;
+            urduPdfHelper.drawTextRTL(doc, "...", 230, currentY);
+            break;
           }
           const cName = classesList[i];
           const subs = assignmentsGroups[cName];
@@ -2888,12 +2914,12 @@ exports.generateTeacherIdCard = async (req, res) => {
         doc.fontSize(8).font(fontBold).fillColor('#666').text("Assignments:", labelX, currentY);
         currentY += 10;
         doc.fillColor('black').font(fontRegular);
-        
+
         let renderedLines = 0;
         for (let i = 0; i < classesList.length; i++) {
           if (renderedLines >= 4) {
-             doc.text("...", labelX, currentY);
-             break;
+            doc.text("...", labelX, currentY);
+            break;
           }
           const cName = classesList[i];
           const subs = assignmentsGroups[cName];
@@ -2926,7 +2952,7 @@ exports.generateCombinedResultPDF = async (req, res) => {
     const { fetchCombinedStudentResult } = require('./reportController');
     const language = resolvePdfLanguage(req.query.language);
     const isUrdu = language === 'ur';
-    
+
     // Fetch data using the newly isolated Phase 4A logic
     let combinedData;
     try {
@@ -2989,7 +3015,7 @@ exports.generateCombinedResultPDF = async (req, res) => {
         fail: "فیل"
       }
     };
-    
+
     const l = LABELS[isUrdu ? 'ur' : 'en'];
     const isUrduTextStr = (str) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(str);
 
@@ -2997,7 +3023,7 @@ exports.generateCombinedResultPDF = async (req, res) => {
       if (fs.existsSync(PDF_FONT_PATHS.urdu)) {
         doc.registerFont("UrduFont", PDF_FONT_PATHS.urdu);
       }
-      
+
       const drawText = (text, x, y, options = {}) => {
         const textStr = String(text || '');
         if (isUrduTextStr(textStr)) {
@@ -3019,9 +3045,9 @@ exports.generateCombinedResultPDF = async (req, res) => {
       doc.moveDown(0.2);
       doc.font("Helvetica").fontSize(10).text("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€", leftMargin, doc.y);
       doc.moveDown(0.5);
-      
+
       let studentName = getLocalizedStudentName(student, language);
-      
+
       drawText(l.name + ":", leftMargin, doc.y, { font: "Helvetica-Bold" });
       drawText(studentName, leftMargin + 80, doc.y);
       doc.moveDown(1);
@@ -3033,18 +3059,18 @@ exports.generateCombinedResultPDF = async (req, res) => {
       if (madrasa && madrasa.resultsAvailable) {
         drawText(l.partA, leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 12 });
         doc.moveDown(1);
-        
+
         drawText(l.class + ":", leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 10 });
         drawText(getLocalizedClassName(madrasa.class.name, language), leftMargin + 50, doc.y);
         doc.moveDown(1);
-        
+
         let startY = doc.y;
         drawText(l.subject, leftMargin, startY, { font: "Helvetica-Bold" });
         drawText(l.max, leftMargin + 200, startY, { font: "Helvetica-Bold" });
         drawText(l.obtained, leftMargin + 270, startY, { font: "Helvetica-Bold" });
         drawText(l.remarks, leftMargin + 350, startY, { font: "Helvetica-Bold" });
         doc.moveDown(1);
-        
+
         madrasa.subjects.forEach(sub => {
           let y = doc.y;
           drawText(sub.subject, leftMargin, y);
@@ -3059,7 +3085,7 @@ exports.generateCombinedResultPDF = async (req, res) => {
         drawText(madrasa.totals.maxMarks.toString(), leftMargin + 200, doc.y);
         drawText(madrasa.totals.obtainedMarks.toString(), leftMargin + 270, doc.y);
         doc.moveDown(1);
-        
+
         drawText(l.percentage, leftMargin, doc.y, { font: "Helvetica-Bold" });
         drawText(madrasa.totals.percentage.toFixed(2) + "%", leftMargin + 270, doc.y);
         doc.moveDown(2);
@@ -3069,24 +3095,24 @@ exports.generateCombinedResultPDF = async (req, res) => {
       if (school && school.resultsAvailable) {
         drawText(l.partB, leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 12 });
         doc.moveDown(1);
-        
+
         drawText(l.class + ":", leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 10 });
         drawText(school.class.name, leftMargin + 50, doc.y);
-        
+
         if (school.class.section) {
           doc.moveDown(1);
           drawText(l.section + ":", leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 10 });
           drawText(school.class.section, leftMargin + 50, doc.y);
         }
         doc.moveDown(1);
-        
+
         let startY = doc.y;
         drawText(l.subject, leftMargin, startY, { font: "Helvetica-Bold" });
         drawText(l.max, leftMargin + 200, startY, { font: "Helvetica-Bold" });
         drawText(l.obtained, leftMargin + 270, startY, { font: "Helvetica-Bold" });
         drawText(l.remarks, leftMargin + 350, startY, { font: "Helvetica-Bold" });
         doc.moveDown(1);
-        
+
         school.subjects.forEach(sub => {
           let y = doc.y;
           drawText(sub.subject, leftMargin, y);
@@ -3098,10 +3124,10 @@ exports.generateCombinedResultPDF = async (req, res) => {
 
         doc.moveDown(0.5);
         drawText(l.total, leftMargin, doc.y, { font: "Helvetica-Bold" });
-        drawText(school.totals.maxMarks.toString(), leftMargin + 200, doc.y); 
+        drawText(school.totals.maxMarks.toString(), leftMargin + 200, doc.y);
         drawText(school.totals.obtainedMarks.toString(), leftMargin + 270, doc.y);
         doc.moveDown(1);
-        
+
         drawText(l.percentage, leftMargin, doc.y, { font: "Helvetica-Bold" });
         drawText(school.totals.percentage.toFixed(2) + "%", leftMargin + 270, doc.y);
         doc.moveDown(2);
@@ -3113,19 +3139,19 @@ exports.generateCombinedResultPDF = async (req, res) => {
         doc.moveDown(0.5);
         drawText(l.combined, leftMargin, doc.y, { font: "Helvetica-Bold", fontSize: 12 });
         doc.moveDown(1);
-        
+
         drawText(l.totalMarks + ":", leftMargin, doc.y, { font: "Helvetica-Bold" });
         drawText(`${combined.obtainedMarks} / ${combined.maxMarks}`, leftMargin + 150, doc.y);
         doc.moveDown(1);
-        
+
         drawText(l.percentage + ":", leftMargin, doc.y, { font: "Helvetica-Bold" });
         drawText(`${combined.percentage.toFixed(3)}%`, leftMargin + 150, doc.y);
         doc.moveDown(1);
-        
+
         drawText(l.grade + ":", leftMargin, doc.y, { font: "Helvetica-Bold" });
         drawText(`${combined.grade}`, leftMargin + 150, doc.y);
         doc.moveDown(1);
-        
+
         doc.font("Helvetica").text("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€", leftMargin, doc.y);
       }
 

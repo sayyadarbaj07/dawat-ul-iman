@@ -69,7 +69,7 @@ export const pdfApi = {
     // Ensure URL doesn't duplicate /api if it comes from getStudentIdCard
     // because getStudentIdCard returns /pdf/..., we need API_BASE
     const fullUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
-    
+
     const response = await fetch(fullUrl, {
       headers: {
         Authorization: `Bearer ${token}`
@@ -87,7 +87,7 @@ export const pdfApi = {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     // Defer revocation to allow mobile download managers to capture the blob stream
     setTimeout(() => {
       window.URL.revokeObjectURL(blobUrl);
