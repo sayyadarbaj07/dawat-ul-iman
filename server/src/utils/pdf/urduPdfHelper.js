@@ -47,7 +47,11 @@ function drawTextRTL(doc, text, x, y, options = {}) {
     const str = mirrorBrackets(raw);
     const hasArabic = ARABIC_RE.test(str);
 
-    if (options.font) doc.font(options.font);
+    if (options.font) {
+        doc.font(options.font);
+    } else if (hasArabic && doc._font && doc._font.name !== "UrduFont" && doc._registeredFonts && doc._registeredFonts["UrduFont"]) {
+        doc.font("UrduFont");
+    }
     if (options.fontSize) doc.fontSize(options.fontSize);
     if (options.color) doc.fillColor(options.color);
     

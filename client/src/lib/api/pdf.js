@@ -14,8 +14,10 @@ export const pdfApi = {
     const query = new URLSearchParams({ examId, language }).toString();
     return `${API_BASE}/pdf/student/${studentId}/report-card?${query}`;
   },
-  getYearlyResult(studentId, language = 'en') {
-    return `${API_BASE}/pdf/student/${studentId}/yearly-result?language=${language}`;
+  getYearlyResult(studentId, language = 'en', academicYear) {
+    const params = new URLSearchParams({ language });
+    if (academicYear) params.append('academicYear', academicYear);
+    return `${API_BASE}/pdf/student/${studentId}/yearly-result?${params.toString()}`;
   },
   getAcademicHistory(studentId, language = 'en') {
     return `${API_BASE}/pdf/student/${studentId}/academic-history?language=${language}`;

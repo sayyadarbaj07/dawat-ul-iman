@@ -265,7 +265,7 @@ export default function Reports() {
           downloadPdf(pdfApi.getStudentReportCard(studentId, examId || examType, exportLang), `Marksheet_${studentId}_${exportLang}.pdf`);
       }
       else if (selectedReport?.id === "yearly_result") {
-          downloadPdf(pdfApi.getYearlyResult(studentId, exportLang), `Yearly_Result_${studentId}_${exportLang}.pdf`);
+          downloadPdf(pdfApi.getYearlyResult(studentId, exportLang, filters.academicYear || filters.year), `Yearly_Result_${studentId}_${exportLang}.pdf`);
       }
       else if (selectedReport?.id === "academic_history") {
           downloadPdf(pdfApi.getAcademicHistory(studentId, exportLang), `Academic_History_${studentId}_${exportLang}.pdf`);
