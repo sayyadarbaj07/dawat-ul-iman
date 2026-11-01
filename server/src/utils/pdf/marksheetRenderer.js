@@ -544,8 +544,8 @@ function drawStudentMarksheet(doc, { student, exam, results, language = "ur", ac
   const cardGap = 7.5;
 
   const resultBadgeText = stats.passed
-    ? (isUrdu ? "کامیاب (پاس)" : "PASSED")
-    : (isUrdu ? "ناکام (فیل)" : "FAILED");
+    ? (isUrdu ? "پاس" : "PASSED")
+    : (isUrdu ? "فیل" : "FAILED");
 
   const cards = isUrdu
     ? [
@@ -622,49 +622,35 @@ function drawStudentMarksheet(doc, { student, exam, results, language = "ur", ac
   });
 
   // 6. Signatures and Seal Area
-  const sigY = Math.max(scaleY + 45, 720);
+  // Keep on same page — cap sigY so it never pushes content off the page
+  const sigY = Math.min(scaleY + 40, 710);
 
   // Class Teacher Signature (Left)
-  doc.moveTo(LEFT_X + 10, sigY).lineTo(LEFT_X + 135, sigY).strokeColor("#94a3b8").lineWidth(1).stroke();
-  drawTextInBox(doc, isUrdu ? "دستخط کلاس ٹیچر" : "Class Teacher Signature", LEFT_X + 10, sigY + 6, 125, 16, {
-    size: isUrdu ? 11 : 9.5,
+  doc.moveTo(LEFT_X + 10, sigY).lineTo(LEFT_X + 145, sigY).strokeColor("#94a3b8").lineWidth(1).stroke();
+  drawTextInBox(doc, isUrdu ? "دستخط کلاس ٹیچر" : "Class Teacher Signature", LEFT_X + 10, sigY + 5, 135, 18, {
+    size: isUrdu ? 11 : 9,
     align: "center",
     font: isUrdu ? "UrduFont" : "Helvetica-Bold",
   });
 
   // Official Seal Box (Center)
   doc.save();
-  doc.rect(LEFT_X + 185, sigY - 26, 125, 48).dash(2, { space: 2 }).strokeColor("#94a3b8").lineWidth(0.8).stroke();
+  doc.rect(LEFT_X + 185, sigY - 22, 125, 44).dash(2, { space: 2 }).strokeColor("#94a3b8").lineWidth(0.8).stroke();
   doc.restore();
-  drawTextInBox(doc, isUrdu ? "مہر جامعہ" : "Institute Seal", LEFT_X + 185, sigY - 8, 125, 16, {
+  drawTextInBox(doc, isUrdu ? "مہر جامعہ" : "Institute Seal", LEFT_X + 185, sigY - 5, 125, 16, {
     size: isUrdu ? 12 : 10,
     align: "center",
     font: isUrdu ? "UrduFont" : "Helvetica-Bold",
     color: isUrdu ? "#0f172a" : "#64748b",
   });
 
-  // Principal Signature (Right)
-  doc.moveTo(RIGHT_X - 135, sigY).lineTo(RIGHT_X - 10, sigY).strokeColor("#94a3b8").lineWidth(1).stroke();
-  drawTextInBox(doc, isUrdu ? "دستخط ناظم امتحانات / مہتمم" : "Principal / Controller Signature", RIGHT_X - 135, sigY + 6, 125, 16, {
-    size: isUrdu ? 11 : 9.5,
+  // Principal / Controller Signature (Right) — wider box so label fits on one line
+  doc.moveTo(RIGHT_X - 150, sigY).lineTo(RIGHT_X - 10, sigY).strokeColor("#94a3b8").lineWidth(1).stroke();
+  drawTextInBox(doc, isUrdu ? "دستخط ناظم امتحانات / مہتمم" : "Principal / Controller Signature", RIGHT_X - 150, sigY + 5, 140, 18, {
+    size: isUrdu ? 10.5 : 8.5,
     align: "center",
     font: isUrdu ? "UrduFont" : "Helvetica-Bold",
   });
-
-  // Date of Issue
-  const todayStr = new Date().toLocaleDateString("en-GB");
-  if (isUrdu) {
-    const centerX = LEFT_X + USABLE_WIDTH / 2;
-    urduPdfHelper.drawTextRTL(doc, "تاریخ اجراء:", centerX + 45, sigY + 36, { font: "UrduFont", fontSize: 10, color: "#64748b" });
-    doc.font("Helvetica").fontSize(9).fillColor("#64748b").text(todayStr, centerX - 55, sigY + 38, { width: 50, align: "right" });
-  } else {
-    drawTextInBox(doc, `Date of Issue: ${todayStr}`, LEFT_X, sigY + 36, USABLE_WIDTH, 14, {
-      size: 8.5,
-      color: "#64748b",
-      align: "center",
-      font: "Helvetica",
-    });
-  }
 }
 
 module.exports = {
