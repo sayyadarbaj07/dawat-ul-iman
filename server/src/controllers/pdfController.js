@@ -1400,13 +1400,6 @@ exports.generateFeeReceiptPDF = async (req, res) => {
     doc.lineWidth(1).strokeColor("#1e3a8a");
     doc.rect(14, 14, w - 28, h - 28).stroke();
 
-    // Inner decorative corner arcs
-    doc.lineWidth(0.8).strokeColor("#1e3a8a");
-    doc.path("M 20 20 Q 32 20 32 32").stroke();
-    doc.path("M 580 20 Q 568 20 568 32").stroke();
-    doc.path("M 20 295 Q 32 295 32 283").stroke();
-    doc.path("M 580 295 Q 568 295 568 283").stroke();
-
     // Rest of drawing colors reset to dark
     doc.fillColor("#0f172a").strokeColor("#0f172a");
 
@@ -1438,21 +1431,22 @@ exports.generateFeeReceiptPDF = async (req, res) => {
     // === META ===
     doc.font(englishBold).fontSize(10).fillColor("#0f172a");
     const receiptNo = tx.receiptId || tx._id.toString().slice(-6).toUpperCase();
-    doc.text(`No.: ${receiptNo}`, 25, 105, { lineBreak: false });
+    doc.text(`No.: ${receiptNo}`, 25, 103, { lineBreak: false });
 
     const d = new Date(tx.date);
     const dateStr = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-    doc.text(`Date: ${dateStr}`, 470, 105, { lineBreak: false });
+    doc.text(`Date: ${dateStr}`, 470, 103, { lineBreak: false });
 
-    // === BODY LINES ===
+    // === BODY LINES (4 structured lines: Name, Address, English Words, Urdu Details) ===
     doc.lineWidth(0.8).strokeColor("#475569");
-    doc.moveTo(25, 142).lineTo(575, 142).stroke(); // Line 1
-    doc.moveTo(25, 178).lineTo(575, 178).stroke(); // Line 2
-    doc.moveTo(25, 216).lineTo(575, 216).stroke(); // Line 3
+    doc.moveTo(25, 136).lineTo(575, 136).stroke(); // Line 1: Name
+    doc.moveTo(25, 168).lineTo(575, 168).stroke(); // Line 2: Address
+    doc.moveTo(25, 200).lineTo(575, 200).stroke(); // Line 3: In Words (English)
+    doc.moveTo(25, 232).lineTo(575, 232).stroke(); // Line 4: Amount in Words (Urdu) & Purpose
 
     // Resolve details for Line 1 and Purpose
     const isExpense = tx.type === "expense";
-    const nameLabel = isExpense ? "اسم گرامی / نام" : "اسم گرامی معطی";
+    const nameLabel = isExpense ? "اسم گرامی / بنام:" : "اسم گرامی معطی:";
 
     let personName = "";
     let purposeName = "";
@@ -1512,78 +1506,87 @@ exports.generateFeeReceiptPDF = async (req, res) => {
 
     // Line 1: Name
     doc.fillColor("#0f172a");
-    urduPdfHelper.drawTextRTL(doc, nameLabel, 575, 122, { font: urduFont, fontSize: 18 });
+    urduPdfHelper.drawTextRTL(doc, nameLabel, 575, 117, { font: urduFont, fontSize: 17 });
     if (personName) {
-      urduPdfHelper.drawTextRTL(doc, personName, 460, 122, {
+      urduPdfHelper.drawTextRTL(doc, personName, 460, 117, {
         font: urduFont,
         fontSize: personName.length > 35 ? 13 : 16
       });
     }
 
     // Line 2: Address
-    urduPdfHelper.drawTextRTL(doc, "مکمل پتہ:", 575, 158, { font: urduFont, fontSize: 18 });
+    urduPdfHelper.drawTextRTL(doc, "مکمل پتہ:", 575, 149, { font: urduFont, fontSize: 17 });
     let addressText = "";
     if (tx.referenceId) {
       addressText = [tx.referenceId.address, tx.referenceId.city].filter(Boolean).join("، ");
     }
     if (addressText) {
-      urduPdfHelper.drawTextRTL(doc, addressText, 510, 158, { font: urduFont, fontSize: 15 });
+      urduPdfHelper.drawTextRTL(doc, addressText, 510, 149, { font: urduFont, fontSize: 14 });
     }
 
-    // Line 3: Amount in words & purpose
-    // 5 dedicated non-overlapping zones:
-    // Zone 1: [475 .. 575] Right label: رقم / اشیاء عبارت میں
-    urduPdfHelper.drawTextRTL(doc, "رقم / اشیاء عبارت میں", 575, 196, { font: urduFont, fontSize: 16 });
+    // Line 3: English Amount in Words (Upper Line)
+    const enWords = numberToWords(tx.amount, "en");
+    let enFontSize = 9.5;
+    if (enWords.length > 55) enFontSize = 8;
+    else if (enWords.length > 40) enFontSize = 8.5;
 
-    // Zone 2: [340 .. 465] Amount in words
-    const amtWords = isUrduWords ? numberToWords(tx.amount, "ur") : numberToWords(tx.amount, "en");
-    if (isUrduWords) {
-      urduPdfHelper.drawTextRTL(doc, amtWords, 465, 196, {
-        font: urduFont,
-        fontSize: amtWords.length > 25 ? 13 : 15
-      });
-    } else {
-      // English words using standard Helvetica-Bold with proper character & word spacing
-      doc.font(englishBold).fillColor("#0f172a");
-      let enFontSize = 9.5;
-      if (amtWords.length > 32) enFontSize = 8;
-      else if (amtWords.length > 24) enFontSize = 8.5;
-      doc.fontSize(enFontSize);
-      const textWidth = doc.widthOfString(amtWords);
-      const startX = 335 + Math.max(0, (135 - textWidth) / 2);
-      doc.text(amtWords, startX, 203, { lineBreak: false });
+    doc.font(englishBold).fontSize(enFontSize);
+    doc.fillColor("#1e3a8a").text("In Words:", 25, 185, { continued: true });
+    doc.fillColor("#0f172a").text(" " + enWords);
+
+    // Line 4: Urdu Line (Amount in Words, Purpose, and Receipt Phrase)
+    const urWords = numberToWords(tx.amount, "ur");
+
+    doc.fillColor("#0f172a");
+    const urduAmountLabel = "رقم الفاظ میں:";
+    urduPdfHelper.drawTextRTL(doc, urduAmountLabel, 575, 214, { font: urduFont, fontSize: 15 });
+
+    let urFontSize = 13;
+    if (urWords.length > 45) urFontSize = 11.5;
+    else if (urWords.length > 35) urFontSize = 12;
+
+    doc.font(urduFont).fontSize(15);
+    const wLabel = doc.widthOfString(urduAmountLabel, { features: ["rtla"] });
+    const rxWords = 575 - wLabel - 8;
+
+    urduPdfHelper.drawTextRTL(doc, urWords, rxWords, 214, { font: urduFont, fontSize: urFontSize });
+
+    doc.font(urduFont).fontSize(urFontSize);
+    const wWords = doc.widthOfString(urWords, { features: ["rtla"] });
+    const rxBamad = rxWords - wWords - 12;
+
+    urduPdfHelper.drawTextRTL(doc, "بمد", rxBamad, 214, { font: urduFont, fontSize: 15 });
+
+    doc.font(urduFont).fontSize(15);
+    const wBamad = doc.widthOfString("بمد", { features: ["rtla"] });
+    const rxPurpose = rxBamad - wBamad - 8;
+
+    if (purposeName) {
+      let pFontSize = 13;
+      if (purposeName.length > 25) pFontSize = 11;
+      urduPdfHelper.drawTextRTL(doc, purposeName, rxPurpose, 214, { font: urduFont, fontSize: pFontSize });
     }
 
-    // Zone 3: [305 .. 330] Label: بمد
-    urduPdfHelper.drawTextRTL(doc, "بمد", 330, 196, { font: urduFont, fontSize: 16 });
-
-    // Zone 4: [135 .. 295] Purpose
-    urduPdfHelper.drawTextRTL(doc, purposeName, 295, 196, {
-      font: urduFont,
-      fontSize: purposeName.length > 20 ? 13 : 15
-    });
-
-    // Zone 5: [25 .. 125] Left label: بشکریہ وصول ہوئے۔
-    urduPdfHelper.drawTextRTL(doc, "بشکریہ وصول ہوئے۔", 125, 196, { font: urduFont, fontSize: 16 });
+    urduPdfHelper.drawTextRTL(doc, "بشکریہ وصول ہوئے۔", 125, 214, { font: urduFont, fontSize: 15 });
 
     // === AMOUNT BOX ===
-    const boxY = 238;
+    const boxY = 246;
     // Magenta "Rs." Box
-    doc.fillColor("#be185d").rect(25, boxY, 42, 26).fill();
-    doc.fillColor("white").font(englishBold).fontSize(14).text("Rs.", 33, boxY + 6);
+    doc.fillColor("#be185d").rect(25, boxY, 42, 24).fill();
+    doc.fillColor("white").font(englishBold).fontSize(13).text("Rs.", 33, boxY + 5);
 
     // White Box with border for amount
     doc.lineWidth(1.2).strokeColor("#1e3a8a").fillColor("#f8fafc");
-    doc.rect(67, boxY, 125, 26).fillAndStroke();
-    doc.fillColor("#0f172a").font(englishBold).fontSize(14).text(tx.amount.toLocaleString("en-IN"), 80, boxY + 6, { lineBreak: false });
+    doc.rect(67, boxY, 125, 24).fillAndStroke();
+    doc.fillColor("#0f172a").font(englishBold).fontSize(13).text(tx.amount.toLocaleString("en-IN"), 78, boxY + 5, { lineBreak: false });
 
     // === JAZAK ALLAH ===
     doc.fillColor("#0f172a");
-    urduPdfHelper.drawTextRTL(doc, "جزاک اللہ", 390, 238, { font: urduFont, fontSize: 20 });
+    urduPdfHelper.drawTextRTL(doc, "جزاک اللہ", 385, 244, { font: urduFont, fontSize: 19 });
 
     // === SIGNATURES ===
-    urduPdfHelper.drawTextRTL(doc, "دستخط وصول کنندہ", 360, 274, { font: urduFont, fontSize: 15 });
-    urduPdfHelper.drawTextRTL(doc, "دستخط صدر", 150, 274, { font: urduFont, fontSize: 15 });
+    urduPdfHelper.drawTextRTL(doc, "دستخط وصول کنندہ", 360, 276, { font: urduFont, fontSize: 14 });
+    urduPdfHelper.drawTextRTL(doc, "دستخط صدر", 150, 276, { font: urduFont, fontSize: 14 });
 
     doc.end();
 

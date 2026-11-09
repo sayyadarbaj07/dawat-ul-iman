@@ -27,7 +27,6 @@ function convertBelowThousand(n, lang) {
       n %= 100;
     }
     if (n > 0) {
-      if (str !== "") str += "اور ";
       str += urdu1to99[n] + " ";
     }
     return str.trim();
@@ -39,8 +38,9 @@ function convertBelowThousand(n, lang) {
     }
     if (n >= 10 && n <= 19) {
       str += teens[n - 10] + " ";
-    } else if (n >= 20 || n > 0) {
-      str += tens[Math.floor(n / 10)] + " ";
+    } else if (n >= 20) {
+      str += tens[Math.floor(n / 10)] + (n % 10 !== 0 ? "-" + ones[n % 10] : "") + " ";
+    } else if (n > 0) {
       str += ones[n % 10] + " ";
     }
     return str.trim();
