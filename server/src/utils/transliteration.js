@@ -459,12 +459,109 @@ function getLocalizedTeacherName(teacher, language = "en") {
   return transliterateUrduToEnglish(teacher.nameUrdu || teacher.name || "");
 }
 
+// Exam mapping between Urdu and English
+const EXAM_TYPE_MAP = {
+  monthly: { en: "Monthly Exam", ur: "ماہانہ امتحان" },
+  "half-yearly": { en: "Half-Yearly Exam", ur: "ششماہی امتحان" },
+  halfyearly: { en: "Half-Yearly Exam", ur: "ششماہی امتحان" },
+  quarterly: { en: "Quarterly Exam", ur: "سہ ماہی امتحان" },
+  yearly: { en: "Annual Exam", ur: "سالانہ امتحان" },
+  annual: { en: "Annual Exam", ur: "سالانہ امتحان" },
+};
+
+const EXAM_NAME_MAP = {
+  "ماہانہ جائزہ": { en: "Monthly Exam", ur: "ماہانہ جائزہ" },
+  "ماہانہ جائزۃ": { en: "Monthly Exam", ur: "ماہانہ جائزہ" },
+  "ماہانہ جاَئزہ": { en: "Monthly Exam", ur: "ماہانہ جائزہ" },
+  "ماہانہ امتحان": { en: "Monthly Exam", ur: "ماہانہ امتحان" },
+  "ششماہی امتحان": { en: "Half-Yearly Exam", ur: "ششماہی امتحان" },
+  "ششماہی جائزہ": { en: "Half-Yearly Assessment", ur: "ششماہی جائزہ" },
+  "سہ ماہی امتحان": { en: "Quarterly Exam", ur: "سہ ماہی امتحان" },
+  "سہ ماہی جائزہ": { en: "Quarterly Assessment", ur: "سہ ماہی جائزہ" },
+  "سالانہ امتحان": { en: "Annual Exam", ur: "سالانہ امتحان" },
+  "سالانہ جائزہ": { en: "Annual Assessment", ur: "سالانہ جائزہ" },
+  "میقات اول": { en: "First Term", ur: "میقات اول" },
+  "میقات اول امتحان": { en: "First Term Exam", ur: "میقات اول امتحان" },
+  "میقات دوم": { en: "Second Term", ur: "میقات دوم" },
+  "میقات دوم امتحان": { en: "Second Term Exam", ur: "میقات دوم امتحان" },
+  "میقات سوم": { en: "Third Term", ur: "میقات سوم" },
+  "میقات سوم امتحان": { en: "Third Term Exam", ur: "میقات سوم امتحان" },
+  "monthly exam": { en: "Monthly Exam", ur: "ماہانہ امتحان" },
+  "monthly assessment": { en: "Monthly Assessment", ur: "ماہانہ جائزہ" },
+  "monthly": { en: "Monthly Exam", ur: "ماہانہ امتحان" },
+  "half-yearly exam": { en: "Half-Yearly Exam", ur: "ششماہی امتحان" },
+  "half yearly exam": { en: "Half-Yearly Exam", ur: "ششماہی امتحان" },
+  "half-yearly": { en: "Half-Yearly Exam", ur: "ششماہی امتحان" },
+  "quarterly exam": { en: "Quarterly Exam", ur: "سہ ماہی امتحان" },
+  "quarterly": { en: "Quarterly Exam", ur: "سہ ماہی امتحان" },
+  "annual exam": { en: "Annual Exam", ur: "سالانہ امتحان" },
+  "yearly exam": { en: "Annual Exam", ur: "سالانہ امتحان" },
+  "annual": { en: "Annual Exam", ur: "سالانہ امتحان" },
+  "yearly": { en: "Annual Exam", ur: "سالانہ امتحان" },
+};
+
+/**
+ * Resolves exam name cleanly based on language ("en" vs "ur").
+ * Completely eliminates duplicate types e.g. "(Monthly) (Monthly)" and ASCII mojibake.
+ */
+function getLocalizedExamName(examOrName, language = "en") {
+  if (!examOrName) return "";
+  const isUrdu = language === "ur";
+
+  let rawName = "";
+  let rawType = "";
+
+  if (typeof examOrName === "string") {
+    rawName = examOrName;
+  } else if (examOrName && typeof examOrName === "object") {
+    rawName = examOrName.name || examOrName.examName || "";
+    rawType = examOrName.examType || "";
+  }
+
+  rawName = String(rawName).trim();
+  rawType = String(rawType).trim();
+
+  // Strip duplicate parenthesized type if already appended, e.g. "ماہانہ جائزہ (Monthly)" -> "ماہانہ جائزہ"
+  let cleanName = rawName.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  // Strip Arabic diacritics
+  const normalizedKey = cleanName.replace(/[\u064B-\u065F\u0670]/g, "").trim();
+
+  const typeKey = rawType.toLowerCase();
+  const typeMap = EXAM_TYPE_MAP[typeKey];
+
+  if (isUrdu) {
+    if (EXAM_NAME_MAP[normalizedKey]) return EXAM_NAME_MAP[normalizedKey].ur;
+    if (EXAM_NAME_MAP[cleanName.toLowerCase()]) return EXAM_NAME_MAP[cleanName.toLowerCase()].ur;
+    if (EXAM_NAME_MAP[rawName.toLowerCase()]) return EXAM_NAME_MAP[rawName.toLowerCase()].ur;
+    if (typeMap && (!cleanName || cleanName.toLowerCase() === typeKey)) return typeMap.ur;
+    if (ARABIC_RE.test(cleanName)) return cleanName;
+    return typeMap ? typeMap.ur : (cleanName || "امتحان");
+  } else {
+    // English mode
+    if (EXAM_NAME_MAP[normalizedKey]) return EXAM_NAME_MAP[normalizedKey].en;
+    if (EXAM_NAME_MAP[cleanName.toLowerCase()]) return EXAM_NAME_MAP[cleanName.toLowerCase()].en;
+    if (EXAM_NAME_MAP[rawName.toLowerCase()]) return EXAM_NAME_MAP[rawName.toLowerCase()].en;
+    if (typeMap && (!cleanName || cleanName.toLowerCase() === typeKey)) return typeMap.en;
+    if (!ARABIC_RE.test(cleanName) && cleanName.length > 0) {
+      if (rawType && !cleanName.toLowerCase().includes(rawType.toLowerCase())) {
+        return `${cleanName} (${rawType})`;
+      }
+      return cleanName;
+    }
+    if (typeMap) return typeMap.en;
+    return transliterateUrduToEnglish(cleanName) || "Exam";
+  }
+}
+
 module.exports = {
   transliterateUrduToEnglish,
   getLocalizedStudentName,
   getLocalizedFatherName,
   getLocalizedClassName,
   getLocalizedTeacherName,
+  getLocalizedExamName,
   CLASS_MAP,
+  EXAM_TYPE_MAP,
+  EXAM_NAME_MAP,
   ARABIC_RE,
 };

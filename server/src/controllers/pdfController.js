@@ -22,6 +22,7 @@ const {
   getLocalizedFatherName,
   getLocalizedClassName,
   getLocalizedTeacherName,
+  getLocalizedExamName,
 } = require("../utils/transliteration");
 
 const PDF_FONT_PATHS = {
@@ -758,30 +759,8 @@ exports.generateClassResultPDF = async (req, res) => {
     const classNameDisplayEn = getLocalizedClassName(rawClassName, 'en');
     const classNameDisplayUr = getLocalizedClassName(rawClassName, 'ur') || rawClassName;
 
-    const EXAM_TYPE_EN_LOCAL = { monthly: "Monthly", "half-yearly": "Half-Yearly", halfyearly: "Half-Yearly", quarterly: "Quarterly", yearly: "Annual", annual: "Annual" };
-    const EXAM_TYPE_UR_LOCAL = { monthly: "ماہانہ امتحان", "half-yearly": "ششماہی امتحان", halfyearly: "ششماہی امتحان", quarterly: "سہ ماہی امتحان", yearly: "سالانہ امتحان", annual: "سالانہ امتحان" };
-    const rawExamType = String(exam.examType || "").toLowerCase().trim();
-
-    const rawName = exam.name || exam.examName || "";
-    let examDisplayNameUr = "";
-    if (rawName && /[\u0600-\u06FF]/.test(rawName)) {
-      examDisplayNameUr = rawName.replace(/\s*\([^)]*\)\s*$/, "").trim();
-    } else {
-      examDisplayNameUr = EXAM_TYPE_UR_LOCAL[rawExamType] || rawName || "امتحان";
-    }
-
-    let examDisplayNameEn = "";
-    if (rawName && !/[\u0600-\u06FF]/.test(rawName)) {
-      const cleanName = rawName.replace(/\s*\([^)]*\)\s*$/, "").trim();
-      const typeLabel = EXAM_TYPE_EN_LOCAL[rawExamType] || "";
-      if (typeLabel && cleanName.toLowerCase() !== typeLabel.toLowerCase() && cleanName.toLowerCase() !== `${typeLabel.toLowerCase()} exam`) {
-        examDisplayNameEn = `${cleanName} (${typeLabel})`;
-      } else {
-        examDisplayNameEn = cleanName;
-      }
-    } else {
-      examDisplayNameEn = EXAM_TYPE_EN_LOCAL[rawExamType] ? `${EXAM_TYPE_EN_LOCAL[rawExamType]} Exam` : (exam.examType || "Exam");
-    }
+    const examDisplayNameUr = getLocalizedExamName(exam, 'ur');
+    const examDisplayNameEn = getLocalizedExamName(exam, 'en');
 
     const reportTitle = isUrdu
       ? `کلاس کا نتیجہ - ${classNameDisplayUr}`
@@ -2419,9 +2398,9 @@ exports.generateAcademicHistoryPDF = async (req, res) => {
         const str = String(text === undefined || text === null ? "" : text);
         if (!str) return;
         const rtl = HAS_ARABIC.test(str);
-        const font = o.font || (rtl ? "UrduFont" : "Helvetica");
+        const font = rtl ? "UrduFont" : (o.font || "Helvetica");
         doc.font(font).fontSize(o.size || 10).fillColor(o.color || "#111111");
-        const opts = { width: w - 8, align: o.align || "center", ellipsis: true };
+        const opts = { width: w - 8, align: o.align || (rtl ? "right" : "center"), ellipsis: true };
         if (rtl) opts.features = ["rtla"];
         const th = Math.min(doc.heightOfString(str, opts), h);
         doc.text(str, x + 4, y + (h - th) / 2, { ...opts, height: h });
@@ -2433,11 +2412,7 @@ exports.generateAcademicHistoryPDF = async (req, res) => {
         return t ? String(t).charAt(0).toUpperCase() + String(t).slice(1) : "";
       };
       const examLabel = (h) => {
-        const type = localizeType(h.examType);
-        const name = h.examName && h.examName !== "Unnamed" ? h.examName : "";
-        if (!name) return type;
-        if (String(name).toLowerCase().trim() === String(h.examType || "").toLowerCase().trim()) return type;
-        return type ? `${name} (${type})` : name;
+        return getLocalizedExamName({ name: h.examName, examType: h.examType }, language);
       };
 
       // ---- Student profile ------------------------------------------------
@@ -2624,9 +2599,9 @@ exports.generateYearlyResultPDF = async (req, res) => {
         const str = String(text === undefined || text === null ? "" : text);
         if (!str) return;
         const rtl = HAS_ARABIC.test(str);
-        const font = o.font || (rtl ? "UrduFont" : "Helvetica");
+        const font = rtl ? "UrduFont" : (o.font || "Helvetica");
         doc.font(font).fontSize(o.size || 10).fillColor(o.color || "#111111");
-        const opts = { width: w - 8, align: o.align || "center", ellipsis: true };
+        const opts = { width: w - 8, align: o.align || (rtl ? "right" : "center"), ellipsis: true };
         if (rtl) opts.features = ["rtla"];
         const th = Math.min(doc.heightOfString(str, opts), h);
         doc.text(str, x + 4, y + (h - th) / 2, { ...opts, height: h });
@@ -2709,11 +2684,7 @@ exports.generateYearlyResultPDF = async (req, res) => {
         hasFailed = isAbsentInAny ? true : !calcRes.passed;
 
         // Exam section heading
-        const examTypeLabel = localizeType(exam.examType);
-        const examName = exam.name || exam.examName || "";
-        const examHeading = examTypeLabel
-          ? (examName && examName.toLowerCase() !== (exam.examType || "").toLowerCase() ? `${examName} (${examTypeLabel})` : examTypeLabel)
-          : (examName || exam.examType || "");
+        const examHeading = getLocalizedExamName(exam, language);
 
         if (y + 30 > 720) { doc.addPage(); y = doc.y; }
         drawCell(examHeading, TABLE_LEFT, y, profileW, 26, {
