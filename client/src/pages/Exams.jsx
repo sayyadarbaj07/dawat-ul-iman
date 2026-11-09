@@ -33,7 +33,6 @@ export default function Exams() {
   const [activeTab, setActiveTab] = useState("exams");
 
   const [exams, setExams] = useState([]);
-  const [students, setStudents] = useState([]);
   const [canonicalClasses, setCanonicalClasses] = useState([]);
   
   // Create Exam
@@ -120,7 +119,6 @@ export default function Exams() {
   useEffect(() => {
     loadExams();
     loadClasses();
-    loadStudents();
     if (user?.role === "teacher") {
       teacherApi.getMe().then(res => setMe(res.data)).catch(console.error);
     }
@@ -167,12 +165,14 @@ export default function Exams() {
     }
   };
 
-  const loadStudents = async () => {
+  const loadStudents = async (classId) => {
+    if (!classId) return [];
     try {
-      const res = await studentApi.list();
-      setStudents(Array.isArray(res.data) ? res.data : (res.data?.data || []));
+      const res = await studentApi.list({ classId, status: "active", limit: 5000 });
+      return Array.isArray(res.data) ? res.data : (res.data?.data || []);
     } catch (err) {
       console.error(err);
+      return [];
     }
   };
 
@@ -328,22 +328,24 @@ export default function Exams() {
     setSelectedExamIdMarks(examId);
     setSelectedSubject("");
     setMarksData({});
-    
-    const exam = exams.find(e => e._id === examId);
-    if (!exam) return;
+    setStudentsForMarks([]);
 
-    // Filter students belonging to this class
-    const cls = exam.class;
-    let clsStudents = [];
-    if (exam.classId) {
-      clsStudents = students.filter(s => {
-        const studentClassId = s.classId && typeof s.classId === "object" ? s.classId._id : s.classId;
-        return String(studentClassId) === String(exam.classId);
-      });
-    } else {
-      clsStudents = students.filter(s => (s.studentClass || s.className) === cls);
+    const exam = exams.find(e => e._id === examId);
+    if (!exam || !exam.classId) return;
+
+    setIsLoadingMarks(true);
+    try {
+      // Fetch ALL active students for this specific class from the server.
+      // This avoids the pagination-truncation bug where studentApi.list() with no
+      // params returns only the most-recent 50 students globally, causing classes
+      // with older students to show partial or zero results.
+      const clsStudents = await loadStudents(exam.classId);
+      setStudentsForMarks(clsStudents);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingMarks(false);
     }
-    setStudentsForMarks(clsStudents);
   };
 
   const handleSubjectSelectMarks = async (subject) => {
