@@ -254,6 +254,7 @@ const CLASS_MAP = {
   "عصری چہارم": { en: "Contemporary 4", ur: "عصری چہارم" },
   "عصری پنجم": { en: "Contemporary 5", ur: "عصری پنجم" },
   "دسویں": { en: "10th (Matric)", ur: "دسویں" },
+  "حفظ دوپہر": { en: "Hifz (Afternoon)", ur: "حفظ دوپہر" },
   // English names mapping to Urdu
   "arabic 1": { en: "Arabic 1", ur: "عربی اول" },
   "arabic 2": { en: "Arabic 2", ur: "عربی دوم" },
@@ -405,6 +406,10 @@ function getLocalizedClassName(classObjOrStr, language = "en") {
 
   let raw = "";
   if (typeof classObjOrStr === "string") {
+    // If it's a 24-char ObjectId hex string, it is an ID, not a class name
+    if (/^[0-9a-fA-F]{24}$/.test(classObjOrStr.trim())) {
+      return "";
+    }
     raw = classObjOrStr;
   } else if (classObjOrStr && typeof classObjOrStr === "object") {
     raw = classObjOrStr.fullName || classObjOrStr.name || classObjOrStr.studentClass || classObjOrStr.className || "";
