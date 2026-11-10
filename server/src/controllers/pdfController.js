@@ -825,9 +825,9 @@ exports.generateClassResultPDF = async (req, res) => {
         let y = tableTop + 24;
 
         calculated.forEach(c => {
-          if (y > 720) {
+          if (y + 20 > 690) {
             doc.addPage();
-            y = 50;
+            y = Math.max(doc.y || 0, 85);
             doc.font("UrduFont").fontSize(11).fillColor("#000000");
             colsUrdu.forEach(col => {
               urduPdfHelper.drawTextRTL(doc, col.label, col.x, y, {
@@ -906,9 +906,9 @@ exports.generateClassResultPDF = async (req, res) => {
         let y = tableTop + 20;
 
         calculated.forEach(c => {
-          if (y > 720) {
+          if (y + 20 > 690) {
             doc.addPage();
-            y = 50;
+            y = Math.max(doc.y || 0, 85);
             doc.font("Helvetica-Bold").fontSize(9).fillColor("#000000");
             colsEn.forEach(col => {
               doc.text(col.label, col.x, y, { width: col.width, align: col.align });
@@ -2803,33 +2803,37 @@ exports.generateStudentListPDF = async (req, res) => {
     const translatedTitle = isUrdu ? "طلبہ کی فہرست" : "Student List";
 
     generatePDF(res, "Student List", (doc) => {
-      let y = doc.y || 150;
+      let y = Math.max(doc.y || 0, 185);
 
       const drawHeader = () => {
         if (isUrdu) {
-          doc.font("UrduFont").fontSize(12);
-          urduPdfHelper.drawTextRTL(doc, "رول نمبر", 550, y, { font: "UrduFont", fontSize: 12 });
-          urduPdfHelper.drawTextRTL(doc, "نام طالب علم", 460, y, { font: "UrduFont", fontSize: 12 });
-          urduPdfHelper.drawTextRTL(doc, "جماعت", 250, y, { font: "UrduFont", fontSize: 12 });
-          urduPdfHelper.drawTextRTL(doc, "رابطہ نمبر", 120, y, { font: "UrduFont", fontSize: 12 });
+          doc.font("UrduFont").fontSize(11).fillColor("#000000");
+          urduPdfHelper.drawTextRTL(doc, "رول نمبر", 490, y, { font: "UrduFont", fontSize: 11, width: 60, align: "center" });
+          urduPdfHelper.drawTextRTL(doc, "نام طالب علم", 270, y, { font: "UrduFont", fontSize: 11, width: 210, align: "right" });
+          urduPdfHelper.drawTextRTL(doc, "جماعت", 160, y, { font: "UrduFont", fontSize: 11, width: 100, align: "right" });
+          urduPdfHelper.drawTextRTL(doc, "رابطہ نمبر", 50, y, { font: "UrduFont", fontSize: 11, width: 100, align: "center" });
         } else {
           doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
-          doc.text("Roll No", 50, y);
-          doc.text("Student Name", 130, y);
-          doc.text("Class", 340, y);
-          doc.text("Phone", 440, y);
+          doc.text("Roll No", 50, y, { width: 60, align: "center" });
+          doc.text("Student Name", 120, y, { width: 200, align: "left" });
+          doc.text("Class", 330, y, { width: 110, align: "left" });
+          doc.text("Phone", 450, y, { width: 100, align: "center" });
         }
-        y += 16;
+        y += 18;
         doc.moveTo(50, y).lineTo(550, y).strokeColor("#2b2b2b").lineWidth(0.8).stroke();
-        y += 10;
+        y += 8;
       };
 
       drawHeader();
 
+      const ROW_HEIGHT = 22;
+      // Safe bottom: page 792pt, border/margin at 30pt, effective content bottom = 762pt
+      const PAGE_BOTTOM = 762;
+
       students.forEach(student => {
-        if (y > 720) {
+        if (y + ROW_HEIGHT > PAGE_BOTTOM) {
           doc.addPage();
-          y = 50;
+          y = Math.max(doc.y || 0, 85);
           drawHeader();
         }
 
@@ -2840,23 +2844,42 @@ exports.generateStudentListPDF = async (req, res) => {
 
         if (isUrdu) {
           doc.font("Helvetica").fontSize(10).fillColor("#000000");
-          doc.text(roll, 510, y + 2, { width: 40, align: "center" });
+          doc.text(roll, 490, y + 2, { width: 60, align: "center" });
 
-          doc.font("UrduFont").fontSize(12).fillColor("#000000");
-          urduPdfHelper.drawTextRTL(doc, nameVal, 460, y, { font: "UrduFont", fontSize: 12 });
-          urduPdfHelper.drawTextRTL(doc, classVal, 250, y, { font: "UrduFont", fontSize: 12 });
+          const isNameArabic = /[\u0600-\u06FF]/.test(nameVal || "");
+          if (isNameArabic) {
+            urduPdfHelper.drawTextRTL(doc, nameVal, 270, y, { font: "UrduFont", fontSize: 11, width: 210, align: "right" });
+          } else {
+            doc.font("Helvetica").fontSize(10).fillColor("#000000");
+            doc.text(nameVal, 270, y + 2, { width: 210, align: "right" });
+          }
+
+          const isClassArabic = /[\u0600-\u06FF]/.test(classVal || "");
+          if (isClassArabic) {
+            urduPdfHelper.drawTextRTL(doc, classVal, 160, y, { font: "UrduFont", fontSize: 11, width: 100, align: "right" });
+          } else {
+            doc.font("Helvetica").fontSize(10).fillColor("#000000");
+            doc.text(classVal, 160, y + 2, { width: 100, align: "right" });
+          }
 
           doc.font("Helvetica").fontSize(10).fillColor("#000000");
-          doc.text(phoneVal, 50, y + 2, { width: 80, align: "center" });
+          doc.text(phoneVal, 50, y + 2, { width: 100, align: "center" });
         } else {
           doc.font("Helvetica").fontSize(10).fillColor("#000000");
-          doc.text(roll, 50, y);
-          doc.text(nameVal, 130, y, { width: 190 });
-          doc.text(classVal, 340, y, { width: 90 });
-          doc.text(phoneVal, 440, y);
+          doc.text(roll, 50, y, { width: 60, align: "center" });
+
+          const isNameArabic = /[\u0600-\u06FF]/.test(nameVal || "");
+          if (isNameArabic) {
+            urduPdfHelper.drawTextRTL(doc, nameVal, 120, y - 2, { font: "UrduFont", fontSize: 11, width: 200, align: "left" });
+          } else {
+            doc.text(nameVal, 120, y, { width: 200, align: "left" });
+          }
+
+          doc.text(classVal, 330, y, { width: 110, align: "left" });
+          doc.text(phoneVal, 450, y, { width: 100, align: "center" });
         }
 
-        y += 22;
+        y += ROW_HEIGHT;
       });
     }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle });
 

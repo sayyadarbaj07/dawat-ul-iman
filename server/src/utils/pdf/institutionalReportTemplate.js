@@ -87,7 +87,7 @@ function drawInstitutionalHeader(doc, isUrdu) {
   doc.x = innerMargin + 10;
 }
 
-function drawContinuationHeader(doc) {
+function drawContinuationHeader(doc, isUrdu = false) {
   const margin = 30; // Double border margins
   const innerMargin = 34;
 
@@ -103,7 +103,18 @@ function drawContinuationHeader(doc) {
      .stroke();
 
   // Very compact header
-  doc.font("Helvetica-Bold").fontSize(10).fillColor("#c8105e").text("JAMIA DAWAT-UL-EIMAN (Continuation)", innerMargin + 10, innerMargin + 10);
+  if (isUrdu) {
+    const urduPdfHelper = require("./urduPdfHelper");
+    urduPdfHelper.drawTextRTL(doc, "جامعہ دعوتِ ایمان (تتمہ)", innerMargin + 10, innerMargin + 8, {
+      font: "UrduFont",
+      fontSize: 11,
+      width: doc.page.width - (innerMargin + 10) * 2,
+      align: "right",
+      color: "#c8105e"
+    });
+  } else {
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#c8105e").text("JAMIA DAWAT-UL-EIMAN (Continuation)", innerMargin + 10, innerMargin + 10);
+  }
   
   // Separator Line
   const lineY = innerMargin + 25;
@@ -125,15 +136,23 @@ function drawContinuationHeader(doc) {
 function applyInstitutionalTemplate(doc, options = {}) {
   const isUrdu = options.language === 'ur';
 
+  // Ensure bottom margin matches template borders (30) so PDFKit internal autowrap doesn't split table rows prematurely
+  if (doc.page && doc.page.margins) {
+    doc.page.margins.bottom = 30;
+  }
+
   // Draw on the first page
   drawInstitutionalHeader(doc, isUrdu);
 
   // Automatically draw on any subsequently added pages
   doc.on('pageAdded', () => {
+    if (doc.page && doc.page.margins) {
+      doc.page.margins.bottom = 30;
+    }
     if (options.standalonePages) {
       drawInstitutionalHeader(doc, isUrdu);
     } else {
-      drawContinuationHeader(doc);
+      drawContinuationHeader(doc, isUrdu);
     }
   });
 }
