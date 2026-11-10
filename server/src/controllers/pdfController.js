@@ -2800,24 +2800,84 @@ exports.generateStudentListPDF = async (req, res) => {
       return String(a.rollNumber || "").localeCompare(String(b.rollNumber || ""));
     });
 
-    const translatedTitle = isUrdu ? "طلبہ کی فہرست" : "Student List";
+    let targetClassDoc = null;
+    if (cId && cId !== "all" && cId.match(/^[0-9a-fA-F]{24}$/)) {
+      const Class = require("../models/classModel");
+      targetClassDoc = await Class.findById(cId).lean();
+    }
+
+    const firstStudent = students[0];
+    const rawClassVal = targetClassDoc
+      ? (targetClassDoc.fullName || targetClassDoc.name)
+      : (firstStudent?.classId?.fullName || firstStudent?.classId?.name || firstStudent?.studentClass || firstStudent?.className || (cId && cId !== "all" ? cId : ""));
+
+    const classDisplayName = rawClassVal ? getLocalizedClassName(rawClassVal, language) : "";
+
+    // Build title: "Student List - ClassName" or just "Student List" if all classes
+    const baseTitle = isUrdu ? "طلبہ کی فہرست" : "Student List";
+    const translatedTitle = classDisplayName
+      ? `${baseTitle} - ${classDisplayName}`
+      : baseTitle;
 
     generatePDF(res, "Student List", (doc) => {
-      let y = Math.max(doc.y || 0, 185);
+      // Subheader line: Date (left), Class Name (center), Academic Year (right)
+      const subY = 176;
+      const yearStr = `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
+      const dateStr = new Date().toLocaleDateString();
+
+      if (isUrdu) {
+        doc.font("Helvetica").fontSize(9).fillColor("#333333").text(`Generated On: ${dateStr}`, 50, subY);
+
+        if (classDisplayName) {
+          urduPdfHelper.drawTextRTL(doc, `جماعت: ${classDisplayName}`, 160, subY - 2, {
+            font: "UrduFont",
+            fontSize: 13,
+            width: 240,
+            align: "center",
+            color: "#1e5c47"
+          });
+        }
+
+        urduPdfHelper.drawTextRTL(doc, `:${URDU_LABELS.academicYear}`, 485, subY, {
+          font: "UrduFont",
+          fontSize: 10,
+          width: 65,
+          align: "right",
+          color: "#333333"
+        });
+        doc.font("Helvetica").fontSize(9).fillColor("#333333").text(yearStr, 410, subY + 2, { width: 75, align: "right" });
+      } else {
+        doc.font("Helvetica").fontSize(9).fillColor("#333333").text(`Generated On: ${dateStr}`, 50, subY);
+
+        if (classDisplayName) {
+          doc.font("Helvetica-Bold").fontSize(11).fillColor("#1e5c47")
+            .text(`Class: ${classDisplayName}`, 160, subY, { width: 240, align: "center" });
+        }
+
+        doc.font("Helvetica").fontSize(9).fillColor("#333333").text(`Academic Year: ${yearStr}`, 410, subY, { width: 140, align: "right" });
+      }
+
+      let y = 205;
+
+      // Table column layout:
+      // Urdu (RTL):  Roll No (495..550, w=55) | Name (295..485, w=190) | Class Box (160..285, w=125) | Phone (50..150, w=100)
+      // English (LTR): Roll No (50..105, w=55)  | Name (115..305, w=190) | Class Box (315..440, w=125) | Phone (450..550, w=100)
+      const BOX_W = 115;
+      const BOX_H = 15;
 
       const drawHeader = () => {
         if (isUrdu) {
           doc.font("UrduFont").fontSize(11).fillColor("#000000");
-          urduPdfHelper.drawTextRTL(doc, "رول نمبر", 490, y, { font: "UrduFont", fontSize: 11, width: 60, align: "center" });
-          urduPdfHelper.drawTextRTL(doc, "نام طالب علم", 270, y, { font: "UrduFont", fontSize: 11, width: 210, align: "right" });
-          urduPdfHelper.drawTextRTL(doc, "جماعت", 160, y, { font: "UrduFont", fontSize: 11, width: 100, align: "right" });
-          urduPdfHelper.drawTextRTL(doc, "رابطہ نمبر", 50, y, { font: "UrduFont", fontSize: 11, width: 100, align: "center" });
+          urduPdfHelper.drawTextRTL(doc, "رول نمبر",   495, y, { font: "UrduFont", fontSize: 11, width: 55,  align: "center" });
+          urduPdfHelper.drawTextRTL(doc, "نام طالب علم", 295, y, { font: "UrduFont", fontSize: 11, width: 190, align: "right"  });
+          urduPdfHelper.drawTextRTL(doc, "جماعت",      160, y, { font: "UrduFont", fontSize: 11, width: 125, align: "center" });
+          urduPdfHelper.drawTextRTL(doc, "رابطہ نمبر",  50,  y, { font: "UrduFont", fontSize: 11, width: 100, align: "center" });
         } else {
           doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
-          doc.text("Roll No", 50, y, { width: 60, align: "center" });
-          doc.text("Student Name", 120, y, { width: 200, align: "left" });
-          doc.text("Class", 330, y, { width: 110, align: "left" });
-          doc.text("Phone", 450, y, { width: 100, align: "center" });
+          doc.text("Roll No",      50,  y, { width: 55,  align: "center" });
+          doc.text("Student Name", 115, y, { width: 190, align: "left"   });
+          doc.text("Class",        315, y, { width: 125, align: "center" });
+          doc.text("Phone",        450, y, { width: 100, align: "center" });
         }
         y += 18;
         doc.moveTo(50, y).lineTo(550, y).strokeColor("#2b2b2b").lineWidth(0.8).stroke();
@@ -2837,51 +2897,57 @@ exports.generateStudentListPDF = async (req, res) => {
           drawHeader();
         }
 
-        const roll = student.rollNumber || "-";
-        const nameVal = getLocalizedStudentName(student, language);
-        const classVal = getLocalizedClassName(student.classId || student.studentClass || student.className, language);
+        const roll     = student.rollNumber || "-";
+        const nameVal  = getLocalizedStudentName(student, language);
         const phoneVal = student.contactNumber || student.whatsapp || student.guardianContact || student.phone || "-";
 
         if (isUrdu) {
+          // Roll No
           doc.font("Helvetica").fontSize(10).fillColor("#000000");
-          doc.text(roll, 490, y + 2, { width: 60, align: "center" });
+          doc.text(roll, 495, y + 2, { width: 55, align: "center" });
 
+          // Student Name
           const isNameArabic = /[\u0600-\u06FF]/.test(nameVal || "");
           if (isNameArabic) {
-            urduPdfHelper.drawTextRTL(doc, nameVal, 270, y, { font: "UrduFont", fontSize: 11, width: 210, align: "right" });
+            urduPdfHelper.drawTextRTL(doc, nameVal, 295, y, { font: "UrduFont", fontSize: 11, width: 190, align: "right" });
           } else {
             doc.font("Helvetica").fontSize(10).fillColor("#000000");
-            doc.text(nameVal, 270, y + 2, { width: 210, align: "right" });
+            doc.text(nameVal, 295, y + 2, { width: 190, align: "right" });
           }
 
-          const isClassArabic = /[\u0600-\u06FF]/.test(classVal || "");
-          if (isClassArabic) {
-            urduPdfHelper.drawTextRTL(doc, classVal, 160, y, { font: "UrduFont", fontSize: 11, width: 100, align: "right" });
-          } else {
-            doc.font("Helvetica").fontSize(10).fillColor("#000000");
-            doc.text(classVal, 160, y + 2, { width: 100, align: "right" });
-          }
+          // Writable Class Box
+          const boxX = 160 + (125 - BOX_W) / 2;
+          const boxY = y + (ROW_HEIGHT - BOX_H) / 2;
+          doc.roundedRect(boxX, boxY, BOX_W, BOX_H, 2).strokeColor("#777777").lineWidth(0.7).stroke();
 
+          // Phone
           doc.font("Helvetica").fontSize(10).fillColor("#000000");
           doc.text(phoneVal, 50, y + 2, { width: 100, align: "center" });
         } else {
+          // Roll No
           doc.font("Helvetica").fontSize(10).fillColor("#000000");
-          doc.text(roll, 50, y, { width: 60, align: "center" });
+          doc.text(roll, 50, y, { width: 55, align: "center" });
 
+          // Student Name
           const isNameArabic = /[\u0600-\u06FF]/.test(nameVal || "");
           if (isNameArabic) {
-            urduPdfHelper.drawTextRTL(doc, nameVal, 120, y - 2, { font: "UrduFont", fontSize: 11, width: 200, align: "left" });
+            urduPdfHelper.drawTextRTL(doc, nameVal, 115, y - 2, { font: "UrduFont", fontSize: 11, width: 190, align: "left" });
           } else {
-            doc.text(nameVal, 120, y, { width: 200, align: "left" });
+            doc.text(nameVal, 115, y, { width: 190, align: "left" });
           }
 
-          doc.text(classVal, 330, y, { width: 110, align: "left" });
+          // Writable Class Box
+          const boxX = 315 + (125 - BOX_W) / 2;
+          const boxY = y + (ROW_HEIGHT - BOX_H) / 2;
+          doc.roundedRect(boxX, boxY, BOX_W, BOX_H, 2).strokeColor("#777777").lineWidth(0.7).stroke();
+
+          // Phone
           doc.text(phoneVal, 450, y, { width: 100, align: "center" });
         }
 
         y += ROW_HEIGHT;
       });
-    }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle });
+    }, null, { language: isUrdu ? 'ur' : 'en', translatedTitle, hideSubHeader: true });
 
   } catch (error) {
     res.status(500).json({ message: "Error generating Student List PDF", error: error.message });
