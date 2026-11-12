@@ -2858,91 +2858,94 @@ exports.generateStudentListPDF = async (req, res) => {
       }
 
       let y = 205;
+      const TABLE_LEFT = 50;
+      const TABLE_WIDTH = 500;
+      const HEADER_H = 26;
+      const ROW_HEIGHT = 22;
+      const BORDER_COLOR = "#444444";
+      const BORDER_WIDTH = 0.8;
+      const PAGE_BOTTOM = 762;
 
-      // Table column layout:
-      // Urdu (RTL):  Roll No (495..550, w=55) | Name (295..485, w=190) | Class Box (160..285, w=125) | Phone (50..150, w=100)
-      // English (LTR): Roll No (50..105, w=55)  | Name (115..305, w=190) | Class Box (315..440, w=125) | Phone (450..550, w=100)
-      const BOX_W = 115;
-      const BOX_H = 15;
+      // Exact table layout matching institutional mark sheet:
+      // Urdu (RTL):   کیفیت (50..160, w=110) | حاصل نمبر (160..270, w=110) | نام طالب علم (270..500, w=230) | شمار (500..550, w=50)
+      // English (LTR): Sr. No. (50..100, w=50) | Student Name (100..330, w=230) | Obtained Marks (330..440, w=110) | Remarks (440..550, w=110)
 
       const drawHeader = () => {
+        doc.rect(TABLE_LEFT, y, TABLE_WIDTH, HEADER_H).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+
         if (isUrdu) {
-          doc.font("UrduFont").fontSize(11).fillColor("#000000");
-          urduPdfHelper.drawTextRTL(doc, "رول نمبر",   495, y, { font: "UrduFont", fontSize: 11, width: 55,  align: "center" });
-          urduPdfHelper.drawTextRTL(doc, "نام طالب علم", 295, y, { font: "UrduFont", fontSize: 11, width: 190, align: "right"  });
-          urduPdfHelper.drawTextRTL(doc, "جماعت",      160, y, { font: "UrduFont", fontSize: 11, width: 125, align: "center" });
-          urduPdfHelper.drawTextRTL(doc, "رابطہ نمبر",  50,  y, { font: "UrduFont", fontSize: 11, width: 100, align: "center" });
+          doc.moveTo(160, y).lineTo(160, y + HEADER_H).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+          doc.moveTo(270, y).lineTo(270, y + HEADER_H).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+          doc.moveTo(500, y).lineTo(500, y + HEADER_H).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+
+          urduPdfHelper.drawTextRTL(doc, "کیفیت", 50, y + 4, { font: "UrduFont", fontSize: 13, width: 110, align: "center", color: "#000000" });
+          urduPdfHelper.drawTextRTL(doc, "حاصل نمبر", 160, y + 4, { font: "UrduFont", fontSize: 13, width: 110, align: "center", color: "#000000" });
+          urduPdfHelper.drawTextRTL(doc, "نام طالب علم", 270, y + 4, { font: "UrduFont", fontSize: 13, width: 230, align: "center", color: "#000000" });
+          urduPdfHelper.drawTextRTL(doc, "شمار", 500, y + 4, { font: "UrduFont", fontSize: 13, width: 50, align: "center", color: "#000000" });
         } else {
+          doc.moveTo(100, y).lineTo(100, y + HEADER_H).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+          doc.moveTo(330, y).lineTo(330, y + HEADER_H).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+          doc.moveTo(440, y).lineTo(440, y + HEADER_H).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+
           doc.font("Helvetica-Bold").fontSize(10).fillColor("#000000");
-          doc.text("Roll No",      50,  y, { width: 55,  align: "center" });
-          doc.text("Student Name", 115, y, { width: 190, align: "left"   });
-          doc.text("Class",        315, y, { width: 125, align: "center" });
-          doc.text("Phone",        450, y, { width: 100, align: "center" });
+          doc.text("Sr. No.", 50, y + 8, { width: 50, align: "center" });
+          doc.text("Student Name", 100, y + 8, { width: 230, align: "center" });
+          doc.text("Obtained Marks", 330, y + 8, { width: 110, align: "center" });
+          doc.text("Remarks", 440, y + 8, { width: 110, align: "center" });
         }
-        y += 18;
-        doc.moveTo(50, y).lineTo(550, y).strokeColor("#2b2b2b").lineWidth(0.8).stroke();
-        y += 8;
+
+        y += HEADER_H;
       };
 
       drawHeader();
 
-      const ROW_HEIGHT = 22;
-      // Safe bottom: page 792pt, border/margin at 30pt, effective content bottom = 762pt
-      const PAGE_BOTTOM = 762;
-
-      students.forEach(student => {
+      students.forEach((student, idx) => {
         if (y + ROW_HEIGHT > PAGE_BOTTOM) {
           doc.addPage();
           y = Math.max(doc.y || 0, 85);
           drawHeader();
         }
 
-        const roll     = student.rollNumber || "-";
-        const nameVal  = getLocalizedStudentName(student, language);
-        const phoneVal = student.contactNumber || student.whatsapp || student.guardianContact || student.phone || "-";
+        const roll    = student.rollNumber || String(idx + 1);
+        const nameVal = getLocalizedStudentName(student, language);
+
+        // Row full border
+        doc.rect(TABLE_LEFT, y, TABLE_WIDTH, ROW_HEIGHT).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
 
         if (isUrdu) {
-          // Roll No
-          doc.font("Helvetica").fontSize(10).fillColor("#000000");
-          doc.text(roll, 495, y + 2, { width: 55, align: "center" });
+          // Vertical divider lines
+          doc.moveTo(160, y).lineTo(160, y + ROW_HEIGHT).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+          doc.moveTo(270, y).lineTo(270, y + ROW_HEIGHT).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+          doc.moveTo(500, y).lineTo(500, y + ROW_HEIGHT).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
 
-          // Student Name
+          // شمار column (formatted as (1, (2, (3 matching the template image)
+          doc.font("Helvetica").fontSize(10).fillColor("#000000");
+          doc.text(`(${roll}`, 500, y + 5, { width: 50, align: "center" });
+
+          // نام طالب علم
           const isNameArabic = /[\u0600-\u06FF]/.test(nameVal || "");
           if (isNameArabic) {
-            urduPdfHelper.drawTextRTL(doc, nameVal, 295, y, { font: "UrduFont", fontSize: 11, width: 190, align: "right" });
+            urduPdfHelper.drawTextRTL(doc, nameVal, 275, y + 3, { font: "UrduFont", fontSize: 11, width: 220, align: "right" });
           } else {
             doc.font("Helvetica").fontSize(10).fillColor("#000000");
-            doc.text(nameVal, 295, y + 2, { width: 190, align: "right" });
+            doc.text(nameVal, 275, y + 5, { width: 220, align: "right" });
           }
 
-          // Writable Class Box
-          const boxX = 160 + (125 - BOX_W) / 2;
-          const boxY = y + (ROW_HEIGHT - BOX_H) / 2;
-          doc.roundedRect(boxX, boxY, BOX_W, BOX_H, 2).strokeColor("#777777").lineWidth(0.7).stroke();
-
-          // Phone
-          doc.font("Helvetica").fontSize(10).fillColor("#000000");
-          doc.text(phoneVal, 50, y + 2, { width: 100, align: "center" });
+          // حاصل نمبر and کیفیت are empty bordered cells for manual entry
         } else {
-          // Roll No
-          doc.font("Helvetica").fontSize(10).fillColor("#000000");
-          doc.text(roll, 50, y, { width: 55, align: "center" });
+          doc.moveTo(100, y).lineTo(100, y + ROW_HEIGHT).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+          doc.moveTo(330, y).lineTo(330, y + ROW_HEIGHT).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
+          doc.moveTo(440, y).lineTo(440, y + ROW_HEIGHT).strokeColor(BORDER_COLOR).lineWidth(BORDER_WIDTH).stroke();
 
-          // Student Name
+          doc.font("Helvetica").fontSize(10).fillColor("#000000");
+          doc.text(`(${roll})`, 50, y + 5, { width: 50, align: "center" });
+
           const isNameArabic = /[\u0600-\u06FF]/.test(nameVal || "");
           if (isNameArabic) {
-            urduPdfHelper.drawTextRTL(doc, nameVal, 115, y - 2, { font: "UrduFont", fontSize: 11, width: 190, align: "left" });
+            urduPdfHelper.drawTextRTL(doc, nameVal, 105, y + 3, { font: "UrduFont", fontSize: 11, width: 220, align: "left" });
           } else {
-            doc.text(nameVal, 115, y, { width: 190, align: "left" });
+            doc.text(nameVal, 105, y + 5, { width: 220, align: "left" });
           }
-
-          // Writable Class Box
-          const boxX = 315 + (125 - BOX_W) / 2;
-          const boxY = y + (ROW_HEIGHT - BOX_H) / 2;
-          doc.roundedRect(boxX, boxY, BOX_W, BOX_H, 2).strokeColor("#777777").lineWidth(0.7).stroke();
-
-          // Phone
-          doc.text(phoneVal, 450, y, { width: 100, align: "center" });
         }
 
         y += ROW_HEIGHT;
